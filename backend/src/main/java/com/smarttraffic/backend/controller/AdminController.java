@@ -8,6 +8,7 @@ import com.smarttraffic.backend.repository.UserRepository;
 import com.smarttraffic.backend.security.CurrentUser;
 import com.smarttraffic.backend.security.SecurityUtils;
 import com.smarttraffic.backend.config.TrafficProperties;
+import com.smarttraffic.backend.service.CameraPollerService;
 import com.smarttraffic.backend.service.SystemMetricsService;
 import com.smarttraffic.backend.service.TrafficService;
 import org.springframework.http.HttpStatus;
@@ -25,15 +26,17 @@ public class AdminController {
     private final UserRepository userRepository;
     private final TrafficService trafficService;
     private final TrafficProperties trafficProperties;
+    private final CameraPollerService cameraPollerService;
 
     public AdminController(SystemMetricsService systemMetricsService, CameraRepository cameraRepository,
                            UserRepository userRepository, TrafficService trafficService,
-                           TrafficProperties trafficProperties) {
+                           TrafficProperties trafficProperties, CameraPollerService cameraPollerService) {
         this.systemMetricsService = systemMetricsService;
         this.cameraRepository = cameraRepository;
         this.userRepository = userRepository;
         this.trafficService = trafficService;
         this.trafficProperties = trafficProperties;
+        this.cameraPollerService = cameraPollerService;
     }
 
     @GetMapping("/resources")
@@ -43,6 +46,12 @@ public class AdminController {
             throw new AppException(HttpStatus.FORBIDDEN, "仅管理员可访问系统资源");
         }
         return systemMetricsService.getSystemMetrics();
+    }
+
+    @GetMapping("/nodes")
+    public Map<String, Object> nodeHealth() {
+        requireAdmin();
+        return Map.of("nodes", cameraPollerService.getNodeHealthMap());
     }
 
     private void requireAdmin() {

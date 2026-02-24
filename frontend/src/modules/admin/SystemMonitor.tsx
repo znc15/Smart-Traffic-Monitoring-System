@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { Badge } from "@/ui/badge";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { getApiUrl, getWsUrl } from "@/config/settings";
 import { authConfig } from "@/config";
+import { Server, Cpu, Timer, Activity } from "lucide-react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -15,13 +17,56 @@ import {
   Legend,
 } from "recharts";
 
+type NodeInfo = {
+  name: string;
+  online: boolean;
+  last_success_time: string | null;
+  last_poll_time: string | null;
+  latency_ms: number;
+  error_count: number;
+  consecutive_failures: number;
+  last_error: string | null;
+};
+
 type Metrics = {
   cpu_percent: number | null;
+  process_cpu: number | null;
   memory: { total: number; available: number; percent: number; used: number; free: number } | null;
   disk: { total: number; used: number; free: number; percent: number } | null;
+  jvm: {
+    heap_used: number;
+    heap_max: number;
+    heap_percent: number;
+    non_heap_used: number;
+    thread_count: number;
+    uptime_ms: number;
+    gc_count: number;
+    gc_time_ms: number;
+  } | null;
   gpu: unknown;
+  nodes?: Record<string, NodeInfo>;
   error?: string;
 };
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  const val = bytes / Math.pow(1024, i);
+  return `${val.toFixed(1)} ${units[i]}`;
+}
+
+function formatUptime(ms: number): string {
+  const totalMin = Math.floor(ms / 60000);
+  const d = Math.floor(totalMin / 1440);
+  const h = Math.floor((totalMin % 1440) / 60);
+  const m = totalMin % 60;
+  const parts: string[] = [];
+  if (d > 0) parts.push(`${d}d`);
+  if (h > 0) parts.push(`${h}h`);
+  parts.push(`${m}m`);
+  return parts.join(" ");
+}
 
 export default function SystemMonitor() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
@@ -113,6 +158,141 @@ export default function SystemMonitor() {
         <StatCard label="RAM" value={metrics?.memory?.percent ?? 0} color="bg-emerald-500 dark:bg-emerald-400" />
         <StatCard label="Disk" value={metrics?.disk?.percent ?? 0} color="bg-amber-500 dark:bg-amber-400" />
       </div>
+
+      {/* JVM Info Card */}
+      {metrics?.jvm && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Server className="h-5 w-5" />
+              JVM 运行状态
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Heap Memory */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Activity className="h-4 w-4" />
+                  堆内存
+                </div>
+                <div className="text-sm font-medium">
+                  {formatBytes(metrics.jvm.heap_used)} / {formatBytes(metrics.jvm.heap_max)}
+                </div>
+                <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-violet-500 dark:bg-violet-400 rounded-full transition-all duration-500"
+                    style={{ width: `${metrics.jvm.heap_percent}%` }}
+                  />
+                </div>
+                <div className="text-xs text-muted-foreground">{metrics.jvm.heap_percent.toFixed(1)}%</div>
+              </div>
+
+              {/* Non-Heap Memory */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Activity className="h-4 w-4" />
+                  非堆内存
+                </div>
+                <div className="text-sm font-medium">{formatBytes(metrics.jvm.non_heap_used)}</div>
+              </div>
+
+              {/* Process CPU */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Cpu className="h-4 w-4" />
+                  进程 CPU
+                </div>
+                <div className="text-sm font-medium">{(metrics.process_cpu ?? 0).toFixed(1)}%</div>
+              </div>
+
+              {/* Thread Count */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Cpu className="h-4 w-4" />
+                  线程数
+                </div>
+                <div className="text-sm font-medium">{metrics.jvm.thread_count}</div>
+              </div>
+
+              {/* Uptime */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Timer className="h-4 w-4" />
+                  运行时间
+                </div>
+                <div className="text-sm font-medium">{formatUptime(metrics.jvm.uptime_ms)}</div>
+              </div>
+
+              {/* GC */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Timer className="h-4 w-4" />
+                  GC 统计
+                </div>
+                <div className="text-sm font-medium">
+                  {metrics.jvm.gc_count} 次 / {metrics.jvm.gc_time_ms} ms
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Camera Node Health Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>摄像头节点状态</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {metrics?.nodes && Object.keys(metrics.nodes).length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-muted-foreground">
+                    <th className="pb-2 pr-4 font-medium">名称</th>
+                    <th className="pb-2 pr-4 font-medium">状态</th>
+                    <th className="pb-2 pr-4 font-medium">延迟</th>
+                    <th className="pb-2 pr-4 font-medium">最后成功时间</th>
+                    <th className="pb-2 pr-4 font-medium">错误次数</th>
+                    <th className="pb-2 font-medium">最近错误</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(metrics.nodes).map(([key, node]) => (
+                    <tr key={key} className="border-b border-border/50 last:border-0">
+                      <td className="py-2.5 pr-4 font-medium">{node.name}</td>
+                      <td className="py-2.5 pr-4">
+                        {node.online ? (
+                          <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25">
+                            在线
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/25">
+                            离线
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="py-2.5 pr-4">{node.latency_ms} ms</td>
+                      <td className="py-2.5 pr-4 text-muted-foreground">
+                        {node.last_success_time
+                          ? new Date(node.last_success_time).toLocaleString("zh-CN")
+                          : "-"}
+                      </td>
+                      <td className="py-2.5 pr-4">{node.error_count}</td>
+                      <td className="py-2.5 text-muted-foreground max-w-[200px] truncate">
+                        {node.last_error ?? "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">暂无节点数据</p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
