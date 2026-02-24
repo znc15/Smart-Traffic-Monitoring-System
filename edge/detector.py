@@ -1,29 +1,57 @@
 """
 YOLOv8 车辆检测模块
+支持 OpenVINO 加速：首次运行自动将 .pt 导出为 OpenVINO IR，后续直接加载
 """
 
 import time
 import random
+from pathlib import Path
 
 import cv2
 import numpy as np
 from ultralytics import YOLO
 
-from config import MODEL_NAME, CONF_THRESHOLD, CAR_CLASSES, MOTOR_CLASSES
+from config import MODEL_NAME, CONF_THRESHOLD, CAR_CLASSES, MOTOR_CLASSES, USE_OPENVINO
 
 # ---------------------------------------------------------------------------
-# 模型加载（懒加载单例）
+# 模型加载（懒加载单例，支持 OpenVINO）
 # ---------------------------------------------------------------------------
 _model: YOLO | None = None
 
 
+def _get_openvino_path() -> Path:
+    """获取 OpenVINO IR 模型目录路径"""
+    stem = Path(MODEL_NAME).stem  # e.g. "yolov8n"
+    return Path(f"{stem}_openvino_model")
+
+
 def _load_model() -> YOLO:
-    """加载 YOLOv8 模型（首次调用时自动下载）"""
+    """
+    加载 YOLOv8 模型
+    - USE_OPENVINO=True: 自动导出并加载 OpenVINO IR 格式（CPU 加速）
+    - USE_OPENVINO=False: 直接加载 PyTorch 模型
+    """
     global _model
-    if _model is None:
-        print(f"[INFO] 加载模型: {MODEL_NAME}")
+    if _model is not None:
+        return _model
+
+    if USE_OPENVINO:
+        ov_dir = _get_openvino_path()
+        if not ov_dir.exists():
+            # 首次运行：加载 .pt → 导出 OpenVINO IR
+            print(f"[INFO] 首次运行，导出 OpenVINO 模型: {MODEL_NAME} → {ov_dir}")
+            pt_model = YOLO(MODEL_NAME)
+            pt_model.export(format="openvino")
+            print(f"[INFO] OpenVINO 导出完成: {ov_dir}")
+
+        print(f"[INFO] 加载 OpenVINO 模型: {ov_dir}")
+        _model = YOLO(ov_dir)
+        print("[INFO] OpenVINO 模型加载完成 (CPU 加速已启用)")
+    else:
+        print(f"[INFO] 加载 PyTorch 模型: {MODEL_NAME}")
         _model = YOLO(MODEL_NAME)
-        print(f"[INFO] 模型加载完成")
+        print("[INFO] PyTorch 模型加载完成")
+
     return _model
 
 

@@ -1,6 +1,6 @@
 """
 边缘节点配置
-通过环境变量注入，支持模拟模式和摄像头模式
+通过环境变量或 CLI 参数注入，支持模拟模式和摄像头模式
 """
 
 import os
@@ -23,6 +23,9 @@ MODEL_NAME = os.environ.get("MODEL", "yolov8n.pt")
 
 # 检测置信度阈值
 CONF_THRESHOLD = float(os.environ.get("CONF", "0.35"))
+
+# OpenVINO 加速（仅 CPU 推理时有效）
+USE_OPENVINO = os.environ.get("OPENVINO", "true").lower() in ("1", "true", "yes")
 
 # COCO 类别映射
 CAR_CLASSES = {2, 5, 7}       # car, bus, truck → 归为"汽车"

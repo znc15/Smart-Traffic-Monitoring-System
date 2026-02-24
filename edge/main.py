@@ -82,6 +82,10 @@ def parse_args() -> argparse.Namespace:
         "--port", type=int, default=None,
         help="HTTP 服务端口 (默认读取 $PORT 或 8000)",
     )
+    p.add_argument(
+        "--no-openvino", action="store_true", default=False,
+        help="禁用 OpenVINO 加速，使用原始 PyTorch 推理",
+    )
     return p.parse_args()
 
 
@@ -98,6 +102,8 @@ def apply_args(args: argparse.Namespace) -> int:
         config.MODEL_NAME = args.model
     if args.conf is not None:
         config.CONF_THRESHOLD = args.conf
+    if args.no_openvino:
+        config.USE_OPENVINO = False
 
     port = args.port or int(os.environ.get("PORT", "8000"))
 

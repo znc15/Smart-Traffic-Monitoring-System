@@ -4,3 +4,4 @@ opencv-python-headless==4.10.0.84
 numpy==2.1.0
 ultralytics>=8.2.0
 psutil>=5.9.0
+openvino>=2024.0.0
