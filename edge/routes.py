@@ -56,7 +56,7 @@ _VIDEO_FRAME_SKIP = 3
 class ConfigUpdateRequest(BaseModel):
     mode: Optional[str] = Field(None, pattern=r"^(sim|camera)$", description="运行模式: sim 或 camera")
     camera_source: Optional[str] = Field(None, description="摄像头源地址")
-    model: Optional[str] = Field(None, description="模型文件名")
+    model: Optional[str] = Field(None, pattern=r"^[a-zA-Z0-9_\-\.]+\.pt$", description="模型文件名（仅允许 .pt 文件，禁止路径分隔符）")
     confidence: Optional[float] = Field(None, ge=0.1, le=0.9, description="检测置信度阈值 (0.1-0.9)")
     road_name: Optional[str] = Field(None, description="路段名称")
     use_openvino: Optional[bool] = Field(None, description="是否启用 OpenVINO 加速")
@@ -224,6 +224,13 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
             config.camera_source = body.camera_source
 
     if body.model is not None:
+        # 验证模型文件实际存在于 edge 目录下，防止路径穿越
+        model_path = _EDGE_DIR / body.model
+        if not model_path.is_file():
+            raise HTTPException(
+                status_code=400,
+                detail=f"模型文件不存在: {body.model}",
+            )
         config.MODEL_NAME = body.model
 
     if body.confidence is not None:
@@ -258,15 +265,18 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
 # 文件上传检测：辅助函数
 # ---------------------------------------------------------------------------
 def _cleanup_expired_results() -> None:
-    """删除 tmp 目录中超过过期时间的视频结果文件"""
+    """删除 tmp 目录中超过过期时间的临时文件（包括 input_* 和 result_*.mp4）"""
     now = time.time()
     for f in _TMP_DIR.iterdir():
-        if f.is_file() and f.suffix == ".mp4":
+        if not f.is_file():
+            continue
+        # 清理范围：result_*.mp4 输出文件 + input_* 残留输入文件
+        if f.suffix == ".mp4" or f.name.startswith("input_"):
             try:
                 age = now - f.stat().st_mtime
                 if age > _VIDEO_RESULT_EXPIRE_S:
                     f.unlink()
-                    logger.info("已清理过期视频结果: %s", f.name)
+                    logger.info("已清理过期临时文件: %s", f.name)
             except OSError:
                 pass
 
@@ -307,9 +317,10 @@ async def detect_image(file: UploadFile = File(...)) -> JSONResponse:
     if frame is None:
         raise HTTPException(status_code=400, detail="无法解码图片，文件可能已损坏")
 
-    # 调用详细检测
+    # 在线程池中异步调用检测，避免阻塞事件循环
+    loop = asyncio.get_event_loop()
     annotated, car_count, motor_count, inference_ms, objects_list = (
-        detect_vehicles_detailed(frame)
+        await loop.run_in_executor(None, detect_vehicles_detailed, frame)
     )
 
     # 将标注图片编码为 JPEG base64
@@ -429,9 +440,10 @@ async def detect_video(file: UploadFile = File(...)) -> JSONResponse:
 
     input_path.write_bytes(content)
 
-    # 同步处理视频（大视频可能耗时较长）
+    # 在线程池中异步处理视频，避免阻塞事件循环
     try:
-        summary = _process_video(input_path, output_path)
+        loop = asyncio.get_event_loop()
+        summary = await loop.run_in_executor(None, _process_video, input_path, output_path)
     except RuntimeError as e:
         # 清理残留文件
         for p in (input_path, output_path):

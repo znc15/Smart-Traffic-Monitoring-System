@@ -535,6 +535,13 @@
     return '#22c55e';                       // 绿色
   }
 
+  /** HTML 转义，防止 XSS 注入 */
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  }
+
   /** 更新进度条 */
   function updateBar(barId, valueId, percent, suffix) {
     const bar = $(barId);
@@ -846,7 +853,7 @@
       });
       if (!resp.ok) {
         const errData = await resp.json().catch(() => ({}));
-        throw new Error(errData.error || 'HTTP ' + resp.status);
+        throw new Error(errData.detail || errData.error || 'HTTP ' + resp.status);
       }
       const result = await resp.json();
       currentConfig = result;
@@ -949,7 +956,7 @@
       const resp = await fetch('/api/detect/image', { method: 'POST', body: formData });
       if (!resp.ok) {
         const errData = await resp.json().catch(() => ({}));
-        throw new Error(errData.error || 'HTTP ' + resp.status);
+        throw new Error(errData.detail || errData.error || 'HTTP ' + resp.status);
       }
       const data = await resp.json();
       if (!data.success) throw new Error(data.error || '检测失败');
@@ -1029,7 +1036,7 @@
       const resp = await fetch('/api/detect/video', { method: 'POST', body: formData });
       if (!resp.ok) {
         const errData = await resp.json().catch(() => ({}));
-        throw new Error(errData.error || 'HTTP ' + resp.status);
+        throw new Error(errData.detail || errData.error || 'HTTP ' + resp.status);
       }
       const data = await resp.json();
       if (!data.success) throw new Error(data.error || '视频处理失败');
@@ -1156,10 +1163,10 @@
         ${thumbHtml}
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-0.5">
-            <span class="text-sm text-slate-200 truncate">${entry.fileName}</span>
+            <span class="text-sm text-slate-200 truncate">${escapeHtml(entry.fileName)}</span>
             <span class="text-xs px-1.5 py-0.5 rounded ${typeColor} flex-shrink-0">${typeLabel}</span>
           </div>
-          <p class="text-xs text-slate-400 truncate">${entry.summary}</p>
+          <p class="text-xs text-slate-400 truncate">${escapeHtml(entry.summary)}</p>
         </div>
         <div class="text-xs text-slate-500 flex-shrink-0">${timeStr}</div>
       `;

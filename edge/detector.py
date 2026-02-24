@@ -3,6 +3,7 @@ YOLOv8 车辆检测模块
 支持 OpenVINO 加速：首次运行自动将 .pt 导出为 OpenVINO IR，后续直接加载
 """
 
+import threading
 import time
 import random
 from pathlib import Path
@@ -14,15 +15,17 @@ from ultralytics import YOLO
 import config
 
 # ---------------------------------------------------------------------------
-# 模型加载（懒加载单例，支持 OpenVINO）
+# 模型加载（懒加载单例，支持 OpenVINO，线程安全）
 # ---------------------------------------------------------------------------
 _model: YOLO | None = None
+_model_lock = threading.Lock()
 
 
 def reset_model() -> None:
     """重置模型缓存，强制下次调用时重新加载（用于模型热切换）"""
     global _model
-    _model = None
+    with _model_lock:
+        _model = None
     print("[INFO] 模型缓存已清除，下次检测时将重新加载")
 
 
@@ -34,31 +37,37 @@ def _get_openvino_path() -> Path:
 
 def _load_model() -> YOLO:
     """
-    加载 YOLOv8 模型
+    加载 YOLOv8 模型（双重检查锁定，线程安全）
     - USE_OPENVINO=True: 自动导出并加载 OpenVINO IR 格式（CPU 加速）
     - USE_OPENVINO=False: 直接加载 PyTorch 模型
     """
     global _model
+    # 第一次检查（无锁，快速路径）
     if _model is not None:
         return _model
 
-    if config.USE_OPENVINO:
-        ov_dir = _get_openvino_path()
-        if not ov_dir.exists():
-            print(f"[INFO] 首次运行，导出 OpenVINO 模型: {config.MODEL_NAME} → {ov_dir}")
-            pt_model = YOLO(config.MODEL_NAME)
-            pt_model.export(format="openvino")
-            print(f"[INFO] OpenVINO 导出完成: {ov_dir}")
+    with _model_lock:
+        # 第二次检查（持锁，防止并发重复加载）
+        if _model is not None:
+            return _model
 
-        print(f"[INFO] 加载 OpenVINO 模型: {ov_dir}")
-        _model = YOLO(ov_dir)
-        print("[INFO] OpenVINO 模型加载完成 (CPU 加速已启用)")
-    else:
-        print(f"[INFO] 加载 PyTorch 模型: {config.MODEL_NAME}")
-        _model = YOLO(config.MODEL_NAME)
-        print("[INFO] PyTorch 模型加载完成")
+        if config.USE_OPENVINO:
+            ov_dir = _get_openvino_path()
+            if not ov_dir.exists():
+                print(f"[INFO] 首次运行，导出 OpenVINO 模型: {config.MODEL_NAME} → {ov_dir}")
+                pt_model = YOLO(config.MODEL_NAME)
+                pt_model.export(format="openvino")
+                print(f"[INFO] OpenVINO 导出完成: {ov_dir}")
 
-    return _model
+            print(f"[INFO] 加载 OpenVINO 模型: {ov_dir}")
+            _model = YOLO(ov_dir)
+            print("[INFO] OpenVINO 模型加载完成 (CPU 加速已启用)")
+        else:
+            print(f"[INFO] 加载 PyTorch 模型: {config.MODEL_NAME}")
+            _model = YOLO(config.MODEL_NAME)
+            print("[INFO] PyTorch 模型加载完成")
+
+        return _model
 
 
 # ---------------------------------------------------------------------------
@@ -68,41 +77,9 @@ def detect_vehicles(frame: np.ndarray) -> tuple[np.ndarray, int, int, float]:
     """
     使用 YOLOv8 检测车辆
     返回: (标注后的帧, 汽车数, 摩托车数, 推理耗时ms)
+    内部委托给 detect_vehicles_detailed，丢弃额外的目标列表数据
     """
-    model = _load_model()
-
-    t0 = time.time()
-    results = model(frame, conf=config.CONF_THRESHOLD, verbose=False)
-    inference_ms = (time.time() - t0) * 1000
-
-    count_car = 0
-    count_motor = 0
-    annotated = frame.copy()
-
-    for r in results:
-        boxes = r.boxes
-        if boxes is None:
-            continue
-        for box in boxes:
-            cls_id = int(box.cls[0])
-            conf = float(box.conf[0])
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-
-            if cls_id in config.CAR_CLASSES:
-                count_car += 1
-                color = (255, 120, 40)   # 蓝橙色 - 汽车
-                label = f"Car {conf:.0%}"
-            elif cls_id in config.MOTOR_CLASSES:
-                count_motor += 1
-                color = (40, 220, 120)   # 绿色 - 摩托
-                label = f"Motor {conf:.0%}"
-            else:
-                continue
-
-            cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
-            cv2.putText(annotated, label, (x1, y1 - 6),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
-
+    annotated, count_car, count_motor, inference_ms, _ = detect_vehicles_detailed(frame)
     return annotated, count_car, count_motor, inference_ms
 
 
