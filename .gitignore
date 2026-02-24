@@ -38,3 +38,5 @@ backend/*.class
 *.torchscript
 *.bin
 *.npy
+
+.workflow/
