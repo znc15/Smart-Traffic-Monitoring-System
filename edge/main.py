@@ -13,6 +13,7 @@ Usage:
 import os
 import argparse
 import threading
+import webbrowser
 from contextlib import asynccontextmanager
 
 import psutil
@@ -23,6 +24,22 @@ import config
 from routes import router
 from loops import camera_loop, sim_loop
 from camera_discovery import interactive_select
+
+
+# ---------------------------------------------------------------------------
+# 自动打开浏览器（后台线程，延迟等待服务器就绪）
+# ---------------------------------------------------------------------------
+def _open_browser(port: int, delay: float = 1.5) -> None:
+    """在后台线程中延迟打开浏览器访问仪表盘"""
+    import time
+    time.sleep(delay)
+    url = f"http://localhost:{port}"
+    try:
+        webbrowser.open(url)
+        print(f"[INFO] 已自动打开浏览器: {url}")
+    except Exception:
+        # Docker / 无头环境中 webbrowser 可能不可用，静默忽略
+        print("[WARN] 无法自动打开浏览器，请手动访问仪表盘")
 
 
 # ---------------------------------------------------------------------------
@@ -41,6 +58,16 @@ async def lifespan(application: FastAPI):
         print(f"[INFO] 模拟模式，路段: {config.ROAD_NAME}")
         t = threading.Thread(target=sim_loop, daemon=True)
     t.start()
+
+    # 打印仪表盘访问地址
+    port = int(os.environ.get("_EDGE_PORT", "8000"))
+    print(f"[INFO] Dashboard: http://localhost:{port}")
+
+    # 自动打开浏览器（除非被禁用）
+    if not config.NO_BROWSER:
+        bt = threading.Thread(target=_open_browser, args=(port,), daemon=True)
+        bt.start()
+
     yield
 
 
@@ -92,6 +119,10 @@ def parse_args() -> argparse.Namespace:
         "--no-openvino", action="store_true", default=False,
         help="禁用 OpenVINO 加速，使用原始 PyTorch 推理",
     )
+    p.add_argument(
+        "--no-browser", action="store_true", default=False,
+        help="禁用启动时自动打开浏览器（Docker/无头环境使用）",
+    )
     return p.parse_args()
 
 
@@ -110,8 +141,13 @@ def apply_args(args: argparse.Namespace) -> int:
         config.CONF_THRESHOLD = args.conf
     if args.no_openvino:
         config.USE_OPENVINO = False
+    if args.no_browser:
+        config.NO_BROWSER = True
 
     port = args.port or int(os.environ.get("PORT", "8000"))
+
+    # 将端口存入环境变量，供 lifespan 读取（lifespan 无法直接访问局部变量）
+    os.environ["_EDGE_PORT"] = str(port)
 
     # 摄像头源决策
     if config.MODE == "camera":

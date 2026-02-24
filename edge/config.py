@@ -27,6 +27,9 @@ CONF_THRESHOLD = float(os.environ.get("CONF", "0.35"))
 # OpenVINO 加速（仅 CPU 推理时有效）
 USE_OPENVINO = os.environ.get("OPENVINO", "true").lower() in ("1", "true", "yes")
 
+# 启动时是否自动打开浏览器（Docker/无头环境设为 true 禁用）
+NO_BROWSER = os.environ.get("NO_BROWSER", "false").lower() in ("1", "true", "yes")
+
 # COCO 类别映射
 CAR_CLASSES = {2, 5, 7}       # car, bus, truck → 归为"汽车"
 MOTOR_CLASSES = {1, 3}        # bicycle, motorcycle → 归为"摩托/非机动车"
