@@ -66,15 +66,10 @@ class UserConfig {
 // ============================================
 class WebSocketConfig {
   // WebSocket Paths
-  CHAT_PATH = "/ws/chat";
   FRAMES_PATH = "/ws/frames";
   INFO_PATH = "/ws/info";
 
   // Full WebSocket URLs
-  get CHAT_WS() {
-    return `${apiConfig.API_WS_BASE}${this.CHAT_PATH}`;
-  }
-
   framesWs(roadName: string) {
     return `${apiConfig.API_WS_BASE}${this.FRAMES_PATH}/${encodeURIComponent(
       roadName
@@ -148,6 +143,5 @@ export const endpoints = {
   roadNames: `${apiConfig.API_HTTP_BASE}/roads_name`,
   framesWs: (roadName: string) => wsConfig.framesWs(roadName),
   infoWs: (roadName: string) => wsConfig.infoWs(roadName),
-  chatWs: wsConfig.CHAT_WS,
   siteSettings: `${apiConfig.API_HTTP_BASE}/site-settings`,
 };

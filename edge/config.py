@@ -30,6 +30,9 @@ USE_OPENVINO = os.environ.get("OPENVINO", "true").lower() in ("1", "true", "yes"
 # 启动时是否自动打开浏览器（Docker/无头环境设为 true 禁用）
 NO_BROWSER = os.environ.get("NO_BROWSER", "false").lower() in ("1", "true", "yes")
 
+# HTTP 服务端口（CLI 参数 > 环境变量 > 默认 8000）
+HTTP_PORT = int(os.environ.get("PORT", "8000"))
+
 # COCO 类别映射
 CAR_CLASSES = {2, 5, 7}       # car, bus, truck → 归为"汽车"
 MOTOR_CLASSES = {1, 3}        # bicycle, motorcycle → 归为"摩托/非机动车"

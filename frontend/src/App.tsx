@@ -26,15 +26,12 @@ import {
   Moon,
   Home,
   BarChart3,
-  Bot,
   ShieldCheck,
 } from "lucide-react";
-import { clearAllChatData } from "@/utils/chatStorage";
 import { cn } from "@/lib/utils";
 import LoginPage from "./pages/LoginPage";
 import TrafficDashboard from "@/modules/features/traffic/components/TrafficDashboard";
 import AnalyticsPage from "./pages/AnalyticsPage";
-import ChatPage from "./pages/ChatPage";
 import ProfilePage from "./pages/ProfilePage";
 import ProtectedRoute from "@/modules/features/auth/guards/ProtectedRoute";
 import AdminPage from "@/pages/AdminPage";
@@ -71,8 +68,6 @@ function AppContent() {
   const handleLogout = () => {
     // Clear authentication
     localStorage.removeItem("access_token");
-    // Clear chat data when user logs out
-    clearAllChatData();
     setAuthed(false);
     setIsAdmin(false);
     navigate("/login", { replace: true });
@@ -175,13 +170,6 @@ function AppContent() {
               <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />
               <span className="hidden sm:inline">分析</span>
             </NavLink>
-            <NavLink
-              to="/chat"
-              className={navItemClass}
-            >
-              <Bot className="h-4 w-4 sm:h-5 sm:w-5" />
-              <span className="hidden sm:inline">AI 助手</span>
-            </NavLink>
           </nav>
         </div>
         <div className="flex items-center space-x-1.5 sm:space-x-2 relative flex-shrink-0">
@@ -261,7 +249,6 @@ function AppContent() {
           <Route element={<ProtectedRoute />}>
             <Route path="/home" element={<TrafficDashboard />} />
             <Route path="/analys" element={<AnalyticsPage />} />
-            <Route path="/chat" element={<ChatPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/admin" element={<AdminPage />} />
           </Route>

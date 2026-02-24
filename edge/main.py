@@ -29,11 +29,28 @@ from camera_discovery import interactive_select
 # ---------------------------------------------------------------------------
 # 自动打开浏览器（后台线程，延迟等待服务器就绪）
 # ---------------------------------------------------------------------------
-def _open_browser(port: int, delay: float = 1.5) -> None:
-    """在后台线程中延迟打开浏览器访问仪表盘"""
+def _open_browser(port: int, timeout: float = 10.0) -> None:
+    """在后台线程中轮询 /health 端点，服务器就绪后打开浏览器"""
     import time
-    time.sleep(delay)
+    import urllib.request
+    import urllib.error
+
     url = f"http://localhost:{port}"
+    health_url = f"{url}/health"
+    deadline = time.monotonic() + timeout
+    interval = 0.3  # 轮询间隔（秒）
+
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(health_url, timeout=1):
+                # 服务器已就绪
+                break
+        except (urllib.error.URLError, OSError):
+            time.sleep(interval)
+    else:
+        # 超时仍未就绪，仍尝试打开（可能只是 /health 响应慢）
+        print(f"[WARN] 等待服务器就绪超时 ({timeout}s)，仍尝试打开浏览器")
+
     try:
         webbrowser.open(url)
         print(f"[INFO] 已自动打开浏览器: {url}")
@@ -60,12 +77,11 @@ async def lifespan(application: FastAPI):
     t.start()
 
     # 打印仪表盘访问地址
-    port = int(os.environ.get("_EDGE_PORT", "8000"))
-    print(f"[INFO] Dashboard: http://localhost:{port}")
+    print(f"[INFO] Dashboard: http://localhost:{config.HTTP_PORT}")
 
     # 自动打开浏览器（除非被禁用）
     if not config.NO_BROWSER:
-        bt = threading.Thread(target=_open_browser, args=(port,), daemon=True)
+        bt = threading.Thread(target=_open_browser, args=(config.HTTP_PORT,), daemon=True)
         bt.start()
 
     yield
@@ -144,10 +160,10 @@ def apply_args(args: argparse.Namespace) -> int:
     if args.no_browser:
         config.NO_BROWSER = True
 
-    port = args.port or int(os.environ.get("PORT", "8000"))
+    port = args.port or config.HTTP_PORT
 
-    # 将端口存入环境变量，供 lifespan 读取（lifespan 无法直接访问局部变量）
-    os.environ["_EDGE_PORT"] = str(port)
+    # 将端口写入 config，供 lifespan 和其他模块读取
+    config.HTTP_PORT = port
 
     # 摄像头源决策
     if config.MODE == "camera":

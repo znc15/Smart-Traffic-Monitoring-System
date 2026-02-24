@@ -67,7 +67,6 @@ export const API = {
 
 export const WEBSOCKET = {
   // Paths
-  CHAT_PATH: getEnv("VITE_WS_CHAT_PATH", "/ws/chat"),
   FRAMES_PATH: getEnv("VITE_WS_FRAMES_PATH", "/ws/frames"),
   INFO_PATH: getEnv("VITE_WS_INFO_PATH", "/ws/info"),
 
@@ -126,28 +125,6 @@ export const UI = {
   // Pagination
   DEFAULT_PAGE_SIZE: getNumberEnv("VITE_DEFAULT_PAGE_SIZE", 10),
   PAGE_SIZE_OPTIONS: [10, 20, 50, 100],
-} as const;
-
-// ============================================
-// CHAT CONFIGURATION
-// ============================================
-
-export const CHAT = {
-  // Storage
-  DRAFT_KEY: getEnv("VITE_CHAT_DRAFT_KEY", "chat_draft"),
-  HISTORY_KEY: getEnv("VITE_CHAT_HISTORY_KEY", "chat_history"),
-
-  // Limits
-  MAX_MESSAGE_LENGTH: getNumberEnv("VITE_CHAT_MAX_MESSAGE_LENGTH", 2000),
-  MAX_HISTORY_SIZE: getNumberEnv("VITE_CHAT_MAX_HISTORY_SIZE", 100),
-
-  // Features
-  ENABLE_IMAGE_UPLOAD: getBoolEnv("VITE_CHAT_ENABLE_IMAGE_UPLOAD", true),
-  ENABLE_FILE_UPLOAD: getBoolEnv("VITE_CHAT_ENABLE_FILE_UPLOAD", false),
-  ENABLE_MARKDOWN: getBoolEnv("VITE_CHAT_ENABLE_MARKDOWN", true),
-
-  // Typing indicator
-  TYPING_TIMEOUT: getNumberEnv("VITE_CHAT_TYPING_TIMEOUT", 3000), // 3 seconds
 } as const;
 
 // ============================================
@@ -299,7 +276,6 @@ export const settings = {
   WEBSOCKET,
   AUTH,
   UI,
-  CHAT,
   TRAFFIC,
   FILE_UPLOAD,
   NOTIFICATION,
@@ -344,13 +320,6 @@ export const getFramesWsUrl = (roadName: string): string => {
  */
 export const getInfoWsUrl = (roadName: string): string => {
   return getWsUrl(`${WEBSOCKET.INFO_PATH}/${encodeURIComponent(roadName)}`);
-};
-
-/**
- * Get chat WebSocket URL
- */
-export const getChatWsUrl = (): string => {
-  return getWsUrl(WEBSOCKET.CHAT_PATH);
 };
 
 /**

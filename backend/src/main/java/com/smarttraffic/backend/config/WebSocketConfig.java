@@ -3,7 +3,6 @@ package com.smarttraffic.backend.config;
 import com.smarttraffic.backend.security.JwtService;
 import com.smarttraffic.backend.security.TokenExtractionService;
 import com.smarttraffic.backend.websocket.AdminMetricsWebSocketHandler;
-import com.smarttraffic.backend.websocket.ChatWebSocketHandler;
 import com.smarttraffic.backend.websocket.FrameWebSocketHandler;
 import com.smarttraffic.backend.websocket.TrafficInfoWebSocketHandler;
 import com.smarttraffic.backend.websocket.WebSocketAuthInterceptor;
@@ -16,7 +15,6 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @EnableWebSocket
 public class WebSocketConfig implements WebSocketConfigurer {
 
-    private final ChatWebSocketHandler chatWebSocketHandler;
     private final TrafficInfoWebSocketHandler trafficInfoWebSocketHandler;
     private final FrameWebSocketHandler frameWebSocketHandler;
     private final AdminMetricsWebSocketHandler adminMetricsWebSocketHandler;
@@ -24,14 +22,12 @@ public class WebSocketConfig implements WebSocketConfigurer {
     private final JwtService jwtService;
 
     public WebSocketConfig(
-            ChatWebSocketHandler chatWebSocketHandler,
             TrafficInfoWebSocketHandler trafficInfoWebSocketHandler,
             FrameWebSocketHandler frameWebSocketHandler,
             AdminMetricsWebSocketHandler adminMetricsWebSocketHandler,
             TokenExtractionService tokenExtractionService,
             JwtService jwtService
     ) {
-        this.chatWebSocketHandler = chatWebSocketHandler;
         this.trafficInfoWebSocketHandler = trafficInfoWebSocketHandler;
         this.frameWebSocketHandler = frameWebSocketHandler;
         this.adminMetricsWebSocketHandler = adminMetricsWebSocketHandler;
@@ -43,10 +39,6 @@ public class WebSocketConfig implements WebSocketConfigurer {
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         WebSocketAuthInterceptor userAuth = new WebSocketAuthInterceptor(tokenExtractionService, jwtService, false);
         WebSocketAuthInterceptor adminAuth = new WebSocketAuthInterceptor(tokenExtractionService, jwtService, true);
-
-        registry.addHandler(chatWebSocketHandler, "/api/v1/ws/chat")
-                .addInterceptors(userAuth)
-                .setAllowedOriginPatterns("*");
 
         registry.addHandler(trafficInfoWebSocketHandler, "/api/v1/ws/info/*")
                 .addInterceptors(userAuth)
