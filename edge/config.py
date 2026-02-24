@@ -4,6 +4,10 @@
 """
 
 import os
+from pathlib import Path
+
+# 模型存放目录（edge/models/）
+MODELS_DIR = Path(__file__).parent / "models"
 
 # 运行模式：sim = 模拟, camera = 摄像头
 MODE = os.environ.get("MODE", "sim")
@@ -36,3 +40,19 @@ HTTP_PORT = int(os.environ.get("PORT", "8000"))
 # COCO 类别映射
 CAR_CLASSES = {2, 5, 7}       # car, bus, truck → 归为"汽车"
 MOTOR_CLASSES = {1, 3}        # bicycle, motorcycle → 归为"摩托/非机动车"
+
+
+def get_model_path() -> Path:
+    """
+    获取当前模型的完整路径（MODELS_DIR / MODEL_NAME）
+    向后兼容：如果 models/ 下找不到，回退到 edge/ 根目录
+    """
+    primary = MODELS_DIR / MODEL_NAME
+    if primary.exists():
+        return primary
+    # 兼容旧部署：模型可能还在 edge/ 根目录下
+    fallback = Path(__file__).parent / MODEL_NAME
+    if fallback.exists():
+        return fallback
+    # 都不存在时返回 models/ 路径（让 YOLO 自动下载到此处）
+    return primary

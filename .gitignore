@@ -42,3 +42,4 @@ backend/*.class
 .workflow/
 edge/__pycache__/
 edge/tmp/
+edge/models/*_openvino_model/

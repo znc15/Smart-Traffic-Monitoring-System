@@ -30,8 +30,8 @@ def reset_model() -> None:
 
 
 def _get_openvino_path() -> Path:
-    """获取 OpenVINO IR 模型目录路径，与原始模型同目录"""
-    model_path = Path(config.MODEL_NAME)
+    """获取 OpenVINO IR 模型目录路径，与原始模型同目录（models/ 子目录下）"""
+    model_path = config.get_model_path()
     return model_path.parent / f"{model_path.stem}_openvino_model"
 
 
@@ -51,11 +51,14 @@ def _load_model() -> YOLO:
         if _model is not None:
             return _model
 
+        # 获取模型完整路径（优先 models/ 目录，兼容旧部署回退到 edge/ 根目录）
+        model_path = config.get_model_path()
+
         if config.USE_OPENVINO:
             ov_dir = _get_openvino_path()
             if not ov_dir.exists():
-                print(f"[INFO] 首次运行，导出 OpenVINO 模型: {config.MODEL_NAME} → {ov_dir}")
-                pt_model = YOLO(config.MODEL_NAME)
+                print(f"[INFO] 首次运行，导出 OpenVINO 模型: {model_path} → {ov_dir}")
+                pt_model = YOLO(str(model_path))
                 pt_model.export(format="openvino")
                 print(f"[INFO] OpenVINO 导出完成: {ov_dir}")
 
@@ -63,8 +66,8 @@ def _load_model() -> YOLO:
             _model = YOLO(ov_dir)
             print("[INFO] OpenVINO 模型加载完成 (CPU 加速已启用)")
         else:
-            print(f"[INFO] 加载 PyTorch 模型: {config.MODEL_NAME}")
-            _model = YOLO(config.MODEL_NAME)
+            print(f"[INFO] 加载 PyTorch 模型: {model_path}")
+            _model = YOLO(str(model_path))
             print("[INFO] PyTorch 模型加载完成")
 
         return _model

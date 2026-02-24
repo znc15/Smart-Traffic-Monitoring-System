@@ -186,15 +186,19 @@ def get_config() -> JSONResponse:
 
 @router.get("/api/models", response_model=None)
 def get_models() -> JSONResponse:
-    """扫描 edge 目录下可用的模型文件列表"""
+    """扫描 models/ 目录下可用的模型文件列表"""
     models: list[dict] = []
 
-    # 扫描所有 .pt 文件
-    for pt_file in sorted(_EDGE_DIR.glob("*.pt")):
+    # 确保 models 目录存在
+    models_dir = config.MODELS_DIR
+    models_dir.mkdir(exist_ok=True)
+
+    # 扫描 models/ 目录下所有 .pt 文件
+    for pt_file in sorted(models_dir.glob("*.pt")):
         # 检查是否存在对应的 OpenVINO 模型目录
         # 命名约定: yolov8n.pt → yolov8n_openvino_model/
         stem = pt_file.stem  # 例如 "yolov8n"
-        has_openvino = (_EDGE_DIR / f"{stem}_openvino_model").is_dir()
+        has_openvino = (models_dir / f"{stem}_openvino_model").is_dir()
 
         try:
             size_mb = round(pt_file.stat().st_size / (1024 * 1024), 1)
@@ -232,8 +236,8 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
             config.camera_source = body.camera_source
 
     if body.model is not None:
-        # 验证模型文件实际存在于 edge 目录下，防止路径穿越
-        model_path = _EDGE_DIR / body.model
+        # 验证模型文件实际存在于 models/ 目录下，防止路径穿越
+        model_path = config.MODELS_DIR / body.model
         if not model_path.is_file():
             raise HTTPException(
                 status_code=400,
