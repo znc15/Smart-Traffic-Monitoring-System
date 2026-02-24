@@ -30,6 +30,86 @@
     /* 视频流离线占位 */
     .stream-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center;
       min-height: 300px; color: #94a3b8; }
+
+    /* ===== Tab 导航样式 ===== */
+    .tab-bar { display: flex; gap: 0; background: #1e293b; border-bottom: 2px solid #334155; }
+    .tab-item { padding: 10px 24px; cursor: pointer; color: #94a3b8; font-size: 0.875rem; font-weight: 500;
+      border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color 0.2s, border-color 0.2s;
+      user-select: none; }
+    .tab-item:hover { color: #cbd5e1; }
+    .tab-item.active { color: #38bdf8; border-bottom-color: #38bdf8; }
+
+    /* ===== Toggle Switch 样式 ===== */
+    .toggle-switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; inset: 0; background: #475569; border-radius: 12px; cursor: pointer;
+      transition: background 0.25s; }
+    .toggle-slider::before { content: ''; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px;
+      background: #e2e8f0; border-radius: 50%; transition: transform 0.25s; }
+    .toggle-switch input:checked + .toggle-slider { background: #3b82f6; }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+    /* ===== 模式切换按钮组 ===== */
+    .mode-group { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid #475569; }
+    .mode-btn { flex: 1; padding: 8px 16px; text-align: center; font-size: 0.875rem; cursor: pointer;
+      background: #334155; color: #94a3b8; transition: background 0.2s, color 0.2s; border: none; }
+    .mode-btn.active { background: #3b82f6; color: #fff; }
+    .mode-btn:not(.active):hover { background: #3d4f6a; }
+
+    /* ===== 自定义滑块样式 ===== */
+    .custom-range { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 3px;
+      background: #334155; outline: none; }
+    .custom-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px;
+      border-radius: 50%; background: #3b82f6; cursor: pointer; border: 2px solid #1e293b;
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.25); }
+    .custom-range::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #3b82f6;
+      cursor: pointer; border: 2px solid #1e293b; }
+
+    /* ===== Toast 通知样式 ===== */
+    .toast-container { position: fixed; top: 80px; right: 20px; z-index: 9999; display: flex;
+      flex-direction: column; gap: 8px; pointer-events: none; }
+    .toast { padding: 12px 20px; border-radius: 8px; font-size: 0.875rem; color: #fff;
+      pointer-events: auto; opacity: 0; transform: translateX(40px);
+      animation: toastIn 0.3s ease forwards; box-shadow: 0 4px 16px rgba(0,0,0,0.4); max-width: 360px; }
+    .toast.success { background: #166534; border: 1px solid #22c55e; }
+    .toast.error { background: #7f1d1d; border: 1px solid #ef4444; }
+    .toast.removing { animation: toastOut 0.3s ease forwards; }
+    @keyframes toastIn { to { opacity: 1; transform: translateX(0); } }
+    @keyframes toastOut { to { opacity: 0; transform: translateX(40px); } }
+
+    /* ===== 设置面板表单控件 ===== */
+    .form-input { width: 100%; padding: 8px 12px; background: #334155; border: 1px solid #475569;
+      border-radius: 8px; color: #e2e8f0; font-size: 0.875rem; outline: none;
+      transition: border-color 0.2s; }
+    .form-input:focus { border-color: #3b82f6; }
+    .form-input:disabled { opacity: 0.5; cursor: not-allowed; }
+    .form-select { width: 100%; padding: 8px 12px; background: #334155; border: 1px solid #475569;
+      border-radius: 8px; color: #e2e8f0; font-size: 0.875rem; outline: none;
+      transition: border-color 0.2s; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center; }
+    .form-select:focus { border-color: #3b82f6; }
+    .form-label { display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 6px; font-weight: 500; }
+
+    /* ===== 设置卡片 ===== */
+    .settings-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; }
+    .settings-card h4 { font-size: 0.9rem; font-weight: 600; color: #e2e8f0; margin-bottom: 16px;
+      padding-bottom: 10px; border-bottom: 1px solid #334155; }
+
+    /* ===== 按钮样式 ===== */
+    .btn-primary { padding: 10px 28px; background: #3b82f6; color: #fff; border: none; border-radius: 8px;
+      font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background 0.2s;
+      display: inline-flex; align-items: center; gap: 8px; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-secondary { padding: 10px 28px; background: #475569; color: #e2e8f0; border: none; border-radius: 8px;
+      font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background 0.2s; }
+    .btn-secondary:hover { background: #64748b; }
+
+    /* Loading spinner */
+    .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body class="min-h-screen">
@@ -50,8 +130,23 @@
     </div>
   </nav>
 
+  <!-- Tab 导航栏 -->
+  <div class="max-w-7xl mx-auto px-4 pt-4">
+    <div class="tab-bar rounded-t-lg">
+      <div class="tab-item active" data-tab="monitor" onclick="switchTab('monitor')">监控</div>
+      <div class="tab-item" data-tab="settings" onclick="switchTab('settings')">设置</div>
+      <div class="tab-item" data-tab="test" onclick="switchTab('test')">测试</div>
+    </div>
+  </div>
+
+  <!-- Toast 通知容器 -->
+  <div id="toastContainer" class="toast-container"></div>
+
   <!-- 主体内容 -->
   <main class="max-w-7xl mx-auto px-4 py-6">
+
+    <!-- ===== 监控 Tab ===== -->
+    <div id="tabMonitor" class="tab-content">
     <!-- 两栏布局：视频流 + 数据面板 -->
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
@@ -190,6 +285,93 @@
         <canvas id="trendChart"></canvas>
       </div>
     </div>
+
+    </div><!-- /tabMonitor -->
+
+    <!-- ===== 设置 Tab ===== -->
+    <div id="tabSettings" class="tab-content" style="display:none;">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- 视频源设置卡片 -->
+        <div class="settings-card">
+          <h4>视频源设置</h4>
+          <div class="mb-4">
+            <label class="form-label">模式选择</label>
+            <div class="mode-group">
+              <button type="button" class="mode-btn active" id="modeSimBtn" onclick="setMode('sim')">模拟 (sim)</button>
+              <button type="button" class="mode-btn" id="modeCameraBtn" onclick="setMode('camera')">摄像头 (camera)</button>
+            </div>
+          </div>
+          <div>
+            <label class="form-label">摄像头源</label>
+            <input type="text" id="settingCameraSource" class="form-input" disabled
+                   placeholder="RTSP URL / 设备号 / 视频文件路径">
+            <p class="text-xs text-slate-500 mt-1" id="cameraSourceHint">模拟模式下无需配置摄像头源</p>
+          </div>
+        </div>
+
+        <!-- 模型设置卡片 -->
+        <div class="settings-card">
+          <h4>模型设置</h4>
+          <div class="mb-4">
+            <label class="form-label">检测模型</label>
+            <select id="settingModel" class="form-select">
+              <option value="">加载中...</option>
+            </select>
+          </div>
+          <div class="flex items-center justify-between">
+            <div>
+              <label class="form-label mb-0">OpenVINO 加速</label>
+              <p class="text-xs text-slate-500">启用 Intel OpenVINO 推理加速</p>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingOpenVINO">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 检测设置卡片 -->
+        <div class="settings-card">
+          <h4>检测设置</h4>
+          <div class="mb-4">
+            <label class="form-label">置信度阈值: <span id="confidenceDisplay" class="text-sky-400 font-mono">0.50</span></label>
+            <input type="range" id="settingConfidence" class="custom-range" min="0.1" max="0.9" step="0.05" value="0.5">
+            <div class="flex justify-between text-xs text-slate-500 mt-1">
+              <span>0.1 (宽松)</span>
+              <span>0.9 (严格)</span>
+            </div>
+          </div>
+          <div>
+            <label class="form-label">路段名称</label>
+            <input type="text" id="settingRoadName" class="form-input" placeholder="例如：主干道A段">
+          </div>
+        </div>
+
+        <!-- 操作按钮卡片 -->
+        <div class="settings-card flex items-end justify-end gap-3">
+          <button type="button" class="btn-secondary" onclick="resetSettings()">重置</button>
+          <button type="button" class="btn-primary" id="applyBtn" onclick="applySettings()">
+            应用设置
+          </button>
+        </div>
+
+      </div>
+    </div><!-- /tabSettings -->
+
+    <!-- ===== 测试 Tab ===== -->
+    <div id="tabTest" class="tab-content" style="display:none;">
+      <div class="flex items-center justify-center" style="min-height: 300px;">
+        <div class="text-center text-slate-500">
+          <svg class="w-16 h-16 mx-auto mb-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+          </svg>
+          <p class="text-lg font-medium text-slate-400">测试功能开发中...</p>
+          <p class="text-sm mt-1">此功能即将上线，敬请期待</p>
+        </div>
+      </div>
+    </div><!-- /tabTest -->
 
   </main>
 
@@ -380,6 +562,199 @@
       setOnlineStatus(false);
     }
   }
+
+  // ========== Tab 切换 ==========
+  let currentTab = 'monitor';
+  let settingsLoaded = false;  // 设置是否已加载（懒加载标记）
+  let currentConfig = null;    // 当前运行配置缓存
+
+  /** 切换 Tab */
+  function switchTab(tabName) {
+    currentTab = tabName;
+    // 更新 Tab 按钮样式
+    document.querySelectorAll('.tab-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.tab === tabName);
+    });
+    // 切换内容区域显示
+    $('tabMonitor').style.display = tabName === 'monitor' ? 'block' : 'none';
+    $('tabSettings').style.display = tabName === 'settings' ? 'block' : 'none';
+    $('tabTest').style.display = tabName === 'test' ? 'block' : 'none';
+    // 切换到设置 Tab 时懒加载配置
+    if (tabName === 'settings') {
+      loadSettingsData();
+    }
+  }
+
+  // ========== Toast 通知系统 ==========
+
+  /** 显示 toast 通知 */
+  function showToast(message, type) {
+    const container = $('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + (type || 'success');
+    toast.textContent = message;
+    container.appendChild(toast);
+    // 3秒后自动移除
+    setTimeout(() => {
+      toast.classList.add('removing');
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
+  }
+
+  // ========== 设置面板逻辑 ==========
+
+  /** 加载设置数据（配置 + 模型列表） */
+  async function loadSettingsData() {
+    try {
+      const [configResp, modelsResp] = await Promise.all([
+        fetch('/api/config'),
+        fetch('/api/models')
+      ]);
+      if (!configResp.ok) throw new Error('获取配置失败');
+      if (!modelsResp.ok) throw new Error('获取模型列表失败');
+
+      const config = await configResp.json();
+      const modelsData = await modelsResp.json();
+
+      currentConfig = config;
+      settingsLoaded = true;
+
+      // 填充模型下拉框
+      populateModels(modelsData.models || [], modelsData.current || config.model);
+      // 填充表单
+      fillSettingsForm(config);
+    } catch (err) {
+      console.error('加载设置失败:', err);
+      showToast('加载设置失败: ' + err.message, 'error');
+    }
+  }
+
+  /** 填充模型下拉框 */
+  function populateModels(models, currentModel) {
+    const select = $('settingModel');
+    select.innerHTML = '';
+    if (models.length === 0) {
+      select.innerHTML = '<option value="">无可用模型</option>';
+      return;
+    }
+    models.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.name;
+      // 显示：模型名 + 大小 + OpenVINO 缓存状态
+      const sizeMB = m.size_mb ? ` (${m.size_mb.toFixed(1)} MB)` : '';
+      const ov = m.has_openvino ? ' [OV缓存]' : '';
+      opt.textContent = m.name + sizeMB + ov;
+      if (m.name === currentModel) opt.selected = true;
+      select.appendChild(opt);
+    });
+  }
+
+  /** 用配置数据填充表单 */
+  function fillSettingsForm(config) {
+    // 模式
+    setMode(config.mode || 'sim');
+    // 摄像头源
+    $('settingCameraSource').value = config.camera_source || '';
+    // 模型（已在 populateModels 中设置）
+    // OpenVINO
+    $('settingOpenVINO').checked = !!config.use_openvino;
+    // 置信度
+    const conf = config.confidence || 0.5;
+    $('settingConfidence').value = conf;
+    $('confidenceDisplay').textContent = conf.toFixed(2);
+    // 路段名称
+    $('settingRoadName').value = config.road_name || '';
+  }
+
+  /** 模式切换 */
+  function setMode(mode) {
+    const simBtn = $('modeSimBtn');
+    const camBtn = $('modeCameraBtn');
+    const sourceInput = $('settingCameraSource');
+    const hint = $('cameraSourceHint');
+
+    if (mode === 'sim') {
+      simBtn.classList.add('active');
+      camBtn.classList.remove('active');
+      sourceInput.disabled = true;
+      hint.textContent = '模拟模式下无需配置摄像头源';
+    } else {
+      simBtn.classList.remove('active');
+      camBtn.classList.add('active');
+      sourceInput.disabled = false;
+      hint.textContent = '支持 RTSP 地址、设备编号（如 0）或本地视频文件路径';
+    }
+  }
+
+  /** 获取当前选中的模式 */
+  function getSelectedMode() {
+    return $('modeSimBtn').classList.contains('active') ? 'sim' : 'camera';
+  }
+
+  /** 应用设置 */
+  async function applySettings() {
+    const btn = $('applyBtn');
+    // 收集表单值
+    const payload = {
+      mode: getSelectedMode(),
+      camera_source: $('settingCameraSource').value.trim(),
+      model: $('settingModel').value,
+      confidence: parseFloat($('settingConfidence').value),
+      road_name: $('settingRoadName').value.trim(),
+      use_openvino: $('settingOpenVINO').checked
+    };
+
+    // 按钮切换为加载状态
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> 切换中...';
+
+    try {
+      const resp = await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        throw new Error(errData.error || 'HTTP ' + resp.status);
+      }
+      const result = await resp.json();
+      currentConfig = result;
+
+      showToast('设置已应用，系统重启中...', 'success');
+
+      // 等待3秒后切换回监控Tab并刷新视频流
+      setTimeout(() => {
+        switchTab('monitor');
+        reconnectStream();
+      }, 3000);
+
+    } catch (err) {
+      console.error('应用设置失败:', err);
+      showToast('应用设置失败: ' + err.message, 'error');
+    } finally {
+      // 恢复按钮状态
+      btn.disabled = false;
+      btn.innerHTML = '应用设置';
+    }
+  }
+
+  /** 重置设置（重新加载当前运行配置） */
+  async function resetSettings() {
+    settingsLoaded = false;
+    await loadSettingsData();
+    showToast('已重置为当前运行配置', 'success');
+  }
+
+  // ========== 置信度滑块实时更新 ==========
+  document.addEventListener('DOMContentLoaded', function() {
+    const slider = $('settingConfidence');
+    if (slider) {
+      slider.addEventListener('input', function() {
+        $('confidenceDisplay').textContent = parseFloat(this.value).toFixed(2);
+      });
+    }
+  });
 
   // ========== 启动 ==========
   document.addEventListener('DOMContentLoaded', function() {
