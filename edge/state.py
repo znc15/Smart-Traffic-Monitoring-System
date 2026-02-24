@@ -7,7 +7,7 @@ import threading
 
 import psutil
 
-from config import MODEL_NAME
+import config
 
 
 class EdgeState:
@@ -66,7 +66,7 @@ class EdgeState:
             "inference_ms": self.inference_ms,
             "fps": self.fps,
             "uptime_s": round(uptime),
-            "model": MODEL_NAME,
+            "model": config.MODEL_NAME,
         }
 
         # 尝试获取 GPU 信息

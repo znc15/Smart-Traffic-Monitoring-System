@@ -9,7 +9,7 @@ import numpy as np
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse, Response
 
-from config import MODE, ROAD_NAME, MODEL_NAME
+import config
 from state import state
 
 router = APIRouter()
@@ -46,8 +46,8 @@ def health_check() -> JSONResponse:
     """健康检查"""
     return JSONResponse(content={
         "status": "ok",
-        "mode": MODE,
-        "road": ROAD_NAME,
-        "model": MODEL_NAME,
+        "mode": config.MODE,
+        "road": config.ROAD_NAME,
+        "model": config.MODEL_NAME,
         "timestamp": datetime.now().isoformat(),
     })
