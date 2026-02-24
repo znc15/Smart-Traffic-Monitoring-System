@@ -88,7 +88,7 @@ function Register({ onRegisterSuccess }: { onRegisterSuccess?: () => void }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-blue-50/40 to-indigo-100/30 dark:from-background dark:via-blue-950/20 dark:to-indigo-950/10 p-4">
+    <div className="h-full flex items-center justify-center p-4">
       <Card className="w-full max-w-lg shadow-2xl shadow-primary/5 border-border/50 bg-card/95 backdrop-blur-xl">
         <CardHeader className="text-center pb-8">
           <div className="mx-auto w-16 h-16 bg-gradient-to-br from-indigo-600 via-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-blue-500/25">

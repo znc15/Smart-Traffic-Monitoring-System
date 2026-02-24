@@ -125,7 +125,7 @@ function AppContent() {
     );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-blue-50/40 to-indigo-100/30 dark:from-background dark:via-blue-950/20 dark:to-indigo-950/10">
+    <div className="h-screen flex flex-col overflow-hidden bg-gradient-to-br from-background via-blue-50/40 to-indigo-100/30 dark:from-background dark:via-blue-950/20 dark:to-indigo-950/10">
       {/* Banner */}
       <div className="w-full flex flex-wrap items-center justify-between px-2 sm:px-4 py-1.5 bg-background/80 dark:bg-background/70 shadow-sm border-b border-border/60 backdrop-blur-xl backdrop-saturate-150 sticky top-0 z-50 transition-colors">
         <div className="flex items-center min-w-0 gap-2">
@@ -244,6 +244,7 @@ function AppContent() {
         </div>
       </div>
       {/* Main Content */}
+      <div className="flex-1 overflow-auto">
       <TrafficProvider>
         <Routes>
           <Route
@@ -270,6 +271,7 @@ function AppContent() {
           />
         </Routes>
       </TrafficProvider>
+      </div>
       <Toaster position="top-right" richColors />
     </div>
   );

@@ -70,7 +70,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-6 space-y-6">
+    <div className="bg-background p-4 sm:p-6 space-y-6">
       <h2 className="text-2xl font-bold">后台管理</h2>
       <Tabs defaultValue="cameras">
         <TabsList>

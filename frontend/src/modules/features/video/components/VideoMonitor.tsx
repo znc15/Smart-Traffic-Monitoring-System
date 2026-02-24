@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
 import { Skeleton } from "@/ui/skeleton";
 import {
@@ -10,6 +10,8 @@ import {
   Clock,
   Wifi,
   WifiOff,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import VideoModal from "./VideoModal";
@@ -55,6 +57,32 @@ const VideoMonitor = ({
 }: VideoMonitorProps) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalRoadName, setModalRoadName] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState(0);
+  const [autoPaging, setAutoPaging] = useState(true);
+
+  const perPage = isFullscreen ? 8 : 6;
+  const totalPages = Math.max(1, Math.ceil(allowedRoads.length / perPage));
+  const pagedRoads = allowedRoads.slice(currentPage * perPage, (currentPage + 1) * perPage);
+
+  // 自动翻页
+  useEffect(() => {
+    if (!autoPaging || totalPages <= 1) return;
+    const timer = setInterval(() => {
+      setCurrentPage((p) => (p + 1) % totalPages);
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [autoPaging, totalPages]);
+
+  // 页数越界修正
+  useEffect(() => {
+    if (currentPage >= totalPages) setCurrentPage(0);
+  }, [allowedRoads.length, currentPage, totalPages]);
+
+  const goPage = useCallback((page: number) => {
+    setCurrentPage(page);
+    setAutoPaging(false);
+    setTimeout(() => setAutoPaging(true), 30000);
+  }, []);
 
   const getTrafficStatus = (roadName: string) => {
     const data = trafficData[roadName];
@@ -211,8 +239,8 @@ const VideoMonitor = ({
               : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
           }`}
         >
-          <AnimatePresence>
-            {allowedRoads.map((roadName) => {
+          <AnimatePresence mode="wait">
+            {pagedRoads.map((roadName) => {
               const frame = frameData[roadName];
               const data = trafficData[roadName];
               const { color, text } = getTrafficStatus(roadName);
@@ -228,7 +256,7 @@ const VideoMonitor = ({
                     transition: { duration: 0.2 },
                   }}
                   exit={{ opacity: 0 }}
-                  className={`relative overflow-hidden rounded-xl border transition-all duration-200 cursor-pointer inline-block w-full max-w-sm mx-auto ${
+                  className={`relative overflow-hidden rounded-xl border transition-all duration-200 cursor-pointer w-full ${
                     isSelected
                       ? "border-primary shadow-sm"
                       : "border-border/40 hover:border-border hover:shadow-sm"
@@ -240,12 +268,12 @@ const VideoMonitor = ({
                   }}
                 >
                   {/* Video Frame (responsive) */}
-                  <div className="relative w-full max-w-sm mx-auto aspect-[3/2] bg-muted overflow-hidden">
+                  <div className="relative w-full aspect-[3/2] bg-muted overflow-hidden">
                     {frame?.frame ? (
                       <img
                         src={frame.frame}
                         alt={`摄像头 ${roadName}`}
-                        className="w-full h-full object-contain block"
+                        className="w-full h-full object-cover block"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
@@ -301,6 +329,25 @@ const VideoMonitor = ({
             })}
           </AnimatePresence>
         </div>
+
+        {/* 分页控件 */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 pt-3">
+            <button onClick={() => goPage((currentPage - 1 + totalPages) % totalPages)} className="p-1 rounded-md hover:bg-muted text-muted-foreground">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i}
+                onClick={() => goPage(i)}
+                className={`h-2 rounded-full transition-all ${i === currentPage ? "w-6 bg-primary" : "w-2 bg-muted-foreground/30 hover:bg-muted-foreground/50"}`}
+              />
+            ))}
+            <button onClick={() => goPage((currentPage + 1) % totalPages)} className="p-1 rounded-md hover:bg-muted text-muted-foreground">
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </CardContent>
 
       {/* Video Modal */}

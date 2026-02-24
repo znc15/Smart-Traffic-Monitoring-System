@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Maximize2, Minimize2, Video, Car, Bike, Timer } from "lucide-react";
+import { X, Maximize2, Minimize2, Video, Car, Bike, Gauge, Activity } from "lucide-react";
 import { Button } from "@/ui/button";
 import { getThresholdForRoad } from "../../../../config/trafficThresholds";
 
@@ -8,7 +8,7 @@ interface VideoModalProps {
   isOpen: boolean;
   onClose: () => void;
   roadName: string;
-  frameData: string | null; // Now using blob URL string
+  frameData: string | null;
   trafficData?: {
     count_car: number;
     count_motor: number;
@@ -30,27 +30,48 @@ const VideoModal = ({
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
+      if (e.key === "Escape") onClose();
     };
-
     if (isOpen) {
       document.addEventListener("keydown", handleEscape);
       document.body.style.overflow = "hidden";
     }
-
     return () => {
       document.removeEventListener("keydown", handleEscape);
       document.body.style.overflow = "unset";
     };
   }, [isOpen, onClose]);
 
-  const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
+  if (!isOpen) return null;
+
+  // 计算密度状态
+  const getDensity = () => {
+    const d = trafficData?.density_status;
+    if (d === "拥堵") return { text: "拥堵", cls: "bg-red-500/10 text-red-600 dark:text-red-400" };
+    if (d === "较拥挤") return { text: "较拥挤", cls: "bg-amber-500/10 text-amber-600 dark:text-amber-400" };
+    if (d === "畅通") return { text: "畅通", cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" };
+    if (!trafficData) return { text: "未知", cls: "bg-muted text-muted-foreground" };
+    const threshold = getThresholdForRoad(roadName);
+    const total = (trafficData.count_car ?? 0) + (trafficData.count_motor ?? 0);
+    if (total > threshold.c2) return { text: "拥堵", cls: "bg-red-500/10 text-red-600 dark:text-red-400" };
+    if (total > threshold.c1) return { text: "较拥挤", cls: "bg-amber-500/10 text-amber-600 dark:text-amber-400" };
+    return { text: "畅通", cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" };
   };
 
-  if (!isOpen) return null;
+  // 计算速度状态
+  const getSpeed = () => {
+    const s = trafficData?.speed_status;
+    if (s === "较快") return { text: "较快", cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" };
+    if (s === "较慢") return { text: "较慢", cls: "bg-amber-500/10 text-amber-600 dark:text-amber-400" };
+    if (!trafficData) return { text: "未知", cls: "bg-muted text-muted-foreground" };
+    const threshold = getThresholdForRoad(roadName);
+    const avg = ((trafficData.speed_car ?? 0) + (trafficData.speed_motor ?? 0)) / 2;
+    if (avg >= threshold.v) return { text: "较快", cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" };
+    return { text: "较慢", cls: "bg-amber-500/10 text-amber-600 dark:text-amber-400" };
+  };
+
+  const density = getDensity();
+  const speed = getSpeed();
 
   return (
     <AnimatePresence>
@@ -58,281 +79,108 @@ const VideoModal = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
         onClick={onClose}
       >
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
+          initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.8, opacity: 0 }}
+          exit={{ scale: 0.9, opacity: 0 }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
-          className={`relative bg-card rounded-xl shadow-2xl overflow-hidden ${
+          className={`relative bg-card rounded-2xl shadow-2xl overflow-hidden flex flex-col ${
             isFullscreen
               ? "w-screen h-screen rounded-none"
-              : "w-[95vw] sm:w-auto h-auto max-w-6xl mx-4"
+              : "w-[95vw] max-w-5xl max-h-[90vh]"
           }`}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border bg-muted/50">
-            <h2 className="text-base sm:text-xl font-semibold text-foreground flex items-center gap-2">
-              <Video className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-              <span className="truncate">摄像头：{roadName}</span>
+          {/* 顶栏 */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
+            <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+              <Video className="h-5 w-5 text-primary" />
+              {roadName}
             </h2>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleFullscreen}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                {isFullscreen ? (
-                  <Minimize2 className="h-5 w-5" />
-                ) : (
-                  <Maximize2 className="h-5 w-5" />
-                )}
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsFullscreen(!isFullscreen)}>
+                {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-5 w-5" />
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
+                <X className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
-          {/* Video Content */}
-          <div className="flex flex-col lg:flex-row max-h-[85vh] sm:max-h-[80vh]">
-            {/* Video */}
-            <div className="relative bg-muted p-3 sm:p-6 flex-1 flex items-center justify-center min-h-[40vh] lg:min-h-0">
-              <div className="relative w-full h-full flex items-center justify-center">
-                {frameData ? (
-                  <img
-                    src={frameData}
-                    alt={`摄像头 ${roadName}`}
-                    className="max-w-full max-h-[50vh] sm:max-h-[60vh] lg:max-h-[70vh] object-contain rounded-lg shadow-lg"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-white">
-                    <div className="text-center">
-                      <div className="w-12 h-12 sm:w-16 sm:h-16 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-                      <p className="text-sm sm:text-base">正在加载视频...</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+          {/* 主体 */}
+          <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
+            {/* 视频区域 */}
+            <div className="flex-1 bg-black flex items-center justify-center min-h-[30vh]">
+              {frameData ? (
+                <img
+                  src={frameData}
+                  alt={roadName}
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <div className="text-center text-muted-foreground">
+                  <div className="w-10 h-10 border-3 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin mx-auto mb-3" />
+                  <p className="text-sm">正在加载...</p>
+                </div>
+              )}
             </div>
 
-            {/* Traffic Info - Responsive Side/Bottom Panel */}
+            {/* 信息面板 */}
             {trafficData && (
-              <div className="p-3 sm:p-4 bg-muted/50 border-t lg:border-t-0 lg:border-l border-border overflow-y-auto w-full lg:w-80 max-h-[40vh] lg:max-h-[80vh]">
-                <h3 className="text-sm sm:text-base font-semibold mb-3 sm:mb-4 text-foreground flex items-center space-x-2">
-                  <Timer className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                  <span>交通信息</span>
-                </h3>
+              <div className="lg:w-72 border-t lg:border-t-0 lg:border-l border-border bg-muted/20 p-4 overflow-y-auto space-y-4">
+                {/* 总览状态 */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg bg-card border border-border/50 p-3 text-center">
+                    <Activity className="h-4 w-4 text-muted-foreground mx-auto mb-1.5" />
+                    <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${density.cls}`}>
+                      {density.text}
+                    </span>
+                    <p className="text-[10px] text-muted-foreground mt-1">密度</p>
+                  </div>
+                  <div className="rounded-lg bg-card border border-border/50 p-3 text-center">
+                    <Gauge className="h-4 w-4 text-muted-foreground mx-auto mb-1.5" />
+                    <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${speed.cls}`}>
+                      {speed.text}
+                    </span>
+                    <p className="text-[10px] text-muted-foreground mt-1">速度</p>
+                  </div>
+                </div>
 
-                {/* Traffic Status Section */}
-                <div className="mb-3 sm:mb-4 bg-card p-2 sm:p-3 rounded-lg shadow-sm">
-                  <h4 className="text-xs sm:text-sm font-medium mb-2 sm:mb-3 text-foreground flex items-center gap-2">
-                    <Timer className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-                    状态
+                {/* 汽车 */}
+                <div className="rounded-lg bg-card border border-border/50 p-3">
+                  <h4 className="text-xs font-medium text-foreground flex items-center gap-1.5 mb-2.5">
+                    <Car className="h-3.5 w-3.5 text-primary" />
+                    汽车
                   </h4>
-                  <div className="space-y-2">
-                    {/* 车辆密度评估 */}
-                    <div className="p-2 bg-muted/50 rounded">
-                      {(() => {
-                        // Prefer backend-provided label
-                        const densityFromBackend = trafficData.density_status;
-                        if (densityFromBackend) {
-                          if (densityFromBackend === "拥堵") {
-                            return (
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs text-muted-foreground">
-                                  密度：
-                                </span>
-                                <span className="font-medium text-xs sm:text-sm bg-destructive/10 px-2 py-1 rounded text-destructive">
-                                  拥堵
-                                </span>
-                              </div>
-                            );
-                          }
-                          if (densityFromBackend === "较拥挤") {
-                            return (
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs text-muted-foreground">
-                                  密度：
-                                </span>
-                                <span className="font-medium text-xs sm:text-sm bg-amber-500/10 px-2 py-1 rounded text-amber-700 dark:text-amber-400">
-                                  较拥挤
-                                </span>
-                              </div>
-                            );
-                          }
-                          return (
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-muted-foreground">
-                                密度：
-                              </span>
-                              <span className="font-medium text-xs sm:text-sm bg-emerald-500/10 px-2 py-1 rounded text-emerald-700 dark:text-emerald-400">
-                                畅通
-                              </span>
-                            </div>
-                          );
-                        }
-
-                        // Fallback: compute locally if backend not available
-                        const threshold = getThresholdForRoad(roadName);
-                        const totalVehicles =
-                          (trafficData?.count_car || 0) +
-                          (trafficData?.count_motor || 0);
-                        if (totalVehicles > threshold.c2) {
-                          return (
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-muted-foreground">
-                                密度：
-                              </span>
-                              <span className="font-medium text-xs sm:text-sm bg-destructive/10 px-2 py-1 rounded text-destructive">
-                                拥堵
-                              </span>
-                            </div>
-                          );
-                        } else if (totalVehicles > threshold.c1) {
-                          return (
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-muted-foreground">
-                                密度：
-                              </span>
-                              <span className="font-medium text-xs sm:text-sm bg-amber-500/10 px-2 py-1 rounded text-amber-700 dark:text-amber-400">
-                                较拥挤
-                              </span>
-                            </div>
-                          );
-                        }
-                        return (
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground">
-                              密度：
-                            </span>
-                            <span className="font-medium text-xs sm:text-sm bg-emerald-500/10 px-2 py-1 rounded text-emerald-700 dark:text-emerald-400">
-                              畅通
-                            </span>
-                          </div>
-                        );
-                      })()}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-muted/50 rounded-md px-2.5 py-2 text-center">
+                      <p className="text-lg font-semibold text-foreground">{trafficData.count_car ?? 0}</p>
+                      <p className="text-[10px] text-muted-foreground">数量</p>
                     </div>
-
-                    {/* 速度评估 */}
-                    <div className="p-2 bg-muted/50 rounded">
-                      {(() => {
-                        const speedFromBackend = trafficData.speed_status;
-                        if (speedFromBackend) {
-                          if (speedFromBackend === "较快") {
-                            return (
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs text-muted-foreground">
-                                  速度：
-                                </span>
-                                <span className="font-medium text-xs sm:text-sm bg-emerald-500/10 px-2 py-1 rounded text-emerald-700 dark:text-emerald-400">
-                                  较快
-                                </span>
-                              </div>
-                            );
-                          }
-                          return (
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-muted-foreground">
-                                速度：
-                              </span>
-                              <span className="font-medium text-xs sm:text-sm bg-amber-500/10 px-2 py-1 rounded text-amber-700 dark:text-amber-400">
-                                较慢
-                              </span>
-                            </div>
-                          );
-                        }
-
-                        // Fallback
-                        const threshold = getThresholdForRoad(roadName);
-                        const avgSpeed =
-                          ((trafficData?.speed_car || 0) +
-                            (trafficData?.speed_motor || 0)) /
-                          2;
-                        if (avgSpeed >= threshold.v) {
-                          return (
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-muted-foreground">
-                                速度：
-                              </span>
-                              <span className="font-medium text-xs sm:text-sm bg-emerald-500/10 px-2 py-1 rounded text-emerald-700 dark:text-emerald-400">
-                                较快
-                              </span>
-                            </div>
-                          );
-                        }
-                        return (
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground">
-                              速度：
-                            </span>
-                            <span className="font-medium text-xs sm:text-sm bg-amber-500/10 px-2 py-1 rounded text-amber-700 dark:text-amber-400">
-                              较慢
-                            </span>
-                          </div>
-                        );
-                      })()}
+                    <div className="bg-muted/50 rounded-md px-2.5 py-2 text-center">
+                      <p className="text-lg font-semibold text-foreground">{trafficData.speed_car ?? 0}</p>
+                      <p className="text-[10px] text-muted-foreground">km/h</p>
                     </div>
                   </div>
                 </div>
 
-                {/* Car Section */}
-                <div className="mb-2 bg-card p-2 sm:p-3 rounded-lg shadow-sm">
-                  <h4 className="text-xs sm:text-sm font-medium mb-2 text-foreground flex items-center gap-2">
-                    <Car className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-                    汽车信息
+                {/* 摩托车 */}
+                <div className="rounded-lg bg-card border border-border/50 p-3">
+                  <h4 className="text-xs font-medium text-foreground flex items-center gap-1.5 mb-2.5">
+                    <Bike className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                    摩托车
                   </h4>
-                  <div className="space-y-1.5 sm:space-y-2">
-                    <div className="flex justify-between items-center p-1.5 sm:p-2 bg-muted/50 rounded">
-                      <span className="text-xs text-muted-foreground">
-                        数量：
-                      </span>
-                      <span className="font-medium text-xs sm:text-sm bg-primary/10 px-2 py-1 rounded text-primary">
-                        {trafficData?.count_car || 0}
-                      </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-muted/50 rounded-md px-2.5 py-2 text-center">
+                      <p className="text-lg font-semibold text-foreground">{trafficData.count_motor ?? 0}</p>
+                      <p className="text-[10px] text-muted-foreground">数量</p>
                     </div>
-                    <div className="flex justify-between items-center p-1.5 sm:p-2 bg-muted/50 rounded">
-                      <span className="text-xs text-muted-foreground">
-                        速度：
-                      </span>
-                      <span className="font-medium text-xs sm:text-sm bg-emerald-500/10 px-2 py-1 rounded text-emerald-700 dark:text-emerald-400">
-                        {trafficData?.speed_car || 0} km/h
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Motorcycle Section */}
-                <div className="mb-2 bg-card p-2 sm:p-3 rounded-lg shadow-sm">
-                  <h4 className="text-xs sm:text-sm font-medium mb-2 text-foreground flex items-center gap-2">
-                    <Bike className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" />
-                    摩托车信息
-                  </h4>
-                  <div className="space-y-1.5 sm:space-y-2">
-                    <div className="flex justify-between items-center p-1.5 sm:p-2 bg-muted/50 rounded">
-                      <span className="text-xs text-muted-foreground">
-                        数量：
-                      </span>
-                      <span className="font-medium text-xs sm:text-sm bg-emerald-500/10 px-2 py-1 rounded text-emerald-700 dark:text-emerald-400">
-                        {trafficData?.count_motor || 0}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center p-1.5 sm:p-2 bg-muted/50 rounded">
-                      <span className="text-xs text-muted-foreground">
-                        速度：
-                      </span>
-                      <span className="font-medium text-xs sm:text-sm bg-emerald-500/10 px-2 py-1 rounded text-emerald-700 dark:text-emerald-400">
-                        {trafficData?.speed_motor || 0} km/h
-                      </span>
+                    <div className="bg-muted/50 rounded-md px-2.5 py-2 text-center">
+                      <p className="text-lg font-semibold text-foreground">{trafficData.speed_motor ?? 0}</p>
+                      <p className="text-[10px] text-muted-foreground">km/h</p>
                     </div>
                   </div>
                 </div>

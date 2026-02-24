@@ -151,7 +151,7 @@ function UserProfile() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white via-sky-50 to-blue-100 dark:from-slate-950 dark:via-slate-900 dark:to-blue-950 p-4">
+    <div className="h-full flex items-center justify-center p-4">
       <div className="flex flex-col lg:flex-row max-w-3xl w-full gap-4">
         {/* Vertical Navigation - hidden on mobile, shown as horizontal tabs on tablet+ */}
         <div className="hidden lg:flex flex-col space-y-2 py-8">

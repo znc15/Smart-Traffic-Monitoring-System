@@ -138,7 +138,7 @@ const TrafficDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen pt-4 px-2 sm:px-4 space-y-4 sm:space-y-6">
+    <div className="pt-4 px-2 sm:px-4 space-y-4 sm:space-y-6">
       {announcement && (
         <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-sm">
           <Info className="h-4 w-4 shrink-0" />
@@ -176,7 +176,7 @@ const TrafficDashboard = () => {
                     <span>交通状态</span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3 px-4 max-h-60 overflow-y-auto overscroll-contain">
+                <CardContent className="space-y-3 px-4 max-h-[calc(100vh-12rem)] overflow-y-auto overscroll-contain">
                   {loading ? (
                     // Loading skeleton
                     <>
