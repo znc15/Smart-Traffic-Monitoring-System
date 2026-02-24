@@ -329,10 +329,16 @@
           </div>
           <!-- 扫描本地摄像头 -->
           <div class="mb-4">
-            <button type="button" class="btn-scan" id="scanCamerasBtn" onclick="settings_scanCameras()">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              扫描本地摄像头
-            </button>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <button type="button" class="btn-scan" id="scanCamerasBtn" onclick="settings_scanCameras()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                扫描本地摄像头
+              </button>
+              <button type="button" class="btn-scan" id="scanCamerasServerBtn" onclick="settings_scanCamerasServer()" style="color:#94a3b8; font-size:0.75rem;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                服务端扫描（RTSP/网络摄像头）
+              </button>
+            </div>
             <div id="cameraListContainer" class="camera-list" style="display:none;"></div>
           </div>
           <!-- 摄像头源输入 + 测试按钮 -->
@@ -931,11 +937,83 @@
 
   // ========== 摄像头扫描与连接测试 ==========
 
-  /** 扫描本地摄像头 */
+  /** 扫描本地摄像头（浏览器 API） */
   async function settings_scanCameras() {
     const btn = $('scanCamerasBtn');
     const container = $('cameraListContainer');
-    // 按钮进入加载状态
+    const camIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+
+    // 检查浏览器是否支持 mediaDevices
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      container.innerHTML = '<p style="font-size:0.8rem;color:#dc2626;padding:6px 0;">'
+        + '当前浏览器不支持摄像头访问。请使用 HTTPS 或 localhost 访问，或换用现代浏览器。</p>';
+      container.style.display = 'flex';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner" style="width:12px;height:12px;border-width:1.5px;"></span> 请求权限...';
+
+    try {
+      // 1. 请求摄像头权限
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      // 2. 立即停止，只为获取权限
+      stream.getTracks().forEach(t => t.stop());
+
+      btn.innerHTML = '<span class="spinner" style="width:12px;height:12px;border-width:1.5px;"></span> 枚举设备...';
+
+      // 3. 枚举设备（有权限后 label 才可用）
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(d => d.kind === 'videoinput');
+
+      container.innerHTML = '';
+      if (videoDevices.length === 0) {
+        container.innerHTML = '<p style="font-size:0.8rem;color:#64748b;padding:6px 0;">未发现本地摄像头</p>';
+      } else {
+        videoDevices.forEach((dev, idx) => {
+          const item = document.createElement('div');
+          item.className = 'camera-item';
+          item.dataset.index = idx;
+          item.setAttribute('tabindex', '0');
+          item.setAttribute('role', 'button');
+          const label = dev.label || ('摄像头 #' + idx);
+          item.setAttribute('aria-label', '选择 ' + label);
+          item.innerHTML = '<div class="cam-label">' + escapeHtml(label) + '</div>'
+            + '<div class="cam-info">设备索引: ' + idx + '</div>';
+          item.onclick = () => settings_selectCamera(idx, item);
+          item.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); settings_selectCamera(idx, item); } };
+          container.appendChild(item);
+        });
+      }
+      container.style.display = 'flex';
+    } catch (err) {
+      console.error('扫描摄像头失败:', err);
+      container.innerHTML = '';
+      let msg = '扫描失败: ' + err.message;
+      if (err.name === 'NotAllowedError') {
+        msg = '摄像头权限被拒绝，请在浏览器设置中允许摄像头访问后重试。';
+      } else if (err.name === 'NotFoundError') {
+        msg = '未检测到摄像头设备。';
+      } else if (err.name === 'NotReadableError') {
+        msg = '摄像头被其他程序占用，请关闭后重试。';
+      }
+      const errP = document.createElement('p');
+      errP.style.cssText = 'font-size:0.8rem;color:#dc2626;padding:6px 0;';
+      errP.textContent = msg;
+      container.appendChild(errP);
+      container.style.display = 'flex';
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = camIcon + ' 扫描本地摄像头';
+    }
+  }
+
+  /** 服务端扫描摄像头（用于 RTSP / 网络摄像头） */
+  async function settings_scanCamerasServer() {
+    const btn = $('scanCamerasServerBtn');
+    const container = $('cameraListContainer');
+    const serverIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>';
+
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner" style="width:12px;height:12px;border-width:1.5px;"></span> 扫描中...';
 
@@ -947,10 +1025,8 @@
 
       container.innerHTML = '';
       if (cameras.length === 0) {
-        // 无摄像头提示
-        container.innerHTML = '<p style="font-size:0.8rem;color:#64748b;padding:6px 0;">未发现本地摄像头</p>';
+        container.innerHTML = '<p style="font-size:0.8rem;color:#64748b;padding:6px 0;">服务端未发现摄像头设备</p>';
       } else {
-        // 渲染摄像头列表
         cameras.forEach(cam => {
           const item = document.createElement('div');
           item.className = 'camera-item';
@@ -960,7 +1036,7 @@
           item.setAttribute('aria-label', '选择摄像头 #' + cam.index);
           const res = (cam.width && cam.height) ? escapeHtml(String(cam.width)) + 'x' + escapeHtml(String(cam.height)) : '未知分辨率';
           const fps = cam.fps ? escapeHtml(String(cam.fps.toFixed(0))) + 'fps' : '';
-          item.innerHTML = '<div class="cam-label">摄像头 #' + escapeHtml(String(cam.index)) + '</div>'
+          item.innerHTML = '<div class="cam-label">摄像头 #' + escapeHtml(String(cam.index)) + ' (服务端)</div>'
             + '<div class="cam-info">' + res + (fps ? ' @ ' + fps : '') + '</div>';
           item.onclick = () => settings_selectCamera(cam.index, item);
           item.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); settings_selectCamera(cam.index, item); } };
@@ -969,16 +1045,16 @@
       }
       container.style.display = 'flex';
     } catch (err) {
-      console.error('扫描摄像头失败:', err);
+      console.error('服务端扫描摄像头失败:', err);
       container.innerHTML = '';
       const errP = document.createElement('p');
       errP.style.cssText = 'font-size:0.8rem;color:#dc2626;padding:6px 0;';
-      errP.textContent = '扫描失败: ' + err.message;
+      errP.textContent = '服务端扫描失败: ' + err.message;
       container.appendChild(errP);
       container.style.display = 'flex';
     } finally {
       btn.disabled = false;
-      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> 扫描本地摄像头';
+      btn.innerHTML = serverIcon + ' 服务端扫描（RTSP/网络摄像头）';
     }
   }
 
@@ -994,7 +1070,10 @@
     setMode('camera');
     // 更新测试按钮状态
     settings_updateTestBtn();
-    showToast('已选择摄像头 #' + index, 'success');
+    // 显示设备名称（如果有）
+    const labelEl = el.querySelector('.cam-label');
+    const label = labelEl ? labelEl.textContent : ('摄像头 #' + index);
+    showToast('已选择: ' + label, 'success');
   }
 
   /** 更新测试连接按钮的启用状态 */
