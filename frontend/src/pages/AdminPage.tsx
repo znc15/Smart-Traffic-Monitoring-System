@@ -7,6 +7,8 @@ import { getApiUrl } from "@/config/settings";
 import { useNavigate } from "react-router-dom";
 import CameraManagement from "@/modules/admin/CameraManagement";
 import SystemMonitor from "@/modules/admin/SystemMonitor";
+import UserManagement from "@/modules/admin/UserManagement";
+import SiteSettings from "@/modules/admin/SiteSettings";
 
 export default function AdminPage() {
   const [loading, setLoading] = useState(true);
@@ -79,7 +81,7 @@ export default function AdminPage() {
         </TabsList>
         <TabsContent value="cameras"><CameraManagement /></TabsContent>
         <TabsContent value="monitor"><SystemMonitor /></TabsContent>
-        <TabsContent value="users"><div className="py-8 text-center text-muted-foreground">待实现</div></TabsContent>
+        <TabsContent value="users"><UserManagement /></TabsContent>
         <TabsContent value="settings"><div className="py-8 text-center text-muted-foreground">待实现</div></TabsContent>
       </Tabs>
     </div>
