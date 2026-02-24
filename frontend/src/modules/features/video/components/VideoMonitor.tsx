@@ -22,6 +22,7 @@ interface VehicleData {
   count_motor: number;
   speed_car: number;
   speed_motor: number;
+  online?: boolean;
   density_status?: string;
   speed_status?: string;
 }
@@ -92,6 +93,14 @@ const VideoMonitor = ({
         color: "gray",
         icon: Clock,
         text: "未知",
+      };
+
+    if (data.online === false)
+      return {
+        status: "offline",
+        color: "gray",
+        icon: WifiOff,
+        text: "离线",
       };
 
     // Prefer backend-provided classification when available
@@ -246,6 +255,7 @@ const VideoMonitor = ({
               const { color, text } = getTrafficStatus(roadName);
               const { speedText, speedColor } = getSpeedStatus(roadName);
               const isSelected = selectedRoad === roadName;
+              const isOffline = data?.online === false;
 
               return (
                 <motion.div
@@ -260,7 +270,7 @@ const VideoMonitor = ({
                     isSelected
                       ? "border-primary shadow-sm"
                       : "border-border/40 hover:border-border hover:shadow-sm"
-                  }`}
+                  } ${isOffline ? "opacity-70" : ""}`}
                   onClick={() => {
                     setModalRoadName(roadName);
                     setModalOpen(true);
@@ -278,6 +288,14 @@ const VideoMonitor = ({
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <Video className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground/40" />
+                      </div>
+                    )}
+
+                    {/* Offline overlay */}
+                    {isOffline && (
+                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center z-10">
+                        <WifiOff className="h-8 w-8 text-white/80 mb-1" />
+                        <span className="text-white/80 text-xs font-medium">节点离线</span>
                       </div>
                     )}
 

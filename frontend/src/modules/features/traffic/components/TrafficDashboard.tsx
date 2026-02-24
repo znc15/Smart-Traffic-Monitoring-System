@@ -10,6 +10,7 @@ import {
   CheckCircle,
   Clock,
   Gauge,
+  WifiOff,
 } from "lucide-react";
 import VideoMonitor from "../../video/components/VideoMonitor";
 import { motion, AnimatePresence } from "framer-motion";
@@ -243,27 +244,34 @@ const TrafficDashboard = () => {
                             </div>
 
                             {/* 数量和速度信息 */}
-                            <div className="flex items-center justify-between gap-2">
-                              {data && (
-                                <div className="text-xs font-medium text-muted-foreground flex items-center space-x-1">
-                                  <Car className="h-3 w-3 text-primary" />
-                                  <span>{String(data.count_car)}</span>
-                                  <Bike className="h-3 w-3 ml-2 text-emerald-600 dark:text-emerald-400" />
-                                  <span>{String(data.count_motor)}</span>
-                                </div>
-                              )}
-                              <Badge
-                                variant="outline"
-                                className={`flex items-center space-x-1 text-xs px-2 py-0 h-5 leading-none ${
-                                  speedColor === "green"
-                                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
-                                    : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
-                                }`}
-                              >
-                                <Gauge className="h-3 w-3" />
-                                <span className="font-medium">{speedText}</span>
-                              </Badge>
-                            </div>
+                            {status === "offline" ? (
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <WifiOff className="h-3 w-3" />
+                                <span>节点离线</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between gap-2">
+                                {data && (
+                                  <div className="text-xs font-medium text-muted-foreground flex items-center space-x-1">
+                                    <Car className="h-3 w-3 text-primary" />
+                                    <span>{String(data.count_car)}</span>
+                                    <Bike className="h-3 w-3 ml-2 text-emerald-600 dark:text-emerald-400" />
+                                    <span>{String(data.count_motor)}</span>
+                                  </div>
+                                )}
+                                <Badge
+                                  variant="outline"
+                                  className={`flex items-center space-x-1 text-xs px-2 py-0 h-5 leading-none ${
+                                    speedColor === "green"
+                                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
+                                      : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+                                  }`}
+                                >
+                                  <Gauge className="h-3 w-3" />
+                                  <span className="font-medium">{speedText}</span>
+                                </Badge>
+                              </div>
+                            )}
                           </motion.div>
                         );
                       })}
