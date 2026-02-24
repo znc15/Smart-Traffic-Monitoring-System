@@ -40,3 +40,4 @@ backend/*.class
 *.npy
 
 .workflow/
+edge/__pycache__/

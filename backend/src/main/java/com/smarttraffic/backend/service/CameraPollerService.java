@@ -85,6 +85,16 @@ public class CameraPollerService {
         }
 
         trafficService.updateFromRemote(name, data, frame);
+
+        // 存储边缘节点性能指标
+        if (data != null && data.containsKey("edge_metrics")) {
+            NodeHealth h = nodeHealthMap.get(name);
+            if (h != null) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> em = (Map<String, Object>) data.get("edge_metrics");
+                h.edgeMetrics = em;
+            }
+        }
     }
 
     // 获取所有摄像头节点的健康状态
@@ -101,6 +111,7 @@ public class CameraPollerService {
             info.put("errorCount", h.errorCount);
             info.put("consecutiveFailures", h.consecutiveFailures);
             info.put("lastError", h.lastError);
+            info.put("edgeMetrics", h.edgeMetrics);
             result.put(entry.getKey(), info);
         }
         return result;
@@ -115,5 +126,6 @@ public class CameraPollerService {
         volatile int errorCount;
         volatile int consecutiveFailures;
         volatile String lastError;
+        volatile Map<String, Object> edgeMetrics;
     }
 }

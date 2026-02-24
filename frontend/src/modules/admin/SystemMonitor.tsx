@@ -26,6 +26,18 @@ type NodeInfo = {
   error_count: number;
   consecutive_failures: number;
   last_error: string | null;
+  edgeMetrics?: {
+    cpu_percent: number;
+    memory_percent: number;
+    memory_used: number;
+    memory_total: number;
+    gpu_percent: number | null;
+    gpu_memory_percent: number | null;
+    inference_ms: number;
+    fps: number;
+    uptime_s: number;
+    model: string;
+  } | null;
 };
 
 type Metrics = {
@@ -284,7 +296,28 @@ export default function SystemMonitor() {
                         {node.last_error ?? "-"}
                       </td>
                     </tr>
-                  ))}
+                  )).flatMap((row, i) => {
+                    const entries = Object.entries(metrics.nodes!);
+                    const [, node] = entries[i];
+                    if (!node.edgeMetrics) return [row];
+                    const em = node.edgeMetrics;
+                    return [
+                      row,
+                      <tr key={`${entries[i][0]}-edge`} className="border-b border-border/50 last:border-0">
+                        <td colSpan={6} className="py-1.5 px-4 bg-muted/30">
+                          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                            <span>CPU: <span className="text-foreground font-medium">{em.cpu_percent}%</span></span>
+                            <span>内存: <span className="text-foreground font-medium">{em.memory_percent}%</span></span>
+                            <span>GPU: <span className="text-foreground font-medium">{em.gpu_percent != null ? `${em.gpu_percent}%` : "N/A"}</span></span>
+                            <span>推理: <span className="text-foreground font-medium">{em.inference_ms}ms</span></span>
+                            <span>FPS: <span className="text-foreground font-medium">{em.fps}</span></span>
+                            <span>模型: <span className="text-foreground font-medium">{em.model}</span></span>
+                            <span>运行: <span className="text-foreground font-medium">{formatUptime(em.uptime_s * 1000)}</span></span>
+                          </div>
+                        </td>
+                      </tr>,
+                    ];
+                  })}
                 </tbody>
               </table>
             </div>
