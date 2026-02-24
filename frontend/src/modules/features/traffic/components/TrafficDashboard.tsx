@@ -35,7 +35,6 @@ type TrafficBackendData = VehicleData & {
 
 const TrafficDashboard = () => {
   const [selectedRoad, setSelectedRoad] = useState<string | null>(null);
-  const [qrError, setQrError] = useState(false); // QR load fallback
   const [localFullscreen] = useState(false);
 
   const [allowedRoads, setAllowedRoads] = useState<string[]>([]);
@@ -257,37 +256,6 @@ const TrafficDashboard = () => {
           )}
         </div>
       </div>
-      {/* Floating QR bottom-right */}
-      <a
-        href="https://t.me/Smart_Traffic_System_LVA_bot"
-        target="_blank"
-        rel="noreferrer"
-        className="fixed bottom-4 right-4 z-50 group"
-        title="打开 Telegram：@Smart_Traffic_System_LVA_bot"
-      >
-        <div className="rounded-xl shadow-lg border border-border/50 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 p-2 transition-transform group-hover:scale-[1.02] w-40">
-          <div className="text-center text-xs font-semibold mb-1 text-foreground">
-            Telegram 机器人
-          </div>
-          {!qrError ? (
-            <img
-              src="/images/bot-qr.png"
-              alt="Telegram 二维码 @Smart_Traffic_System_LVA_bot"
-              className="w-36 h-36 object-contain mx-auto rounded-lg"
-              loading="lazy"
-              onError={() => setQrError(true)}
-            />
-          ) : (
-            <div className="w-36 h-36 flex items-center justify-center text-center text-[11px] font-medium text-muted-foreground select-none">
-              未找到二维码图片（请将文件放到
-              <br /> public/images/bot-qr.png）
-            </div>
-          )}
-          <div className="mt-1 text-center text-xs font-medium text-muted-foreground">
-            二维码：@Smart Traffic System
-          </div>
-        </div>
-      </a>
     </div>
   );
 };
