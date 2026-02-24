@@ -17,6 +17,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
+import camera_discovery
 import config
 from detector import detect_vehicles_detailed
 from state import state
@@ -60,6 +61,13 @@ class ConfigUpdateRequest(BaseModel):
     confidence: Optional[float] = Field(None, ge=0.1, le=0.9, description="检测置信度阈值 (0.1-0.9)")
     road_name: Optional[str] = Field(None, description="路段名称")
     use_openvino: Optional[bool] = Field(None, description="是否启用 OpenVINO 加速")
+
+
+# ---------------------------------------------------------------------------
+# 摄像头探测请求体
+# ---------------------------------------------------------------------------
+class ProbeRequest(BaseModel):
+    url: str = Field(..., description="RTSP 或视频流地址")
 
 
 def _current_config() -> dict:
@@ -259,6 +267,35 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
     result = _current_config()
     result["restarted"] = restarted
     return JSONResponse(content=result)
+
+
+# ---------------------------------------------------------------------------
+# 摄像头发现与探测 API
+# ---------------------------------------------------------------------------
+@router.get("/api/cameras", response_model=None)
+async def get_cameras() -> JSONResponse:
+    """扫描本地摄像头设备，返回可用设备列表"""
+    loop = asyncio.get_event_loop()
+    cameras = await loop.run_in_executor(None, camera_discovery.scan_local_cameras)
+    return JSONResponse(content={"cameras": cameras})
+
+
+@router.post("/api/cameras/probe", response_model=None)
+async def probe_camera(body: ProbeRequest) -> JSONResponse:
+    """测试 RTSP/视频流地址的连通性"""
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, camera_discovery.probe_rtsp, body.url)
+    if result is not None:
+        return JSONResponse(content={
+            "reachable": True,
+            "width": result["width"],
+            "height": result["height"],
+            "message": "连接成功",
+        })
+    return JSONResponse(content={
+        "reachable": False,
+        "message": "无法连接到指定地址",
+    })
 
 
 # ---------------------------------------------------------------------------
