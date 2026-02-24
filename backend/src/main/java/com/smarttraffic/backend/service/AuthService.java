@@ -38,7 +38,7 @@ public class AuthService {
         entity.setUsername(request.getUsername());
         entity.setEmail(request.getEmail());
         entity.setPhoneNumber(request.getPhoneNumber());
-        entity.setRoleId(1);
+        entity.setRoleId(userRepository.count() == 0 ? 0 : 1);
         entity.setPassword(passwordEncoder.encode(request.getPassword()));
         userRepository.save(entity);
     }
