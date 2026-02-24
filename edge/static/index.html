@@ -361,16 +361,146 @@
 
     <!-- ===== 测试 Tab ===== -->
     <div id="tabTest" class="tab-content" style="display:none;">
-      <div class="flex items-center justify-center" style="min-height: 300px;">
-        <div class="text-center text-slate-500">
-          <svg class="w-16 h-16 mx-auto mb-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-          </svg>
-          <p class="text-lg font-medium text-slate-400">测试功能开发中...</p>
-          <p class="text-sm mt-1">此功能即将上线，敬请期待</p>
+
+      <!-- 上传区域 -->
+      <div id="testDropZone" class="relative border-2 border-dashed border-slate-600 rounded-xl bg-slate-800/60
+            hover:border-blue-500 transition-colors cursor-pointer p-8 text-center mb-6"
+           onclick="document.getElementById('testFileInput').click()">
+        <input type="file" id="testFileInput" class="hidden"
+               accept="image/jpeg,image/png,image/bmp,image/webp,video/mp4,video/avi,video/quicktime,.jpg,.jpeg,.png,.bmp,.webp,.mp4,.avi,.mov">
+        <svg class="w-12 h-12 mx-auto mb-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+        </svg>
+        <p class="text-slate-300 font-medium mb-1">拖拽图片或视频文件到此处，或点击选择</p>
+        <p class="text-xs text-slate-500">支持格式：JPG, PNG, BMP, WebP, MP4, AVI, MOV</p>
+        <p class="text-xs text-slate-500 mt-1">图片最大 10MB / 视频最大 100MB</p>
+        <!-- 拖拽高亮遮罩 -->
+        <div id="testDropOverlay" class="absolute inset-0 bg-blue-500/10 border-2 border-blue-500 rounded-xl
+              flex items-center justify-center pointer-events-none" style="display:none;">
+          <p class="text-blue-400 font-semibold text-lg">释放文件以上传</p>
         </div>
       </div>
+
+      <!-- 检测结果展示区域 -->
+      <div id="testResultArea" style="display:none;" class="mb-6">
+
+        <!-- 加载状态 -->
+        <div id="testLoading" style="display:none;"
+             class="bg-slate-800 border border-slate-700 rounded-xl p-10 text-center">
+          <div class="spinner mx-auto mb-3" style="width:32px;height:32px;border-width:3px;"></div>
+          <p id="testLoadingText" class="text-slate-300">检测中...</p>
+        </div>
+
+        <!-- 图片检测结果 -->
+        <div id="testImageResult" style="display:none;">
+          <!-- 左右对比 -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-3">
+              <p class="text-xs text-slate-400 mb-2 font-medium">原始图片</p>
+              <img id="testOriginalImg" class="w-full rounded-lg object-contain" style="max-height:400px;" alt="原图">
+            </div>
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-3">
+              <p class="text-xs text-slate-400 mb-2 font-medium">检测标注</p>
+              <img id="testAnnotatedImg" class="w-full rounded-lg object-contain" style="max-height:400px;" alt="标注图">
+            </div>
+          </div>
+          <!-- 检测统计 -->
+          <div class="grid grid-cols-3 gap-3 mb-4">
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+              <p class="text-xs text-slate-400 mb-1">汽车数量</p>
+              <p id="testCountCar" class="text-2xl font-bold text-blue-400">0</p>
+            </div>
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+              <p class="text-xs text-slate-400 mb-1">摩托/非机动车</p>
+              <p id="testCountMotor" class="text-2xl font-bold text-emerald-400">0</p>
+            </div>
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+              <p class="text-xs text-slate-400 mb-1">推理时间</p>
+              <p class="text-2xl font-bold text-amber-400"><span id="testInferenceMs">0</span><span class="text-sm font-normal text-slate-500 ml-1">ms</span></p>
+            </div>
+          </div>
+          <!-- 检测目标列表 -->
+          <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="bg-slate-700/60 text-slate-300 text-xs">
+                  <th class="text-left px-4 py-2.5 font-medium">类别</th>
+                  <th class="text-left px-4 py-2.5 font-medium">置信度</th>
+                  <th class="text-left px-4 py-2.5 font-medium">坐标 (x1, y1, x2, y2)</th>
+                </tr>
+              </thead>
+              <tbody id="testObjectsTable" class="text-slate-300">
+              </tbody>
+            </table>
+            <div id="testNoObjects" class="text-center text-slate-500 text-sm py-4" style="display:none;">
+              未检测到目标
+            </div>
+          </div>
+        </div>
+
+        <!-- 视频检测结果 -->
+        <div id="testVideoResult" style="display:none;">
+          <!-- 摘要统计卡片 -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+              <p class="text-xs text-slate-400 mb-1">总帧数</p>
+              <p id="testTotalFrames" class="text-xl font-bold text-slate-200">0</p>
+            </div>
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+              <p class="text-xs text-slate-400 mb-1">处理帧数</p>
+              <p id="testProcessedFrames" class="text-xl font-bold text-sky-400">0</p>
+            </div>
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+              <p class="text-xs text-slate-400 mb-1">平均汽车数</p>
+              <p id="testAvgCar" class="text-xl font-bold text-blue-400">0</p>
+            </div>
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+              <p class="text-xs text-slate-400 mb-1">平均摩托车数</p>
+              <p id="testAvgMotor" class="text-xl font-bold text-emerald-400">0</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+              <p class="text-xs text-slate-400 mb-1">平均推理时间</p>
+              <p class="text-xl font-bold text-amber-400"><span id="testAvgInference">0</span><span class="text-sm font-normal text-slate-500 ml-1">ms</span></p>
+            </div>
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
+              <p class="text-xs text-slate-400 mb-1">视频时长</p>
+              <p class="text-xl font-bold text-slate-200"><span id="testDuration">0</span><span class="text-sm font-normal text-slate-500 ml-1">秒</span></p>
+            </div>
+          </div>
+          <!-- 视频预览 + 下载 -->
+          <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-sm text-slate-300 font-medium">标注视频预览</p>
+              <a id="testVideoDownload" href="#" download class="btn-primary text-xs py-2 px-4" style="text-decoration:none;">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                下载视频
+              </a>
+            </div>
+            <video id="testVideoPlayer" class="w-full rounded-lg" style="max-height:420px; background:#0f172a;"
+                   controls preload="metadata"></video>
+          </div>
+        </div>
+
+      </div><!-- /testResultArea -->
+
+      <!-- 历史记录区域 -->
+      <div id="testHistorySection">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-semibold text-slate-300">测试历史</h3>
+          <span id="testHistoryCount" class="text-xs text-slate-500">0 / 10</span>
+        </div>
+        <div id="testHistoryList" class="space-y-2">
+          <div id="testHistoryEmpty" class="text-center text-slate-500 text-sm py-6">
+            暂无测试记录，上传文件开始检测
+          </div>
+        </div>
+      </div>
+
     </div><!-- /tabTest -->
 
   </main>
@@ -756,12 +886,402 @@
     }
   });
 
+  // ========== 测试面板逻辑 ==========
+
+  // 测试历史记录数组（最多10条，不持久化）
+  let testHistory = [];
+  // 当前查看的结果缓存（用于历史记录回看）
+  let testCurrentResult = null;
+
+  // 支持的文件类型
+  const TEST_IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'bmp', 'webp'];
+  const TEST_VIDEO_EXTS = ['mp4', 'avi', 'mov'];
+  const TEST_IMAGE_MAX_SIZE = 10 * 1024 * 1024;   // 10MB
+  const TEST_VIDEO_MAX_SIZE = 100 * 1024 * 1024;   // 100MB
+
+  /** 判断文件是图片还是视频，返回 'image' | 'video' | null */
+  function test_getFileType(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (TEST_IMAGE_EXTS.includes(ext)) return 'image';
+    if (TEST_VIDEO_EXTS.includes(ext)) return 'video';
+    // 也检查 MIME 类型
+    if (file.type.startsWith('image/')) return 'image';
+    if (file.type.startsWith('video/')) return 'video';
+    return null;
+  }
+
+  /** 验证文件大小 */
+  function test_validateFile(file) {
+    const type = test_getFileType(file);
+    if (!type) {
+      showToast('不支持的文件格式，请上传图片或视频文件', 'error');
+      return null;
+    }
+    const maxSize = type === 'image' ? TEST_IMAGE_MAX_SIZE : TEST_VIDEO_MAX_SIZE;
+    if (file.size > maxSize) {
+      const limitMB = maxSize / (1024 * 1024);
+      showToast(`文件过大，${type === 'image' ? '图片' : '视频'}最大 ${limitMB}MB`, 'error');
+      return null;
+    }
+    return type;
+  }
+
+  /** 格式化文件大小 */
+  function test_formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  /** 图片检测流程 */
+  async function test_detectImage(file) {
+    // 先用 FileReader 读取原图预览
+    const originalDataUrl = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.readAsDataURL(file);
+    });
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const resp = await fetch('/api/detect/image', { method: 'POST', body: formData });
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        throw new Error(errData.error || 'HTTP ' + resp.status);
+      }
+      const data = await resp.json();
+      if (!data.success) throw new Error(data.error || '检测失败');
+
+      // 隐藏加载，显示图片结果
+      $('testLoading').style.display = 'none';
+      $('testImageResult').style.display = 'block';
+
+      // 设置图片
+      $('testOriginalImg').src = originalDataUrl;
+      $('testAnnotatedImg').src = data.annotated_image;
+
+      // 设置统计数据
+      const det = data.detections || {};
+      $('testCountCar').textContent = det.count_car || 0;
+      $('testCountMotor').textContent = det.count_motor || 0;
+      $('testInferenceMs').textContent = (det.inference_ms || 0).toFixed(1);
+
+      // 填充目标列表表格
+      test_renderObjectsTable(det.objects || []);
+
+      // 缓存当前结果
+      testCurrentResult = { type: 'image', data, originalDataUrl, fileName: file.name };
+
+      // 添加到历史记录
+      test_addHistory({
+        type: 'image',
+        fileName: file.name,
+        fileSize: file.size,
+        thumbnail: originalDataUrl,
+        summary: `汽车 ${det.count_car || 0} / 摩托 ${det.count_motor || 0} / ${(det.inference_ms || 0).toFixed(1)}ms`,
+        time: new Date(),
+        result: { data, originalDataUrl }
+      });
+
+      showToast('图片检测完成', 'success');
+    } catch (err) {
+      console.error('图片检测失败:', err);
+      $('testLoading').style.display = 'none';
+      showToast('图片检测失败: ' + err.message, 'error');
+    }
+  }
+
+  /** 渲染检测目标表格 */
+  function test_renderObjectsTable(objects) {
+    const tbody = $('testObjectsTable');
+    const noObj = $('testNoObjects');
+
+    if (!objects || objects.length === 0) {
+      tbody.innerHTML = '';
+      noObj.style.display = 'block';
+      return;
+    }
+    noObj.style.display = 'none';
+
+    tbody.innerHTML = objects.map((obj, i) => {
+      const conf = (obj.confidence * 100).toFixed(1);
+      const bbox = obj.bbox ? obj.bbox.map(v => Math.round(v)).join(', ') : '--';
+      const bgClass = i % 2 === 0 ? 'bg-slate-800' : 'bg-slate-800/60';
+      // 类别中文映射
+      const classMap = { car: '汽车', motor: '摩托/非机动车', truck: '卡车', bus: '公交车' };
+      const className = classMap[obj.class] || obj.class;
+      return `<tr class="${bgClass}">
+        <td class="px-4 py-2">${className}</td>
+        <td class="px-4 py-2"><span class="text-sky-400">${conf}%</span></td>
+        <td class="px-4 py-2 font-mono text-xs text-slate-400">${bbox}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  /** 视频检测流程 */
+  async function test_detectVideo(file) {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const resp = await fetch('/api/detect/video', { method: 'POST', body: formData });
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        throw new Error(errData.error || 'HTTP ' + resp.status);
+      }
+      const data = await resp.json();
+      if (!data.success) throw new Error(data.error || '视频处理失败');
+
+      // 隐藏加载，显示视频结果
+      $('testLoading').style.display = 'none';
+      $('testVideoResult').style.display = 'block';
+
+      // 填充摘要统计
+      const s = data.summary || {};
+      $('testTotalFrames').textContent = s.total_frames || 0;
+      $('testProcessedFrames').textContent = s.processed_frames || 0;
+      $('testAvgCar').textContent = (s.avg_car_count || 0).toFixed(1);
+      $('testAvgMotor').textContent = (s.avg_motor_count || 0).toFixed(1);
+      $('testAvgInference').textContent = (s.avg_inference_ms || 0).toFixed(1);
+      $('testDuration').textContent = (s.duration_s || 0).toFixed(1);
+
+      // 设置视频播放器和下载链接
+      const videoUrl = data.video_url || '';
+      $('testVideoPlayer').src = videoUrl;
+      $('testVideoDownload').href = videoUrl;
+
+      // 缓存当前结果
+      testCurrentResult = { type: 'video', data, fileName: file.name };
+
+      // 添加到历史记录
+      test_addHistory({
+        type: 'video',
+        fileName: file.name,
+        fileSize: file.size,
+        thumbnail: null,
+        summary: `帧 ${s.processed_frames || 0}/${s.total_frames || 0} / 车均 ${(s.avg_car_count || 0).toFixed(1)} / ${(s.duration_s || 0).toFixed(1)}s`,
+        time: new Date(),
+        result: { data }
+      });
+
+      showToast('视频处理完成', 'success');
+    } catch (err) {
+      console.error('视频检测失败:', err);
+      $('testLoading').style.display = 'none';
+      showToast('视频检测失败: ' + err.message, 'error');
+    }
+  }
+
+  /** 处理文件上传 */
+  function test_handleFile(file) {
+    const type = test_validateFile(file);
+    if (!type) return;
+
+    // 显示结果区域和加载状态
+    $('testResultArea').style.display = 'block';
+    $('testLoading').style.display = 'block';
+    $('testImageResult').style.display = 'none';
+    $('testVideoResult').style.display = 'none';
+
+    if (type === 'image') {
+      $('testLoadingText').textContent = '图片检测中...';
+      test_detectImage(file);
+    } else {
+      $('testLoadingText').textContent = '视频处理中，请稍候...';
+      test_detectVideo(file);
+    }
+  }
+
+  // ========== 历史记录管理 ==========
+
+  /** 添加历史记录 */
+  function test_addHistory(entry) {
+    testHistory.unshift(entry);
+    if (testHistory.length > 10) testHistory.pop();
+    test_renderHistory();
+  }
+
+  /** 渲染历史记录列表 */
+  function test_renderHistory() {
+    const list = $('testHistoryList');
+    const empty = $('testHistoryEmpty');
+    const count = $('testHistoryCount');
+
+    count.textContent = testHistory.length + ' / 10';
+
+    if (testHistory.length === 0) {
+      empty.style.display = 'block';
+      // 清除除 empty 之外的内容
+      Array.from(list.children).forEach(child => {
+        if (child.id !== 'testHistoryEmpty') child.remove();
+      });
+      return;
+    }
+
+    empty.style.display = 'none';
+
+    // 重新渲染所有历史项
+    const fragment = document.createDocumentFragment();
+    testHistory.forEach((entry, index) => {
+      const item = document.createElement('div');
+      item.className = 'flex items-center gap-3 bg-slate-800 border border-slate-700 rounded-lg p-3 cursor-pointer hover:border-slate-500 transition-colors';
+      item.onclick = () => test_viewHistory(index);
+
+      // 缩略图或文件图标
+      let thumbHtml;
+      if (entry.thumbnail) {
+        thumbHtml = `<img src="${entry.thumbnail}" class="w-12 h-12 rounded object-cover flex-shrink-0" alt="缩略图">`;
+      } else {
+        thumbHtml = `<div class="w-12 h-12 rounded bg-slate-700 flex items-center justify-center flex-shrink-0">
+          <svg class="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                  d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+          </svg>
+        </div>`;
+      }
+
+      // 类型标签
+      const typeLabel = entry.type === 'image' ? '图片' : '视频';
+      const typeColor = entry.type === 'image' ? 'text-blue-400 bg-blue-400/10' : 'text-emerald-400 bg-emerald-400/10';
+
+      // 时间格式化
+      const t = entry.time;
+      const timeStr = t.getHours().toString().padStart(2, '0') + ':' +
+                      t.getMinutes().toString().padStart(2, '0') + ':' +
+                      t.getSeconds().toString().padStart(2, '0');
+
+      item.innerHTML = `
+        ${thumbHtml}
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-0.5">
+            <span class="text-sm text-slate-200 truncate">${entry.fileName}</span>
+            <span class="text-xs px-1.5 py-0.5 rounded ${typeColor} flex-shrink-0">${typeLabel}</span>
+          </div>
+          <p class="text-xs text-slate-400 truncate">${entry.summary}</p>
+        </div>
+        <div class="text-xs text-slate-500 flex-shrink-0">${timeStr}</div>
+      `;
+
+      fragment.appendChild(item);
+    });
+
+    // 清除旧内容（保留 empty 元素）
+    Array.from(list.children).forEach(child => {
+      if (child.id !== 'testHistoryEmpty') child.remove();
+    });
+    list.appendChild(fragment);
+  }
+
+  /** 查看历史记录 */
+  function test_viewHistory(index) {
+    const entry = testHistory[index];
+    if (!entry) return;
+
+    $('testResultArea').style.display = 'block';
+    $('testLoading').style.display = 'none';
+
+    if (entry.type === 'image') {
+      $('testImageResult').style.display = 'block';
+      $('testVideoResult').style.display = 'none';
+
+      const r = entry.result;
+      $('testOriginalImg').src = r.originalDataUrl;
+      $('testAnnotatedImg').src = r.data.annotated_image;
+
+      const det = r.data.detections || {};
+      $('testCountCar').textContent = det.count_car || 0;
+      $('testCountMotor').textContent = det.count_motor || 0;
+      $('testInferenceMs').textContent = (det.inference_ms || 0).toFixed(1);
+      test_renderObjectsTable(det.objects || []);
+    } else {
+      $('testImageResult').style.display = 'none';
+      $('testVideoResult').style.display = 'block';
+
+      const r = entry.result;
+      const s = r.data.summary || {};
+      $('testTotalFrames').textContent = s.total_frames || 0;
+      $('testProcessedFrames').textContent = s.processed_frames || 0;
+      $('testAvgCar').textContent = (s.avg_car_count || 0).toFixed(1);
+      $('testAvgMotor').textContent = (s.avg_motor_count || 0).toFixed(1);
+      $('testAvgInference').textContent = (s.avg_inference_ms || 0).toFixed(1);
+      $('testDuration').textContent = (s.duration_s || 0).toFixed(1);
+
+      const videoUrl = r.data.video_url || '';
+      $('testVideoPlayer').src = videoUrl;
+      $('testVideoDownload').href = videoUrl;
+    }
+
+    // 滚动到结果区域
+    $('testResultArea').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   // ========== 启动 ==========
   document.addEventListener('DOMContentLoaded', function() {
     initChart();
     fetchTrafficData();
     setInterval(fetchTrafficData, POLL_INTERVAL);
+
+    // ===== 测试面板：拖拽和文件选择事件绑定 =====
+    test_initDropZone();
   });
+
+  /** 初始化拖拽上传区域 */
+  function test_initDropZone() {
+    const dropZone = $('testDropZone');
+    const fileInput = $('testFileInput');
+    const overlay = $('testDropOverlay');
+    if (!dropZone || !fileInput) return;
+
+    // 文件选择
+    fileInput.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) test_handleFile(file);
+      // 重置 input 以允许重复选择同一文件
+      this.value = '';
+    });
+
+    // 拖拽进入
+    dropZone.addEventListener('dragenter', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      overlay.style.display = 'flex';
+      dropZone.classList.add('border-blue-500');
+    });
+
+    // 拖拽悬停
+    dropZone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      overlay.style.display = 'flex';
+      dropZone.classList.add('border-blue-500');
+    });
+
+    // 拖拽离开
+    dropZone.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      // 只在真正离开 dropZone 时隐藏（排除子元素触发）
+      if (!dropZone.contains(e.relatedTarget)) {
+        overlay.style.display = 'none';
+        dropZone.classList.remove('border-blue-500');
+      }
+    });
+
+    // 放下文件
+    dropZone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      overlay.style.display = 'none';
+      dropZone.classList.remove('border-blue-500');
+
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        test_handleFile(files[0]);
+      }
+    });
+  }
 </script>
 
 </body>
