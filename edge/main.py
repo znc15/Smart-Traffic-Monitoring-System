@@ -17,6 +17,7 @@ from contextlib import asynccontextmanager
 
 import psutil
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 import config
 from routes import router
@@ -48,6 +49,11 @@ async def lifespan(application: FastAPI):
 # ---------------------------------------------------------------------------
 app = FastAPI(title="Edge Node - YOLOv8 智能交通检测", lifespan=lifespan)
 app.include_router(router)
+
+# 挂载静态文件目录（仪表盘 HTML 等）
+_static_dir = os.path.join(os.path.dirname(__file__), "static")
+os.makedirs(_static_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
 
 # ---------------------------------------------------------------------------

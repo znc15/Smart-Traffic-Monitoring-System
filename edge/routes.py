@@ -2,12 +2,14 @@
 FastAPI 路由定义
 """
 
+import asyncio
 from datetime import datetime
+from typing import AsyncGenerator
 
 import cv2
 import numpy as np
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
 
 import config
 from state import state
@@ -51,3 +53,42 @@ def health_check() -> JSONResponse:
         "model": config.MODEL_NAME,
         "timestamp": datetime.now().isoformat(),
     })
+
+
+@router.get("/")
+def root_redirect() -> RedirectResponse:
+    """根路由重定向到仪表盘页面"""
+    return RedirectResponse(url="/static/index.html")
+
+
+async def _mjpeg_generator() -> AsyncGenerator[bytes, None]:
+    """逐帧生成 MJPEG 流数据"""
+    while True:
+        frame = state.get_frame()
+        if frame:
+            yield (
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n"
+                + frame
+                + b"\r\n"
+            )
+        else:
+            # 无帧可用时生成 1x1 灰色占位图
+            placeholder = np.full((1, 1, 3), 128, dtype=np.uint8)
+            _, jpeg = cv2.imencode(".jpg", placeholder)
+            yield (
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n"
+                + jpeg.tobytes()
+                + b"\r\n"
+            )
+        await asyncio.sleep(0.05)  # ~20 FPS
+
+
+@router.get("/api/stream")
+async def stream_mjpeg() -> StreamingResponse:
+    """MJPEG 视频流端点，持续推送检测帧"""
+    return StreamingResponse(
+        _mjpeg_generator(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+    )
