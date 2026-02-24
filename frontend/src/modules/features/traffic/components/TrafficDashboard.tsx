@@ -27,6 +27,7 @@ type VehicleData = {
   count_motor: number;
   speed_car: number;
   speed_motor: number;
+  online?: boolean;
 };
 
 type TrafficBackendData = VehicleData & {
@@ -86,6 +87,7 @@ const TrafficDashboard = () => {
   const getTrafficStatus = (roadName: string) => {
     const data = trafficData[roadName] as VehicleData | undefined;
     if (!data) return { status: "unknown", color: "gray", icon: Clock };
+    if (data.online === false) return { status: "offline", color: "gray", icon: AlertTriangle };
     // Prefer backend-provided classification when available
     const densityFromBackend = (data as TrafficBackendData).density_status;
     if (densityFromBackend) {
@@ -132,6 +134,8 @@ const TrafficDashboard = () => {
         return "较拥挤";
       case "clear":
         return "畅通";
+      case "offline":
+        return "离线";
       default:
         return "未知";
     }
@@ -212,7 +216,9 @@ const TrafficDashboard = () => {
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -20 }}
                             transition={{ duration: 0.3 }}
-                            className="flex flex-col p-3 rounded-lg bg-card border border-border/50 hover:bg-accent/50 hover:border-border transition-all cursor-pointer hover:shadow-md space-y-2"
+                            className={`flex flex-col p-3 rounded-lg bg-card border border-border/50 hover:bg-accent/50 hover:border-border transition-all cursor-pointer hover:shadow-md space-y-2 ${
+                              data && (data as VehicleData).online === false ? "opacity-60" : ""
+                            }`}
                             onClick={() => setSelectedRoad(road)}
                           >
                             {/* 道路名称和密度标签 */}
@@ -226,6 +232,8 @@ const TrafficDashboard = () => {
                                     ? "destructive"
                                     : color === "yellow"
                                     ? "secondary"
+                                    : color === "gray"
+                                    ? "outline"
                                     : "default"
                                 }
                                 className="text-xs h-5 leading-none px-2 py-0"

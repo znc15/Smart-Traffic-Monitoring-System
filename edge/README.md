@@ -138,7 +138,7 @@ python main.py [OPTIONS]
 | `--mode` | 运行模式: `sim` / `camera` | `$MODE` 或 `sim` |
 | `--url` | 视频源: RTSP URL / 设备编号 / 文件路径 | `$CAMERA_URL`，留空交互选择 |
 | `--road` | 路段名称 | `$ROAD_NAME` 或 `示例路段-Edge01` |
-| `--model` | YOLOv8 模型文件名 | `$MODEL` 或 `yolov8n.pt` |
+| `--model` | YOLOv8 模型文件名或路径 | `$MODEL` 或 `yolov8n.pt` |
 | `--conf` | 检测置信度阈值 | `$CONF` 或 `0.35` |
 | `--port` | HTTP 服务端口 | `$PORT` 或 `8000` |
 | `--no-openvino` | 禁用 OpenVINO，使用 PyTorch 推理 | 默认启用 OpenVINO |
@@ -162,6 +162,10 @@ python main.py --mode camera --url 0
 
 # 自定义端口、路段名、模型
 python main.py --mode camera --url 0 --port 9000 --road "长安街-East" --model yolov8s.pt --conf 0.5
+
+# 使用自定义训练模型（支持绝对路径或相对路径）
+python main.py --mode camera --url 0 --model /path/to/best.pt
+python main.py --mode camera --url 0 --model ./runs/detect/train/weights/best.pt
 
 # 禁用 OpenVINO，使用原始 PyTorch 推理
 python main.py --mode camera --url 0 --no-openvino

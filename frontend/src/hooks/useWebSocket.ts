@@ -291,6 +291,7 @@ export const useMultipleTrafficInfo = (roadNames: string[]) => {
     count_motor: number;
     speed_car: number;
     speed_motor: number;
+    online?: boolean;
   }
 
   interface TrafficData {
@@ -358,6 +359,7 @@ export const useMultipleTrafficInfo = (roadNames: string[]) => {
             count_motor: parsed.count_motor || 0,
             speed_car: parsed.speed_car || 0,
             speed_motor: parsed.speed_motor || 0,
+            online: parsed.online,
           };
 
           setTrafficData((prev) => {

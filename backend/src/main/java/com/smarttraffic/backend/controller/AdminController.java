@@ -84,7 +84,7 @@ public class AdminController {
         if (body.containsKey("name")) cam.setName((String) body.get("name"));
         if (body.containsKey("location")) cam.setLocation((String) body.get("location"));
         if (body.containsKey("enabled")) cam.setEnabled((Boolean) body.get("enabled"));
-        if (body.containsKey("streamUrl")) cam.setStreamUrl((String) body.get("streamUrl"));
+        if (body.containsKey("stream_url")) cam.setStreamUrl((String) body.get("stream_url"));
         CameraEntity saved = cameraRepository.save(cam);
         trafficService.reloadCameras(trafficProperties);
         return saved;

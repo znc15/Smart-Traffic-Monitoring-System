@@ -26,7 +26,7 @@ type NodeInfo = {
   error_count: number;
   consecutive_failures: number;
   last_error: string | null;
-  edgeMetrics?: {
+  edge_metrics?: {
     cpu_percent: number;
     memory_percent: number;
     memory_used: number;
@@ -299,8 +299,8 @@ export default function SystemMonitor() {
                   )).flatMap((row, i) => {
                     const entries = Object.entries(metrics.nodes!);
                     const [, node] = entries[i];
-                    if (!node.edgeMetrics) return [row];
-                    const em = node.edgeMetrics;
+                    if (!node.edge_metrics) return [row];
+                    const em = node.edge_metrics;
                     return [
                       row,
                       <tr key={`${entries[i][0]}-edge`} className="border-b border-border/50 last:border-0">

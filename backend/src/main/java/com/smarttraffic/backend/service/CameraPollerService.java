@@ -105,13 +105,13 @@ public class CameraPollerService {
             Map<String, Object> info = new LinkedHashMap<>();
             info.put("name", entry.getKey());
             info.put("online", h.online);
-            info.put("lastSuccessTime", h.lastSuccessTime != null ? h.lastSuccessTime.toString() : null);
-            info.put("lastPollTime", h.lastPollTime != null ? h.lastPollTime.toString() : null);
-            info.put("latencyMs", h.latencyMs);
-            info.put("errorCount", h.errorCount);
-            info.put("consecutiveFailures", h.consecutiveFailures);
-            info.put("lastError", h.lastError);
-            info.put("edgeMetrics", h.edgeMetrics);
+            info.put("last_success_time", h.lastSuccessTime != null ? h.lastSuccessTime.toString() : null);
+            info.put("last_poll_time", h.lastPollTime != null ? h.lastPollTime.toString() : null);
+            info.put("latency_ms", h.latencyMs);
+            info.put("error_count", h.errorCount);
+            info.put("consecutive_failures", h.consecutiveFailures);
+            info.put("last_error", h.lastError);
+            info.put("edge_metrics", h.edgeMetrics);
             result.put(entry.getKey(), info);
         }
         return result;

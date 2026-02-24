@@ -54,12 +54,12 @@ export default function CameraManagement() {
     if (editing) {
       await authFetch(`${adminConfig.CAMERAS_URL}/${editing.id}`, {
         method: "PUT",
-        body: JSON.stringify({ name: form.name, location: form.location, streamUrl: form.streamUrl || null, enabled: editing.enabled }),
+        body: JSON.stringify({ name: form.name, location: form.location, stream_url: form.streamUrl || null, enabled: editing.enabled }),
       });
     } else {
       await authFetch(adminConfig.CAMERAS_URL, {
         method: "POST",
-        body: JSON.stringify(form),
+        body: JSON.stringify({ name: form.name, location: form.location, stream_url: form.streamUrl || null }),
       });
     }
     setDialogOpen(false);
@@ -75,7 +75,7 @@ export default function CameraManagement() {
   const toggleEnabled = async (c: Camera) => {
     await authFetch(`${adminConfig.CAMERAS_URL}/${c.id}`, {
       method: "PUT",
-      body: JSON.stringify({ name: c.name, location: c.location, streamUrl: c.stream_url, enabled: !c.enabled }),
+      body: JSON.stringify({ name: c.name, location: c.location, stream_url: c.stream_url, enabled: !c.enabled }),
     });
     fetchCameras();
   };
