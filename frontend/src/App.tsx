@@ -109,7 +109,7 @@ function AppContent() {
 
   const navItemClass = ({ isActive }: { isActive: boolean }) =>
     cn(
-      "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 rounded-xl font-semibold text-sm transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+      "flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-1.5 rounded-xl font-semibold text-sm transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
       isActive
         ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
         : "text-muted-foreground hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:scale-95"
@@ -118,25 +118,25 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-blue-50/40 to-indigo-100/30 dark:from-background dark:via-blue-950/20 dark:to-indigo-950/10">
       {/* Banner */}
-      <div className="w-full flex flex-wrap items-center justify-between px-3 sm:px-6 py-2.5 bg-background/80 dark:bg-background/70 shadow-sm border-b border-border/60 backdrop-blur-xl backdrop-saturate-150 sticky top-0 z-50 transition-colors">
-        <div className="flex items-center min-w-0 gap-3">
+      <div className="w-full flex flex-wrap items-center justify-between px-2 sm:px-4 py-1.5 bg-background/80 dark:bg-background/70 shadow-sm border-b border-border/60 backdrop-blur-xl backdrop-saturate-150 sticky top-0 z-50 transition-colors">
+        <div className="flex items-center min-w-0 gap-2">
           <a
             href="/home"
             className="flex items-center flex-shrink-0"
             title="首页"
           >
-            <div className="relative w-12 h-12">
+            <div className="relative w-9 h-9">
               {/* Animated background gradient */}
               <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-indigo-600 via-blue-500 to-cyan-500 animate-gradient-x shadow-lg shadow-blue-500/20"></div>
 
               {/* Icon container with glassmorphism effect */}
               <div className="absolute inset-0.5 rounded-lg bg-white/10 backdrop-blur-sm flex items-center justify-center">
                 <Car
-                  className="w-7 h-7 text-white/90 drop-shadow-lg"
+                  className="w-5 h-5 text-white/90 drop-shadow-lg"
                   strokeWidth={2}
                 />
                 <div className="absolute -right-1 -top-1">
-                  <div className="relative w-4 h-4 bg-green-500 rounded-full animate-pulse">
+                  <div className="relative w-3 h-3 bg-green-500 rounded-full animate-pulse">
                     <div className="absolute inset-0 rounded-full bg-green-500 animate-ping opacity-75"></div>
                   </div>
                 </div>
@@ -144,7 +144,7 @@ function AppContent() {
             </div>
           </a>
           <div className="flex flex-col justify-center min-w-0">
-            <h1 className="text-base sm:text-xl lg:text-2xl font-bold text-primary truncate leading-tight">
+            <h1 className="text-sm sm:text-base lg:text-lg font-bold text-primary truncate leading-tight">
               智能交通监控系统
             </h1>
             <p className="text-muted-foreground text-xs sm:text-sm hidden sm:block leading-tight">
@@ -154,31 +154,31 @@ function AppContent() {
         </div>
         <div className="flex-1 flex flex-col items-center justify-center max-w-md mx-auto">
           {/* Centered Navigation Tabs */}
-          <nav className="flex items-center gap-1 sm:gap-3">
+          <nav className="flex items-center gap-0.5 sm:gap-1.5">
             <NavLink
               to="/home"
               className={navItemClass}
             >
-              <Home className="h-5 w-5 sm:h-6 sm:w-6" />
+              <Home className="h-4 w-4 sm:h-5 sm:w-5" />
               <span className="hidden sm:inline">首页</span>
             </NavLink>
             <NavLink
               to="/analys"
               className={navItemClass}
             >
-              <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6" />
+              <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />
               <span className="hidden sm:inline">分析</span>
             </NavLink>
             <NavLink
               to="/chat"
               className={navItemClass}
             >
-              <Bot className="h-5 w-5 sm:h-6 sm:w-6" />
+              <Bot className="h-4 w-4 sm:h-5 sm:w-5" />
               <span className="hidden sm:inline">AI 助手</span>
             </NavLink>
           </nav>
         </div>
-        <div className="flex items-center space-x-2 sm:space-x-3 relative flex-shrink-0">
+        <div className="flex items-center space-x-1.5 sm:space-x-2 relative flex-shrink-0">
           {authed && (
             <>
               <DropdownMenu>
@@ -187,7 +187,7 @@ function AppContent() {
                     variant="outline"
                     className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary/50 hover:bg-secondary border-border/50 shadow-sm transition-all duration-200 hover:shadow-md active:scale-95"
                   >
-                    <UserCircle className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                    <UserCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                     <span className="font-semibold text-foreground hidden sm:inline text-sm">
                       账号
                     </span>
@@ -226,7 +226,7 @@ function AppContent() {
             variant="outline"
             size="icon"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="h-9 w-9 rounded-xl bg-secondary/50 border-border/50 hover:bg-secondary shadow-sm transition-all duration-200 hover:shadow-md active:scale-95"
+            className="h-8 w-8 rounded-xl bg-secondary/50 border-border/50 hover:bg-secondary shadow-sm transition-all duration-200 hover:shadow-md active:scale-95"
             title={theme === "dark" ? "切换到浅色模式" : "切换到深色模式"}
           >
             {theme === "dark" ? (
