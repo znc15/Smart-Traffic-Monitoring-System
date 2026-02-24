@@ -1,6 +1,6 @@
 /**
  * Chat Storage Utilities
- * Helper functions để quản lý lịch sử chat trong localStorage
+ * 用于管理 localStorage 中聊天记录的辅助函数
  */
 
 import { authConfig } from "../config";

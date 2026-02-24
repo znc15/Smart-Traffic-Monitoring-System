@@ -25,7 +25,7 @@ export const useWebSocket = (
   options: WebSocketHookOptions = {}
 ): WebSocketHook => {
   const {
-    maxReconnectAttempts = 10, // Tăng số lần retry lên 10
+    maxReconnectAttempts = 10, // 最大重试次数设为10
     onOpen,
     onClose,
     onError,
@@ -212,9 +212,9 @@ export const useWebSocket = (
 
   const hasInitialized = useRef(false);
 
-  // Khởi tạo WebSocket một lần duy nhất khi component mount
+  // 组件挂载时仅初始化一次 WebSocket
   useEffect(() => {
-    // Chỉ chạy một lần khi component mount
+    // 仅在组件挂载时执行一次
     if (hasInitialized.current) return;
     hasInitialized.current = true;
     mountedRef.current = true;

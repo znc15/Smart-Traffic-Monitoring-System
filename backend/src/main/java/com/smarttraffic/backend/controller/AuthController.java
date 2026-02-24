@@ -38,7 +38,7 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest request) {
         authService.register(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(new RegisterResponse("Đăng ký thành công"));
+        return ResponseEntity.status(HttpStatus.CREATED).body(new RegisterResponse("注册成功"));
     }
 
     @PostMapping(value = "/login", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)

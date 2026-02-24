@@ -34,7 +34,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
             if (!StringUtils.hasText(userMessage)) {
                 Map<String, Object> payload = new LinkedHashMap<>();
-                payload.put("message", "Bạn chưa nhập tin nhắn.");
+                payload.put("message", "请输入消息。");
                 payload.put("image", null);
                 session.sendMessage(new TextMessage(objectMapper.writeValueAsString(
                         payload
@@ -46,7 +46,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             session.sendMessage(new TextMessage(objectMapper.writeValueAsString(response)));
         } catch (Exception ex) {
             Map<String, Object> payload = new LinkedHashMap<>();
-            payload.put("message", "Lỗi: " + ex.getMessage());
+            payload.put("message", "错误: " + ex.getMessage());
             payload.put("image", null);
             session.sendMessage(new TextMessage(objectMapper.writeValueAsString(
                     payload

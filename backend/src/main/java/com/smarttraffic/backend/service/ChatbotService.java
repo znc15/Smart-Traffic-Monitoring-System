@@ -25,15 +25,15 @@ public class ChatbotService {
     public ChatResponse reply(String message, CurrentUser currentUser) {
         List<String> roads = trafficService.roadNames();
         if (roads.isEmpty()) {
-            return new ChatResponse("Hiện chưa có dữ liệu đường để phân tích.", Collections.emptyList());
+            return new ChatResponse("暂无道路数据可供分析。", Collections.emptyList());
         }
 
         String road = roads.get(0);
         Map<String, Object> info = trafficService.info(road);
-        String userPrefix = currentUser == null ? "Khách" : currentUser.username();
+        String userPrefix = currentUser == null ? "访客" : currentUser.username();
 
         String text = String.format(
-                "%s: Đã nhận câu hỏi \"%s\". %s hiện có ô tô: %s, xe máy: %s, tốc độ ô tô: %s km/h, tốc độ xe máy: %s km/h.",
+                "%s: 已收到问题「%s」。%s 当前汽车: %s, 摩托车: %s, 汽车速度: %s km/h, 摩托车速度: %s km/h。",
                 userPrefix,
                 message,
                 road,

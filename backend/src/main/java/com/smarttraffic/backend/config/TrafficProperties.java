@@ -7,7 +7,7 @@ import java.util.List;
 
 @ConfigurationProperties(prefix = "app.traffic")
 public class TrafficProperties {
-    private String roads = "Đường Trần Hưng Đạo,Đường Trần Phú,Đường Nguyễn Huệ,Đường Lê Lợi,Đường Nguyễn Trãi";
+    private String roads = "陈兴道路,陈富路,阮惠路,黎利路,阮廌路";
 
     public String getRoads() {
         return roads;

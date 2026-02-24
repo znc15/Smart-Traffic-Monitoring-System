@@ -40,7 +40,7 @@ public class AdminController {
     public Map<String, Object> resources() {
         CurrentUser user = SecurityUtils.requireCurrentUser();
         if (!user.isAdmin()) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Chỉ admin mới được phép truy cập tài nguyên hệ thống.");
+            throw new AppException(HttpStatus.FORBIDDEN, "仅管理员可访问系统资源");
         }
         return systemMetricsService.getSystemMetrics();
     }

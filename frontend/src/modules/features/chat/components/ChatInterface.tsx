@@ -19,7 +19,7 @@ function isSameApiOrigin(url: string): boolean {
   }
 }
 
-// Component fetch và hiển thị ảnh từ URL API bằng Authorization header
+// 组件：通过 Authorization header 从 API URL 获取并显示图片
 const ChatImageFromUrl = ({ url }: { url: string }) => {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
@@ -139,7 +139,7 @@ const markdownComponents: Components = {
 };
 import { useWebSocket } from "../../../../hooks/useWebSocket";
 
-// Helper function để tạo unique message ID với random string
+// 辅助函数：生成唯一消息ID（含随机字符串）
 const generateMessageId = () => {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 15);
@@ -170,7 +170,7 @@ interface ChatInterfaceProps {
   trafficData: TrafficData;
 }
 
-// Memoized MessageBubble component để tránh re-render không cần thiết
+// 记忆化 MessageBubble 组件，避免不必要的重新渲染
 const MessageBubble = memo(
   ({
     msg,
@@ -279,7 +279,7 @@ const MessageBubble = memo(
       </motion.div>
     );
   },
-  // Custom comparison function để optimize re-renders
+  // 自定义比较函数以优化重新渲染
   (prevProps, nextProps) => {
     return (
       prevProps.msg.id === nextProps.msg.id &&
@@ -342,9 +342,9 @@ const ChatInterface = ({ trafficData }: ChatInterfaceProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Hàm scroll xuống cuối
+  // 滚动到底部的函数
   const scrollToBottom = useCallback(() => {
-    // Sử dụng setTimeout để đảm bảo DOM đã update xong
+    // 使用 setTimeout 确保 DOM 已更新完毕
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({
         behavior: "smooth",
@@ -402,7 +402,7 @@ const ChatInterface = ({ trafficData }: ChatInterfaceProps) => {
     saveChatDraft(input);
   }, [input]);
 
-  // Kiểm tra trafficData
+  // 检查 trafficData
   useEffect(() => {
     const hasData = trafficData && Object.keys(trafficData).length > 0;
     console.log("Traffic Data Status:", {
@@ -412,7 +412,7 @@ const ChatInterface = ({ trafficData }: ChatInterfaceProps) => {
     });
 
       if (!hasData && messages.length === 1) {
-        // Chỉ hiển thị thông báo nếu là tin nhắn chào đầu tiên
+        // 仅在第一条欢迎消息时显示提示
         setMessages([
           {
             id: "1",
@@ -424,17 +424,17 @@ const ChatInterface = ({ trafficData }: ChatInterfaceProps) => {
       }
     }, [trafficData, messages.length]);
 
-  // Auto-scroll khi messages thay đổi (gửi tin mới hoặc nhận tin mới)
+  // 当消息变化时自动滚动到底部（发送或接收新消息）
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // Scroll xuống cuối khi component mount (mở chat lần đầu)
+  // 组件挂载时滚动到底部（首次打开聊天）
   useEffect(() => {
     scrollToBottom();
   }, [scrollToBottom]);
 
-  // Chat WebSocket with authentication - setup trước để dùng trong handlers
+  // 聊天 WebSocket（带认证）- 提前设置以便在处理函数中使用
   const token = localStorage.getItem(authConfig.TOKEN_KEY);
   const chatWsUrl = endpoints.chatWs;
 
@@ -477,14 +477,14 @@ const ChatInterface = ({ trafficData }: ChatInterfaceProps) => {
     }
   }, [isWsConnected]);
 
-  // Bỏ phần xử lý/biến đổi câu hỏi - gửi thẳng nội dung người dùng nhập
+  // 移除问题处理/转换部分 - 直接发送用户输入的内容
 
-  // Memoize handlers để tránh re-create functions
+  // 记忆化处理函数，避免重复创建函数
   const handleSendMessage = useCallback(async () => {
     if (!input.trim() || isLoading) return;
 
     const userMessage = input.trim();
-    console.log("Sending message:", { message: userMessage }); // Log tin nhắn gửi đi
+    console.log("Sending message:", { message: userMessage }); // 记录发送的消息
     setInput("");
     // clear saved draft after sending
     clearChatDraft();
@@ -499,7 +499,7 @@ const ChatInterface = ({ trafficData }: ChatInterfaceProps) => {
     };
     setMessages((prev) => [...prev, userMsg]);
 
-    // Scroll xuống sau khi thêm tin nhắn người dùng
+    // 添加用户消息后滚动到底部
     scrollToBottom();
 
     // Add typing indicator
@@ -529,7 +529,7 @@ const ChatInterface = ({ trafficData }: ChatInterfaceProps) => {
         return;
       }
 
-      // Gửi thẳng tin nhắn người dùng tới AI
+      // 直接将用户消息发送给 AI
       const ok = chatSocketSend({ message: userMessage });
       console.log("Message sent status:", ok);
 
@@ -565,12 +565,12 @@ const ChatInterface = ({ trafficData }: ChatInterfaceProps) => {
       setIsLoading(false);
       inputRef.current?.focus();
     }
-  }, [input, isLoading, isWsConnected, chatSocketSend, scrollToBottom]); // Dependencies for useCallback
+  }, [input, isLoading, isWsConnected, chatSocketSend, scrollToBottom]); // useCallback 的依赖项
 
   useEffect(() => {
     if (!chatData) return;
     try {
-      // Log toàn bộ dữ liệu nhận được từ WebSocket
+      // 记录从 WebSocket 接收到的全部数据
       console.log("WebSocket Raw Response:", chatData);
       const payload = chatData as
         | { message?: string; image?: string[] }
@@ -578,12 +578,12 @@ const ChatInterface = ({ trafficData }: ChatInterfaceProps) => {
       const responseText = payload?.message;
       const responseImage = payload?.image;
 
-      // Log chi tiết từng phần của response
+      // 记录响应的各部分详情
       console.log("Response Text:", responseText);
       console.log("Response Images:", responseImage);
 
-      // Chỉ bỏ qua nếu cả text và image đều không có hoặc undefined
-      // Chấp nhận empty string vì AI có thể gửi text rỗng kèm ảnh
+      // 仅当 text 和 image 都不存在或为 undefined 时才跳过
+      // 接受空字符串，因为 AI 可能发送空文本附带图片
       const hasText = responseText !== undefined && responseText !== null;
       const hasImages = responseImage && responseImage.length > 0;
 
@@ -626,8 +626,8 @@ const ChatInterface = ({ trafficData }: ChatInterfaceProps) => {
         ];
       });
 
-      // Bỏ toast success notification
-      // toast.success("Đã nhận được phản hồi từ AI");
+      // 移除成功提示通知
+      // toast.success("已收到 AI 的回复");
     } catch (error) {
       console.error("Error processing WebSocket response:", error);
       toast.error("处理响应时出错");
@@ -734,7 +734,7 @@ const ChatInterface = ({ trafficData }: ChatInterfaceProps) => {
                 />
               ))}
             </AnimatePresence>
-            {/* Invisible element để scroll xuống */}
+            {/* 用于滚动到底部的不可见元素 */}
             <div ref={messagesEndRef} className="h-1" />
           </div>
         </ScrollArea>

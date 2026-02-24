@@ -24,12 +24,12 @@ public class UserController {
     @PutMapping("/password")
     public MessageResponse updatePassword(@Valid @RequestBody UpdatePasswordRequest request) {
         userService.updatePassword(SecurityUtils.requireCurrentUser(), request);
-        return new MessageResponse("Cập nhật mật khẩu thành công!");
+        return new MessageResponse("密码修改成功！");
     }
 
     @PutMapping("/profile")
     public MessageResponse updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
         userService.updateProfile(SecurityUtils.requireCurrentUser(), request);
-        return new MessageResponse("Cập nhật thông tin thành công!");
+        return new MessageResponse("资料更新成功！");
     }
 }

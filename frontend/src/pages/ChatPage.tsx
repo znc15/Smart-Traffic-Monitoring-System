@@ -9,7 +9,7 @@ export default function ChatPage() {
   useEffect(() => {
     const fetchRoads = async () => {
       try {
-        // roads_name endpoint không cần authentication
+        // roads_name 接口无需认证
         const res = await fetch(endpoints.roadNames);
         if (!res.ok) {
           setAllowedRoads([]);

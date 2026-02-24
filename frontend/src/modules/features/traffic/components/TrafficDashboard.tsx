@@ -44,15 +44,15 @@ const TrafficDashboard = () => {
   useEffect(() => {
     const fetchRoads = async () => {
       try {
-        // roads_name endpoint không cần authentication
+        // roads_name 端点不需要认证
         const res = await fetch(endpoints.roadNames);
         if (!res.ok) {
           console.error("Failed to fetch road names");
           setAllowedRoads([
-            "Văn Phú",
-            "Nguyễn Trãi",
-            "Ngã Tư Sở",
-            "Đường Láng",
+            "文富",
+            "阮廌路",
+            "四所交叉口",
+            "郎路",
           ]);
           return;
         }
@@ -62,11 +62,11 @@ const TrafficDashboard = () => {
       } catch (error) {
         console.error("Error fetching roads:", error);
         setAllowedRoads([
-          "Văn Phú",
-          "Nguyễn Trãi",
-          "Ngã Tư Sở",
-          "Đường Láng",
-          "Văn Quán",
+          "文富",
+          "阮廌路",
+          "四所交叉口",
+          "郎路",
+          "文馆",
         ]);
       }
     };
@@ -89,11 +89,11 @@ const TrafficDashboard = () => {
     // Prefer backend-provided classification when available
     const densityFromBackend = (data as TrafficBackendData).density_status;
     if (densityFromBackend) {
-      if (densityFromBackend === "Tắc nghẽn")
+      if (densityFromBackend === "拥堵")
         return { status: "congested", color: "red", icon: AlertTriangle };
-      if (densityFromBackend === "Đông đúc")
+      if (densityFromBackend === "较拥挤")
         return { status: "busy", color: "yellow", icon: Clock };
-      if (densityFromBackend === "Thông thoáng")
+      if (densityFromBackend === "畅通")
         return { status: "clear", color: "green", icon: CheckCircle };
     }
     // Fallback: compute from local thresholds when backend doesn't provide classification
@@ -111,9 +111,9 @@ const TrafficDashboard = () => {
     if (!data) return { speedText: "未知", speedColor: "gray" };
     const speedFromBackend = (data as TrafficBackendData).speed_status;
     if (speedFromBackend) {
-      if (speedFromBackend === "Nhanh chóng")
+      if (speedFromBackend === "较快")
         return { speedText: "较快", speedColor: "green" };
-      if (speedFromBackend === "Chậm chạp")
+      if (speedFromBackend === "较慢")
         return { speedText: "较慢", speedColor: "orange" };
     }
     // Fallback: compute from local thresholds
@@ -215,7 +215,7 @@ const TrafficDashboard = () => {
                             className="flex flex-col p-3 rounded-lg bg-card border border-border/50 hover:bg-accent/50 hover:border-border transition-all cursor-pointer hover:shadow-md space-y-2"
                             onClick={() => setSelectedRoad(road)}
                           >
-                            {/* Tên đường và nhãn mật độ */}
+                            {/* 道路名称和密度标签 */}
                             <div className="flex items-center justify-between">
                               <span className="font-semibold text-sm text-foreground">
                                 {road}
@@ -234,7 +234,7 @@ const TrafficDashboard = () => {
                               </Badge>
                             </div>
 
-                            {/* Thông tin số lượng và tốc độ */}
+                            {/* 数量和速度信息 */}
                             <div className="flex items-center justify-between gap-2">
                               {data && (
                                 <div className="text-xs font-medium text-muted-foreground flex items-center space-x-1">

@@ -44,7 +44,7 @@ public class TrafficService {
     public Map<String, Object> info(String roadName) {
         Snapshot snapshot = snapshots.get(roadName);
         if (snapshot == null) {
-            throw new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đường");
+            throw new AppException(HttpStatus.NOT_FOUND, "未找到道路");
         }
 
         snapshot.tick();
@@ -70,7 +70,7 @@ public class TrafficService {
 
     public byte[] frame(String roadName) {
         if (!snapshots.containsKey(roadName)) {
-            throw new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đường");
+            throw new AppException(HttpStatus.NOT_FOUND, "未找到道路");
         }
         return frameCache.getOrDefault(roadName, SAMPLE_JPEG);
     }

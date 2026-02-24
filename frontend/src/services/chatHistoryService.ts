@@ -1,6 +1,6 @@
 /**
  * Chat History Sync Service
- * Đồng bộ lịch sử chat giữa localStorage và server database
+ * 在 localStorage 和服务器数据库之间同步聊天记录
  */
 
 import { authConfig, apiConfig } from "../config";

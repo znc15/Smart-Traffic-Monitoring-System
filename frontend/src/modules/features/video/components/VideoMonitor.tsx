@@ -69,21 +69,21 @@ const VideoMonitor = ({
     // Prefer backend-provided classification when available
     const densityFromBackend = data.density_status;
     if (densityFromBackend) {
-      if (densityFromBackend === "Tắc nghẽn")
+      if (densityFromBackend === "拥堵")
         return {
           status: "congested",
           color: "red",
           icon: AlertTriangle,
           text: "拥堵",
         };
-      if (densityFromBackend === "Đông đúc")
+      if (densityFromBackend === "较拥挤")
         return {
           status: "busy",
           color: "yellow",
           icon: Clock,
           text: "较拥挤",
         };
-      if (densityFromBackend === "Thông thoáng")
+      if (densityFromBackend === "畅通")
         return {
           status: "clear",
           color: "green",
@@ -124,9 +124,9 @@ const VideoMonitor = ({
 
     const speedFromBackend = data.speed_status;
     if (speedFromBackend) {
-      if (speedFromBackend === "Nhanh chóng")
+      if (speedFromBackend === "较快")
         return { speedText: "较快", speedColor: "green" };
-      if (speedFromBackend === "Chậm chạp")
+      if (speedFromBackend === "较慢")
         return { speedText: "较慢", speedColor: "orange" };
     }
 

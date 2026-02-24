@@ -29,7 +29,7 @@ public class UserService {
                 .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Could not validate credentials"));
 
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Mật khẩu hiện tại không đúng!");
+            throw new AppException(HttpStatus.BAD_REQUEST, "当前密码不正确！");
         }
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
@@ -43,21 +43,21 @@ public class UserService {
 
         if (StringUtils.hasText(request.getUsername()) && !request.getUsername().equals(user.getUsername())) {
             if (userRepository.existsByUsernameAndIdNot(request.getUsername(), user.getId())) {
-                throw new AppException(HttpStatus.BAD_REQUEST, "Tên đăng nhập đã tồn tại!");
+                throw new AppException(HttpStatus.BAD_REQUEST, "用户名已存在！");
             }
             user.setUsername(request.getUsername());
         }
 
         if (StringUtils.hasText(request.getEmail()) && !request.getEmail().equals(user.getEmail())) {
             if (userRepository.existsByEmailAndIdNot(request.getEmail(), user.getId())) {
-                throw new AppException(HttpStatus.BAD_REQUEST, "Email đã được sử dụng!");
+                throw new AppException(HttpStatus.BAD_REQUEST, "邮箱已被使用！");
             }
             user.setEmail(request.getEmail());
         }
 
         if (StringUtils.hasText(request.getPhoneNumber()) && !request.getPhoneNumber().equals(user.getPhoneNumber())) {
             if (userRepository.existsByPhoneNumberAndIdNot(request.getPhoneNumber(), user.getId())) {
-                throw new AppException(HttpStatus.BAD_REQUEST, "Số điện thoại đã được sử dụng!");
+                throw new AppException(HttpStatus.BAD_REQUEST, "手机号已被使用！");
             }
             user.setPhoneNumber(request.getPhoneNumber());
         }

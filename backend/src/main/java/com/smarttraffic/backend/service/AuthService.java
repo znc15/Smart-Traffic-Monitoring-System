@@ -33,7 +33,7 @@ public class AuthService {
                 || userRepository.findByPhoneNumber(request.getPhoneNumber()).isPresent();
 
         if (conflict) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Username, email hoặc số điện thoại đã tồn tại!");
+            throw new AppException(HttpStatus.BAD_REQUEST, "用户名、邮箱或手机号已存在！");
         }
 
         UserEntity entity = new UserEntity();
@@ -47,10 +47,10 @@ public class AuthService {
 
     public LoginResponse login(String email, String password) {
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "Sai thông tin đăng nhập"));
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "登录信息错误"));
 
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new AppException(HttpStatus.UNAUTHORIZED, "Sai thông tin đăng nhập");
+            throw new AppException(HttpStatus.UNAUTHORIZED, "登录信息错误");
         }
 
         if (!user.isEnabled()) {

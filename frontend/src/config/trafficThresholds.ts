@@ -1,44 +1,44 @@
 /**
- * Cấu hình ngưỡng giao thông cho từng tuyến đường
+ * 各路段交通阈值配置
  *
- * - v: Ngưỡng vận tốc trung bình (km/h) - Lớn hơn hoặc bằng v thì nhanh chóng, ngược lại là chậm
- * - c1: Ngưỡng số lượng phương tiện thấp - Lớn hơn c1 là đông đúc
- * - c2: Ngưỡng số lượng phương tiện cao - Lớn hơn c2 là tắc nghẽn
+ * - v: 平均速度阈值 (km/h) - 大于等于 v 为畅通，否则为缓慢
+ * - c1: 车辆数量低阈值 - 大于 c1 为拥挤
+ * - c2: 车辆数量高阈值 - 大于 c2 为拥堵
  *
- * Quy tắc phân loại:
- * - Tắc nghẽn: Tổng số phương tiện > c2
- * - Đông đúc: Tổng số phương tiện > c1 và <= c2
- * - Thông thoáng: Tổng số phương tiện <= c1
+ * 分类规则：
+ * - 拥堵：车辆总数 > c2
+ * - 拥挤：车辆总数 > c1 且 <= c2
+ * - 畅通：车辆总数 <= c1
  */
 
 export interface RoadThreshold {
-  v: number; // Ngưỡng vận tốc trung bình
-  c1: number; // Ngưỡng đông đúc
-  c2: number; // Ngưỡng tắc nghẽn
+  v: number; // 平均速度阈值
+  c1: number; // 拥挤阈值
+  c2: number; // 拥堵阈值
 }
 
 export const TRAFFIC_THRESHOLDS: Record<string, RoadThreshold> = {
-  "Đường Láng": {
+  "郎路": {
     v: 6,
     c1: 17,
     c2: 26,
   },
-  "Ngã Tư Sở": {
+  "四所交叉口": {
     v: 17,
     c1: 45,
     c2: 57,
   },
-  "Nguyễn Trãi": {
+  "阮廌路": {
     v: 30,
     c1: 25,
     c2: 35,
   },
-  "Văn Quán": {
+  "文馆": {
     v: 10,
     c1: 10,
     c2: 17,
   },
-  "Văn Phú": {
+  "文富": {
     v: 13,
     c1: 18,
     c2: 26,
@@ -46,7 +46,7 @@ export const TRAFFIC_THRESHOLDS: Record<string, RoadThreshold> = {
 };
 
 /**
- * Ngưỡng mặc định cho các tuyến đường chưa được cấu hình
+ * 未配置路段的默认阈值
  */
 export const DEFAULT_THRESHOLD: RoadThreshold = {
   v: 15,
@@ -55,9 +55,9 @@ export const DEFAULT_THRESHOLD: RoadThreshold = {
 };
 
 /**
- * Lấy ngưỡng cho một tuyến đường cụ thể
- * @param roadName - Tên tuyến đường
- * @returns Ngưỡng cho tuyến đường hoặc ngưỡng mặc định
+ * 获取指定路段的阈值
+ * @param roadName - 路段名称
+ * @returns 该路段的阈值或默认阈值
  */
 export const getThresholdForRoad = (roadName: string): RoadThreshold => {
   return TRAFFIC_THRESHOLDS[roadName] || DEFAULT_THRESHOLD;

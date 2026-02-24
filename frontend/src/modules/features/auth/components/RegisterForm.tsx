@@ -69,7 +69,7 @@ function Register({ onRegisterSuccess }: { onRegisterSuccess?: () => void }) {
       if (res.ok) {
         setSuccess(true);
         onRegisterSuccess?.();
-        // Chuyển hướng đến trang đăng nhập sau 2 giây
+        // 2秒后跳转到登录页
         setTimeout(() => {
           navigate("/login");
         }, 2000);

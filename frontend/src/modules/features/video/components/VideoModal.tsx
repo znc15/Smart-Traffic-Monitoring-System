@@ -140,13 +140,13 @@ const VideoModal = ({
                     状态
                   </h4>
                   <div className="space-y-2">
-                    {/* Đánh giá về số lượng phương tiện */}
+                    {/* 车辆密度评估 */}
                     <div className="p-2 bg-muted/50 rounded">
                       {(() => {
                         // Prefer backend-provided label
                         const densityFromBackend = trafficData.density_status;
                         if (densityFromBackend) {
-                          if (densityFromBackend === "Tắc nghẽn") {
+                          if (densityFromBackend === "拥堵") {
                             return (
                               <div className="flex items-center justify-between">
                                 <span className="text-xs text-muted-foreground">
@@ -158,7 +158,7 @@ const VideoModal = ({
                               </div>
                             );
                           }
-                          if (densityFromBackend === "Đông đúc") {
+                          if (densityFromBackend === "较拥挤") {
                             return (
                               <div className="flex items-center justify-between">
                                 <span className="text-xs text-muted-foreground">
@@ -223,12 +223,12 @@ const VideoModal = ({
                       })()}
                     </div>
 
-                    {/* Đánh giá về tốc độ */}
+                    {/* 速度评估 */}
                     <div className="p-2 bg-muted/50 rounded">
                       {(() => {
                         const speedFromBackend = trafficData.speed_status;
                         if (speedFromBackend) {
-                          if (speedFromBackend === "Nhanh chóng") {
+                          if (speedFromBackend === "较快") {
                             return (
                               <div className="flex items-center justify-between">
                                 <span className="text-xs text-muted-foreground">

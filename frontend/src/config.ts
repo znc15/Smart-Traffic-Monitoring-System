@@ -1,13 +1,13 @@
 /**
- * Configuration file - tương tự backend/app/core/config.py
- * Tập trung tất cả các URL và cấu hình của Frontend
+ * 配置文件 - 类似 backend/app/core/config.py
+ * 集中管理前端所有 URL 和配置
  */
 
 // ============================================
 // API Configuration
 // ============================================
 class ApiConfig {
-  // Base URLs - có thể override qua environment variables
+  // Base URLs - 可通过环境变量覆盖
   BASE_URL_HTTP = import.meta.env.VITE_API_HTTP_BASE || "http://localhost:8000";
   BASE_URL_WS = import.meta.env.VITE_API_WS_BASE || "ws://localhost:8000";
 
@@ -113,7 +113,7 @@ class AppConfig {
 }
 
 // ============================================
-// Export instances (tương tự backend)
+// Export instances (类似后端)
 // ============================================
 export const apiConfig = new ApiConfig();
 export const authConfig = new AuthConfig();
@@ -139,7 +139,7 @@ export async function authFetch(url: string, options: RequestInit = {}) {
 }
 
 // ============================================
-// Backward compatibility với code cũ
+// 向后兼容旧代码
 // ============================================
 export const API_HTTP_BASE = apiConfig.API_HTTP_BASE;
 export const API_WS_BASE = apiConfig.API_WS_BASE;

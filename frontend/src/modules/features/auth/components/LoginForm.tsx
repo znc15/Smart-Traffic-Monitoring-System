@@ -20,9 +20,9 @@ function Login({ onLoginSuccess }: { onLoginSuccess?: () => void }) {
     setLoading(true);
     setError("");
     try {
-      // OAuth2 yêu cầu application/x-www-form-urlencoded
+      // OAuth2 要求 application/x-www-form-urlencoded
       const formData = new URLSearchParams();
-      formData.append("username", email); // OAuth2 dùng field "username" cho cả email/username
+      formData.append("username", email); // OAuth2 使用 "username" 字段兼容邮箱/用户名
       formData.append("password", password);
 
       const res = await fetch(authConfig.LOGIN_URL, {
