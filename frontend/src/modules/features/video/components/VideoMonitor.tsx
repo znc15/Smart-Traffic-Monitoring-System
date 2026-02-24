@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
-import { Badge } from "@/ui/badge";
 import { Skeleton } from "@/ui/skeleton";
 import {
   Video,
@@ -9,7 +8,6 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  Gauge,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -141,19 +139,6 @@ const VideoMonitor = ({
     return { speedText: "较慢", speedColor: "orange" };
   };
 
-  const getStatusBadgeVariant = (color: string) => {
-    switch (color) {
-      case "red":
-        return "destructive";
-      case "yellow":
-        return "secondary";
-      case "green":
-        return "default";
-      default:
-        return "outline";
-    }
-  };
-
   if (loading) {
     return (
       <Card>
@@ -230,25 +215,23 @@ const VideoMonitor = ({
             {allowedRoads.map((roadName) => {
               const frame = frameData[roadName];
               const data = trafficData[roadName];
-              const { color, icon: Icon, text } = getTrafficStatus(roadName);
+              const { color, text } = getTrafficStatus(roadName);
               const { speedText, speedColor } = getSpeedStatus(roadName);
               const isSelected = selectedRoad === roadName;
 
               return (
                 <motion.div
                   key={roadName}
-                  initial={{ opacity: 0, scale: 0.9 }}
+                  initial={{ opacity: 0 }}
                   animate={{
                     opacity: 1,
-                    scale: isSelected ? 1.05 : 1,
-                    transition: { duration: 0.3 },
+                    transition: { duration: 0.2 },
                   }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  whileHover={{ scale: 1.02 }}
-                  className={`relative overflow-hidden rounded-xl border-2 transition-all duration-300 cursor-pointer inline-block w-full max-w-sm mx-auto ${
+                  exit={{ opacity: 0 }}
+                  className={`relative overflow-hidden rounded-xl border transition-all duration-200 cursor-pointer inline-block w-full max-w-sm mx-auto ${
                     isSelected
-                      ? "border-primary shadow-lg shadow-primary/25"
-                      : "border-border/50 hover:border-border"
+                      ? "border-primary shadow-sm"
+                      : "border-border/40 hover:border-border hover:shadow-sm"
                   }`}
                   onClick={() => {
                     setModalRoadName(roadName);
@@ -278,88 +261,39 @@ const VideoMonitor = ({
                     </div>
                   </div>
 
-                  {/* Info Panel (responsive) */}
+                  {/* Info Panel */}
                   <div className="bg-card p-2 sm:p-3">
-                    <h3 className="font-semibold text-sm sm:text-lg mb-2 sm:mb-3 flex items-center space-x-2">
-                      <span className="truncate">{roadName}</span>
-                    </h3>
-
-                    {/* Status Badges */}
-                    <div className="mb-2 sm:mb-3 flex flex-wrap gap-1.5 sm:gap-2">
-                      {/* Mật độ Badge */}
-                      <Badge
-                        variant={getStatusBadgeVariant(color)}
-                        className="flex items-center space-x-1 text-xs"
-                      >
-                        <Icon className="h-3 w-3" />
-                        <span>{text}</span>
-                      </Badge>
-
-                      {/* Tốc độ Badge */}
-                      {data && (
-                        <Badge
-                          variant={
-                            speedColor === "green" ? "default" : "secondary"
-                          }
-                          className={`flex items-center space-x-1 text-xs ${
-                            speedColor === "green"
-                              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                              : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                          }`}
-                        >
-                          <Gauge className="h-3 w-3" />
-                          <span>{speedText}</span>
-                        </Badge>
-                      )}
+                    <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                      <h3 className="font-medium text-sm sm:text-base truncate">{roadName}</h3>
+                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                        <span className={`inline-block h-2 w-2 rounded-full ${
+                          color === "red" ? "bg-red-500" : color === "yellow" ? "bg-amber-400" : color === "green" ? "bg-emerald-500" : "bg-gray-400"
+                        }`} />
+                        <span className="text-xs text-muted-foreground">{text}</span>
+                        {data && (
+                          <>
+                            <span className="text-muted-foreground/40">·</span>
+                            <span className={`text-xs ${speedColor === "green" ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>{speedText}</span>
+                          </>
+                        )}
+                      </div>
                     </div>
 
                     {data ? (
-                      <div className="grid grid-cols-2 gap-2 sm:gap-4">
-                        {/* Car Stats */}
-                        <div className="flex items-center space-x-1 sm:space-x-2">
-                          <div className="p-1 sm:p-2 bg-primary/10 rounded-lg">
-                            <Car className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                              汽车
-                            </p>
-                            <p className="font-semibold text-xs sm:text-base text-foreground">
-                              {data.count_car}
-                            </p>
-                            <p className="text-xs font-medium text-muted-foreground/70">
-                              {data.speed_car.toFixed(1)} km/h
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Motorbike Stats */}
-                        <div className="flex items-center space-x-1 sm:space-x-2">
-                          <div className="p-1 sm:p-2 bg-emerald-500/10 rounded-lg">
-                            <Bike className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                              摩托车
-                            </p>
-                            <p className="font-semibold text-xs sm:text-base text-foreground">
-                              {data.count_motor}
-                            </p>
-                            <p className="text-xs font-medium text-muted-foreground/70">
-                              {data.speed_motor.toFixed(1)} km/h
-                            </p>
-                          </div>
-                        </div>
+                      <div className="flex items-center gap-3 sm:gap-4 text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1">
+                          <Car className="h-3 w-3" />
+                          <span className="font-medium text-foreground">{data.count_car}</span>
+                          <span className="text-muted-foreground/60">{data.speed_car.toFixed(0)}km/h</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <Bike className="h-3 w-3" />
+                          <span className="font-medium text-foreground">{data.count_motor}</span>
+                          <span className="text-muted-foreground/60">{data.speed_motor.toFixed(0)}km/h</span>
+                        </span>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-center py-2 sm:py-4">
-                        <div className="text-center">
-                          <Gauge className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground/40 mx-auto mb-1 sm:mb-2" />
-                          <p className="text-xs sm:text-sm text-muted-foreground">
-                            正在加载数据...
-                          </p>
-                        </div>
-                      </div>
+                      <p className="text-xs text-muted-foreground/50">正在加载数据...</p>
                     )}
                   </div>
                 </motion.div>
