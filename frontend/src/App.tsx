@@ -100,7 +100,7 @@ function AppContent() {
           return;
         }
         const data = await res.json();
-        setIsAdmin(data?.role_id === 0);
+        setIsAdmin(data?.roleId === 0);
       } catch {
         setIsAdmin(false);
       }

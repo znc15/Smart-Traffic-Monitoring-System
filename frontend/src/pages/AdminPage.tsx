@@ -38,7 +38,7 @@ export default function AdminPage() {
         }
         const me = await res.json();
         if (!cancelled) {
-          const admin = me?.role_id === 0;
+          const admin = me?.roleId === 0;
           setIsAdmin(admin);
           if (!admin) setError("你无权访问此页面");
         }

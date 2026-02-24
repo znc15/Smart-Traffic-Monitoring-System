@@ -53,17 +53,18 @@ public class AdminController {
     @PostMapping("/cameras")
     public CameraEntity createCamera(@RequestBody CameraEntity camera) {
         requireAdmin();
+        camera.setId(null);
         return cameraRepository.save(camera);
     }
 
     @PutMapping("/cameras/{id}")
-    public CameraEntity updateCamera(@PathVariable Long id, @RequestBody CameraEntity body) {
+    public CameraEntity updateCamera(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         requireAdmin();
         CameraEntity cam = cameraRepository.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Camera not found"));
-        if (body.getName() != null) cam.setName(body.getName());
-        if (body.getLocation() != null) cam.setLocation(body.getLocation());
-        cam.setEnabled(body.isEnabled());
+        if (body.containsKey("name")) cam.setName((String) body.get("name"));
+        if (body.containsKey("location")) cam.setLocation((String) body.get("location"));
+        if (body.containsKey("enabled")) cam.setEnabled((Boolean) body.get("enabled"));
         return cameraRepository.save(cam);
     }
 
@@ -90,9 +91,20 @@ public class AdminController {
     @PutMapping("/users/{id}/role")
     public Map<String, String> updateUserRole(@PathVariable Long id, @RequestBody Map<String, Integer> body) {
         requireAdmin();
+        CurrentUser current = SecurityUtils.requireCurrentUser();
+        if (current.getUid().equals(id)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Cannot modify your own account");
+        }
+        Integer roleId = body.get("roleId");
+        if (roleId == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "roleId is required");
+        }
+        if (roleId != 0 && roleId != 1) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "roleId must be 0 or 1");
+        }
         UserEntity user = userRepository.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
-        user.setRoleId(body.get("roleId"));
+        user.setRoleId(roleId);
         userRepository.save(user);
         return Map.of("detail", "Role updated");
     }
@@ -100,6 +112,10 @@ public class AdminController {
     @PutMapping("/users/{id}/status")
     public Map<String, Object> toggleUserStatus(@PathVariable Long id) {
         requireAdmin();
+        CurrentUser current = SecurityUtils.requireCurrentUser();
+        if (current.getUid().equals(id)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Cannot modify your own account");
+        }
         UserEntity user = userRepository.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
         user.setEnabled(!user.isEnabled());

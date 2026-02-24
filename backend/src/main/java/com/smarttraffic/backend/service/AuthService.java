@@ -11,6 +11,7 @@ import com.smarttraffic.backend.security.JwtService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
@@ -25,6 +26,7 @@ public class AuthService {
         this.jwtService = jwtService;
     }
 
+    @Transactional
     public void register(RegisterRequest request) {
         boolean conflict = userRepository.findByUsername(request.getUsername()).isPresent()
                 || userRepository.findByEmail(request.getEmail()).isPresent()
