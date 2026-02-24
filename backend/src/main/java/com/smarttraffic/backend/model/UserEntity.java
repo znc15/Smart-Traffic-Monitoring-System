@@ -7,8 +7,10 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -34,6 +36,14 @@ public class UserEntity {
 
     @Column(name = "phone_number", unique = true, nullable = false, length = 20)
     private String phoneNumber;
+
+    @Column(nullable = false)
+    private boolean enabled = true;
+
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    void onCreate() { this.createdAt = LocalDateTime.now(); }
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ChatMessageEntity> chatMessages = new ArrayList<>();
@@ -93,4 +103,10 @@ public class UserEntity {
     public void setChatMessages(List<ChatMessageEntity> chatMessages) {
         this.chatMessages = chatMessages;
     }
+
+    public boolean isEnabled() { return enabled; }
+    public void setEnabled(boolean enabled) { this.enabled = enabled; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

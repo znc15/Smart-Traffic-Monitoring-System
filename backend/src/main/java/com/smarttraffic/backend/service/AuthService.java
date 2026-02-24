@@ -51,6 +51,10 @@ public class AuthService {
             throw new AppException(HttpStatus.UNAUTHORIZED, "Sai thông tin đăng nhập");
         }
 
+        if (!user.isEnabled()) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Account is disabled");
+        }
+
         CurrentUser currentUser = toCurrentUser(user);
         String token = jwtService.createAccessToken(currentUser);
         return new LoginResponse(token, "bearer");
