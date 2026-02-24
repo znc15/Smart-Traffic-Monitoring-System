@@ -1,0 +1,60 @@
+version: "3.9"
+
+services:
+  database:
+    image: postgres:16
+    container_name: database
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: odoo
+      POSTGRES_DB: transportation_system
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - mynet
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        MAVEN_BASE_IMAGE: ${MAVEN_BASE_IMAGE:-docker.m.daocloud.io/library/maven:3.9.9-eclipse-temurin-17}
+        JRE_BASE_IMAGE: ${JRE_BASE_IMAGE:-docker.m.daocloud.io/library/eclipse-temurin:17-jre}
+    container_name: backend
+    ports:
+      - "8000:8000"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://database:5432/transportation_system
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: odoo
+      JWT_SECRET: change-this-dev-secret-change-this-dev-secret
+      ACCESS_TOKEN_EXPIRE_DAYS: 7
+      BASE_URL_API: http://localhost:8000
+    depends_on:
+      - database
+    networks:
+      - mynet
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-docker.m.daocloud.io/library/node:20.17.0-alpine}
+    container_name: frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    networks:
+      - mynet
+
+networks:
+  mynet:
+
+volumes:
+  pgdata:
+
+
+# docker compose up --build
