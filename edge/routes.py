@@ -87,7 +87,7 @@ _MAX_STREAM_CLIENTS = 5
 _stream_semaphore = asyncio.Semaphore(_MAX_STREAM_CLIENTS)
 
 
-@router.get("/api/traffic")
+@router.get("/api/traffic", response_model=None)
 def get_traffic() -> JSONResponse:
     """交通数据 + 边缘节点性能指标（后端每 3 秒轮询此接口）"""
     data = state.get_traffic()
@@ -95,7 +95,7 @@ def get_traffic() -> JSONResponse:
     return JSONResponse(content=data)
 
 
-@router.get("/api/frame")
+@router.get("/api/frame", response_model=None)
 def get_frame() -> Response:
     """最新 JPEG 检测帧"""
     frame = state.get_frame()
@@ -105,13 +105,13 @@ def get_frame() -> Response:
     return Response(content=frame, media_type="image/jpeg")
 
 
-@router.get("/api/metrics")
+@router.get("/api/metrics", response_model=None)
 def get_metrics() -> JSONResponse:
     """详细性能指标（独立端点）"""
     return JSONResponse(content=state.get_edge_metrics())
 
 
-@router.get("/health")
+@router.get("/health", response_model=None)
 def health_check() -> JSONResponse:
     """健康检查"""
     return JSONResponse(content={
@@ -123,7 +123,7 @@ def health_check() -> JSONResponse:
     })
 
 
-@router.get("/")
+@router.get("/", response_model=None)
 def root_redirect() -> RedirectResponse:
     """根路由重定向到仪表盘页面"""
     return RedirectResponse(url="/static/index.html")
@@ -151,7 +151,7 @@ async def _mjpeg_generator() -> AsyncGenerator[bytes, None]:
         _stream_semaphore.release()
 
 
-@router.get("/api/stream")
+@router.get("/api/stream", response_model=None)
 async def stream_mjpeg() -> StreamingResponse | JSONResponse:
     """MJPEG 视频流端点，持续推送检测帧（最多 5 个并发客户端）"""
     # 非阻塞方式获取信号量，超出限制立即返回 503
@@ -170,13 +170,13 @@ async def stream_mjpeg() -> StreamingResponse | JSONResponse:
 # ---------------------------------------------------------------------------
 # 配置读写 API
 # ---------------------------------------------------------------------------
-@router.get("/api/config")
+@router.get("/api/config", response_model=None)
 def get_config() -> JSONResponse:
     """返回当前运行配置"""
     return JSONResponse(content=_current_config())
 
 
-@router.get("/api/models")
+@router.get("/api/models", response_model=None)
 def get_models() -> JSONResponse:
     """扫描 edge 目录下可用的模型文件列表"""
     models: list[dict] = []
@@ -205,7 +205,7 @@ def get_models() -> JSONResponse:
     })
 
 
-@router.put("/api/config")
+@router.put("/api/config", response_model=None)
 def update_config(body: ConfigUpdateRequest) -> JSONResponse:
     """更新运行配置（仅更新传入的字段，未传入的保持不变），并触发检测循环热重启"""
     # 记录旧模型名和 OpenVINO 开关，用于判断模型是否变更
@@ -289,7 +289,7 @@ def _get_file_extension(filename: str) -> str:
 # ---------------------------------------------------------------------------
 # POST /api/detect/image - 图片上传检测
 # ---------------------------------------------------------------------------
-@router.post("/api/detect/image")
+@router.post("/api/detect/image", response_model=None)
 async def detect_image(file: UploadFile = File(...)) -> JSONResponse:
     """
     接收上传图片，使用 YOLOv8 检测车辆，
@@ -409,7 +409,7 @@ def _process_video(input_path: Path, output_path: Path) -> dict:
     }
 
 
-@router.post("/api/detect/video")
+@router.post("/api/detect/video", response_model=None)
 async def detect_video(file: UploadFile = File(...)) -> JSONResponse:
     """
     接收上传视频，逐帧检测车辆，生成标注视频并返回下载链接和摘要
@@ -463,7 +463,7 @@ async def detect_video(file: UploadFile = File(...)) -> JSONResponse:
 # ---------------------------------------------------------------------------
 # GET /api/detect/video/result/{result_id} - 下载标注后的视频
 # ---------------------------------------------------------------------------
-@router.get("/api/detect/video/result/{result_id}")
+@router.get("/api/detect/video/result/{result_id}", response_model=None)
 async def get_video_result(result_id: str) -> FileResponse:
     """返回标注后的视频文件供下载"""
     # 校验 result_id 格式，防止路径遍历

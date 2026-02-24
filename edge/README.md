@@ -1,19 +1,21 @@
 # Edge Node - 智能交通边缘检测节点
 
-基于 YOLOv8 + OpenVINO 的边缘检测节点，负责实时车辆检测并通过 HTTP API 上报交通数据与节点性能指标。默认启用 OpenVINO 加速 CPU 推理，首次运行自动将 PyTorch 模型导出为 OpenVINO IR 格式。后端 `CameraPollerService` 每 3 秒轮询本节点获取数据。
+基于 YOLOv8 + OpenVINO 的边缘检测节点，负责实时车辆检测并通过 HTTP API 上报交通数据与节点性能指标。内置 Web UI 仪表盘，支持实时监控、运行时配置热切换和文件上传检测测试。默认启用 OpenVINO 加速 CPU 推理，首次运行自动将 PyTorch 模型导出为 OpenVINO IR 格式。后端 `CameraPollerService` 每 3 秒轮询本节点获取数据。
 
 ## 项目结构
 
 ```text
 edge/
-├── main.py              # 应用入口，CLI 参数解析
+├── main.py              # 应用入口，CLI 参数解析，热重启逻辑
 ├── config.py            # 配置（CLI > 环境变量 > 默认值）
 ├── camera_discovery.py  # 摄像头自动发现与交互选择
 ├── detector.py          # YOLOv8 模型加载与车辆检测（OpenVINO）
 ├── loops.py             # 摄像头 / 模拟后台循环
 ├── overlay.py           # 帧信息叠加层绘制
-├── routes.py            # FastAPI 路由定义
+├── routes.py            # FastAPI 路由定义（含配置热切换、文件上传检测）
 ├── state.py             # 线程安全全局状态 + 性能采集
+├── static/              # Web UI 仪表盘（深色主题监控面板）
+├── tmp/                 # 视频检测临时文件（自动清理）
 ├── requirements.txt
 ├── environment.yml      # Conda 环境配置
 └── Dockerfile
@@ -55,7 +57,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-启动后访问 `http://localhost:8000/health` 确认节点运行正常。
+启动后浏览器会自动打开 Web 仪表盘（`http://localhost:8000`），可通过 `--no-browser` 禁用自动打开。
 
 **启动摄像头模式：**
 
@@ -86,6 +88,7 @@ docker run -p 8000:8000 \
   -e MODE=camera \
   -e CAMERA_URL=rtsp://192.168.1.100:554/stream \
   -e ROAD_NAME="长安街-East" \
+  -e NO_BROWSER=true \
   edge-node
 
 # 使用本地摄像头（需要设备映射）
@@ -142,6 +145,7 @@ python main.py [OPTIONS]
 | `--conf` | 检测置信度阈值 | `$CONF` 或 `0.35` |
 | `--port` | HTTP 服务端口 | `$PORT` 或 `8000` |
 | `--no-openvino` | 禁用 OpenVINO，使用 PyTorch 推理 | 默认启用 OpenVINO |
+| `--no-browser` | 禁用启动时自动打开浏览器 | `$NO_BROWSER` 或 `false` |
 
 参数优先级: **CLI 参数 > 环境变量 > 默认值**
 
@@ -169,6 +173,9 @@ python main.py --mode camera --url 0 --model ./runs/detect/train/weights/best.pt
 
 # 禁用 OpenVINO，使用原始 PyTorch 推理
 python main.py --mode camera --url 0 --no-openvino
+
+# 禁用自动打开浏览器（Docker/无头环境）
+python main.py --no-browser
 ```
 
 ## API 接口
@@ -239,6 +246,92 @@ python main.py --mode camera --url 0 --no-openvino
   "timestamp": "2026-02-24T10:30:00.123456"
 }
 ```
+
+### GET `/api/stream`
+
+MJPEG 实时视频流端点，持续推送检测帧。
+
+- Content-Type: `multipart/x-mixed-replace; boundary=frame`
+- 最多支持 5 个并发客户端，超出返回 503
+- 帧率约 20 FPS
+
+### GET `/api/config`
+
+返回当前运行配置。
+
+```json
+{
+  "mode": "camera",
+  "camera_source": "0",
+  "model": "yolov8n.pt",
+  "confidence": 0.35,
+  "road_name": "示例路段-Edge01",
+  "use_openvino": true
+}
+```
+
+### PUT `/api/config`
+
+更新运行配置并触发检测循环热重启。所有字段可选，仅更新传入的字段。
+
+请求体示例：
+
+```json
+{
+  "mode": "camera",
+  "camera_source": "rtsp://192.168.1.100:554/stream",
+  "model": "yolov8s.pt",
+  "confidence": 0.5,
+  "road_name": "长安街-East",
+  "use_openvino": true
+}
+```
+
+热切换机制：停止当前检测循环 -> 更新配置 -> 重启检测循环。模型变更时会线程安全地重新加载模型。
+
+### GET `/api/models`
+
+列出 edge 目录下可用的模型文件。
+
+```json
+{
+  "models": [
+    {"name": "yolov8n.pt", "size_mb": 6.2, "has_openvino": true},
+    {"name": "yolov8s.pt", "size_mb": 21.5, "has_openvino": false}
+  ],
+  "current": "yolov8n.pt"
+}
+```
+
+### POST `/api/detect/image`
+
+上传图片进行车辆检测，返回 base64 标注图片和检测结果。
+
+- 支持格式：jpg, jpeg, png, bmp, webp
+- 文件大小上限：10 MB
+
+### POST `/api/detect/video`
+
+上传视频进行逐帧检测，生成标注视频并返回下载链接。
+
+- 支持格式：mp4, avi, mov, mkv, webm
+- 文件大小上限：100 MB
+- 每隔 3 帧检测一次，非检测帧复用上一次标注结果
+- 结果文件 30 分钟后自动清理
+
+### GET `/api/detect/video/result/{id}`
+
+下载标注后的检测结果视频。
+
+## Web 仪表盘
+
+启动后浏览器自动打开深色主题监控面板（`http://localhost:<port>`），包含三个功能页：
+
+- 监控 Tab：实时 MJPEG 视频流、车辆统计（汽车/摩托车数量）、系统指标（CPU/内存/GPU）、趋势图表
+- 设置 Tab：运行时热切换摄像头源、模型、置信度阈值、路段名等配置，无需重启进程
+- 测试 Tab：拖拽上传图片或视频文件进行检测测试，查看标注结果
+
+通过 `--no-browser` 或环境变量 `NO_BROWSER=true` 可禁用自动打开浏览器（适用于 Docker/无头环境）。
 
 ## 车辆分类 (COCO)
 
