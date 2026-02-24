@@ -89,6 +89,21 @@ class WebSocketConfig {
 }
 
 // ============================================
+// Admin Configuration
+// ============================================
+class AdminConfig {
+  get CAMERAS_URL() {
+    return `${apiConfig.API_HTTP_BASE}/admin/cameras`;
+  }
+  get USERS_URL() {
+    return `${apiConfig.API_HTTP_BASE}/admin/users`;
+  }
+  get SITE_SETTINGS_URL() {
+    return `${apiConfig.API_HTTP_BASE}/admin/site-settings`;
+  }
+}
+
+// ============================================
 // App Configuration
 // ============================================
 class AppConfig {
@@ -104,7 +119,24 @@ export const apiConfig = new ApiConfig();
 export const authConfig = new AuthConfig();
 export const userConfig = new UserConfig();
 export const wsConfig = new WebSocketConfig();
+export const adminConfig = new AdminConfig();
 export const appConfig = new AppConfig();
+
+// ============================================
+// Auth Fetch Helper
+// ============================================
+export async function authFetch(url: string, options: RequestInit = {}) {
+  const token = localStorage.getItem(authConfig.TOKEN_KEY);
+  return fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+    credentials: "include",
+  });
+}
 
 // ============================================
 // Backward compatibility với code cũ
