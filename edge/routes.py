@@ -67,7 +67,7 @@ class ConfigUpdateRequest(BaseModel):
 # 摄像头探测请求体
 # ---------------------------------------------------------------------------
 class ProbeRequest(BaseModel):
-    url: str = Field(..., description="RTSP 或视频流地址")
+    url: str = Field(..., pattern=r"^(rtsp://|rtsps://|http://|https://|/dev/|\d+$).+", max_length=2048, description="RTSP 或视频流地址")
 
 
 def _current_config() -> dict:
@@ -279,7 +279,7 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
 @router.get("/api/cameras", response_model=None)
 async def get_cameras() -> JSONResponse:
     """扫描本地摄像头设备，返回可用设备列表"""
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     cameras = await loop.run_in_executor(None, camera_discovery.scan_local_cameras)
     return JSONResponse(content={"cameras": cameras})
 
@@ -287,7 +287,7 @@ async def get_cameras() -> JSONResponse:
 @router.post("/api/cameras/probe", response_model=None)
 async def probe_camera(body: ProbeRequest) -> JSONResponse:
     """测试 RTSP/视频流地址的连通性"""
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(None, camera_discovery.probe_rtsp, body.url)
     if result is not None:
         return JSONResponse(content={
@@ -359,7 +359,7 @@ async def detect_image(file: UploadFile = File(...)) -> JSONResponse:
         raise HTTPException(status_code=400, detail="无法解码图片，文件可能已损坏")
 
     # 在线程池中异步调用检测，避免阻塞事件循环
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     annotated, car_count, motor_count, inference_ms, objects_list = (
         await loop.run_in_executor(None, detect_vehicles_detailed, frame)
     )
@@ -483,7 +483,7 @@ async def detect_video(file: UploadFile = File(...)) -> JSONResponse:
 
     # 在线程池中异步处理视频，避免阻塞事件循环
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         summary = await loop.run_in_executor(None, _process_video, input_path, output_path)
     except RuntimeError as e:
         # 清理残留文件

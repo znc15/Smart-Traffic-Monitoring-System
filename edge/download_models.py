@@ -10,12 +10,10 @@ YOLOv8 模型下载脚本
 """
 
 import sys
-from pathlib import Path
 
 from ultralytics import YOLO
 
-# 模型存放目录（与本脚本同级的 models/ 子目录）
-MODELS_DIR = Path(__file__).parent / "models"
+from config import MODELS_DIR
 
 # 默认下载的模型列表
 DEFAULT_MODELS = ["yolov8n.pt", "yolov8s.pt"]

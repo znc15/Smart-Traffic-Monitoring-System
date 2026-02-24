@@ -17,16 +17,18 @@ def scan_local_cameras(max_index: int = 10) -> list[dict]:
     devices = []
     for i in range(max_index):
         cap = cv2.VideoCapture(i)
-        if cap.isOpened():
-            w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            devices.append({
-                "index": i,
-                "width": w,
-                "height": h,
-                "fps": round(fps, 1) if fps > 0 else 0,
-            })
+        try:
+            if cap.isOpened():
+                w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                fps = cap.get(cv2.CAP_PROP_FPS)
+                devices.append({
+                    "index": i,
+                    "width": w,
+                    "height": h,
+                    "fps": round(fps, 1) if fps > 0 else 0,
+                })
+        finally:
             cap.release()
     return devices
 
@@ -39,14 +41,16 @@ def probe_rtsp(url: str, timeout_ms: int = 5000) -> dict | None:
     尝试连接 RTSP 地址，返回分辨率信息；失败返回 None
     """
     cap = cv2.VideoCapture(url)
-    # 设置超时（部分后端支持）
-    cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, timeout_ms)
-    if not cap.isOpened():
-        return None
-    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    cap.release()
-    return {"url": url, "width": w, "height": h}
+    try:
+        # 设置超时（部分后端支持）
+        cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, timeout_ms)
+        if not cap.isOpened():
+            return None
+        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        return {"url": url, "width": w, "height": h}
+    finally:
+        cap.release()
 
 
 # ---------------------------------------------------------------------------

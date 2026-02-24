@@ -955,18 +955,26 @@
           const item = document.createElement('div');
           item.className = 'camera-item';
           item.dataset.index = cam.index;
-          const res = (cam.width && cam.height) ? cam.width + 'x' + cam.height : '未知分辨率';
-          const fps = cam.fps ? cam.fps.toFixed(0) + 'fps' : '';
-          item.innerHTML = '<div class="cam-label">摄像头 #' + cam.index + '</div>'
+          item.setAttribute('tabindex', '0');
+          item.setAttribute('role', 'button');
+          item.setAttribute('aria-label', '选择摄像头 #' + cam.index);
+          const res = (cam.width && cam.height) ? escapeHtml(String(cam.width)) + 'x' + escapeHtml(String(cam.height)) : '未知分辨率';
+          const fps = cam.fps ? escapeHtml(String(cam.fps.toFixed(0))) + 'fps' : '';
+          item.innerHTML = '<div class="cam-label">摄像头 #' + escapeHtml(String(cam.index)) + '</div>'
             + '<div class="cam-info">' + res + (fps ? ' @ ' + fps : '') + '</div>';
           item.onclick = () => settings_selectCamera(cam.index, item);
+          item.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); settings_selectCamera(cam.index, item); } };
           container.appendChild(item);
         });
       }
       container.style.display = 'flex';
     } catch (err) {
       console.error('扫描摄像头失败:', err);
-      container.innerHTML = '<p style="font-size:0.8rem;color:#dc2626;padding:6px 0;">扫描失败: ' + err.message + '</p>';
+      container.innerHTML = '';
+      const errP = document.createElement('p');
+      errP.style.cssText = 'font-size:0.8rem;color:#dc2626;padding:6px 0;';
+      errP.textContent = '扫描失败: ' + err.message;
+      container.appendChild(errP);
       container.style.display = 'flex';
     } finally {
       btn.disabled = false;
