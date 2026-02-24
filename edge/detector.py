@@ -19,6 +19,13 @@ import config
 _model: YOLO | None = None
 
 
+def reset_model() -> None:
+    """重置模型缓存，强制下次调用时重新加载（用于模型热切换）"""
+    global _model
+    _model = None
+    print("[INFO] 模型缓存已清除，下次检测时将重新加载")
+
+
 def _get_openvino_path() -> Path:
     """获取 OpenVINO IR 模型目录路径，与原始模型同目录"""
     model_path = Path(config.MODEL_NAME)
@@ -97,6 +104,61 @@ def detect_vehicles(frame: np.ndarray) -> tuple[np.ndarray, int, int, float]:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
 
     return annotated, count_car, count_motor, inference_ms
+
+
+def detect_vehicles_detailed(
+    frame: np.ndarray,
+) -> tuple[np.ndarray, int, int, float, list[dict]]:
+    """
+    使用 YOLOv8 检测车辆（详细模式）
+    与 detect_vehicles 相同的检测逻辑，但额外返回每个目标的详细信息
+    返回: (标注后的帧, 汽车数, 摩托车数, 推理耗时ms, 目标列表)
+    目标列表: [{"class": "car"/"motor", "confidence": float, "bbox": [x1,y1,x2,y2]}]
+    """
+    model = _load_model()
+
+    t0 = time.time()
+    results = model(frame, conf=config.CONF_THRESHOLD, verbose=False)
+    inference_ms = (time.time() - t0) * 1000
+
+    count_car = 0
+    count_motor = 0
+    objects_list: list[dict] = []
+    annotated = frame.copy()
+
+    for r in results:
+        boxes = r.boxes
+        if boxes is None:
+            continue
+        for box in boxes:
+            cls_id = int(box.cls[0])
+            conf = float(box.conf[0])
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+
+            if cls_id in config.CAR_CLASSES:
+                count_car += 1
+                color = (255, 120, 40)   # 蓝橙色 - 汽车
+                label = f"Car {conf:.0%}"
+                cls_name = "car"
+            elif cls_id in config.MOTOR_CLASSES:
+                count_motor += 1
+                color = (40, 220, 120)   # 绿色 - 摩托
+                label = f"Motor {conf:.0%}"
+                cls_name = "motor"
+            else:
+                continue
+
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
+            cv2.putText(annotated, label, (x1, y1 - 6),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
+
+            objects_list.append({
+                "class": cls_name,
+                "confidence": round(conf, 4),
+                "bbox": [x1, y1, x2, y2],
+            })
+
+    return annotated, count_car, count_motor, inference_ms, objects_list
 
 
 # ---------------------------------------------------------------------------

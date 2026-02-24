@@ -3,18 +3,22 @@ FastAPI 路由定义
 """
 
 import asyncio
+import base64
 import logging
+import time
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import AsyncGenerator, Optional
 
 import cv2
 import numpy as np
-from fastapi import APIRouter
-from fastapi.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
+from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 import config
+from detector import detect_vehicles_detailed
 from state import state
 
 logger = logging.getLogger(__name__)
@@ -23,6 +27,27 @@ router = APIRouter()
 
 # edge 目录路径（用于扫描模型文件）
 _EDGE_DIR = Path(__file__).parent
+
+# ---------------------------------------------------------------------------
+# 文件上传检测相关常量
+# ---------------------------------------------------------------------------
+# 临时文件目录
+_TMP_DIR = _EDGE_DIR / "tmp"
+_TMP_DIR.mkdir(exist_ok=True)
+
+# 允许的文件类型
+_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "bmp", "webp"}
+_VIDEO_EXTENSIONS = {"mp4", "avi", "mov", "mkv", "webm"}
+
+# 文件大小限制（字节）
+_MAX_IMAGE_SIZE = 10 * 1024 * 1024   # 10 MB
+_MAX_VIDEO_SIZE = 100 * 1024 * 1024  # 100 MB
+
+# 视频结果过期时间（秒）
+_VIDEO_RESULT_EXPIRE_S = 30 * 60  # 30 分钟
+
+# 视频处理：每隔 N 帧检测一次
+_VIDEO_FRAME_SKIP = 3
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +207,11 @@ def get_models() -> JSONResponse:
 
 @router.put("/api/config")
 def update_config(body: ConfigUpdateRequest) -> JSONResponse:
-    """更新运行配置（仅更新传入的字段，未传入的保持不变）"""
+    """更新运行配置（仅更新传入的字段，未传入的保持不变），并触发检测循环热重启"""
+    # 记录旧模型名和 OpenVINO 开关，用于判断模型是否变更
+    old_model = config.MODEL_NAME
+    old_openvino = config.USE_OPENVINO
+
     # 逐字段检查并更新 config 模块变量
     if body.mode is not None:
         config.MODE = body.mode
@@ -206,4 +235,235 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
     if body.use_openvino is not None:
         config.USE_OPENVINO = body.use_openvino
 
-    return JSONResponse(content=_current_config())
+    # 判断模型是否变更（模型文件名或 OpenVINO 开关变化都需要重新加载）
+    model_changed = (
+        config.MODEL_NAME != old_model or config.USE_OPENVINO != old_openvino
+    )
+
+    # 触发检测循环热重启
+    restarted = False
+    if state.restart_callback is not None:
+        try:
+            state.restart_callback(model_changed=model_changed)
+            restarted = True
+        except Exception as e:
+            logger.error(f"重启检测循环失败: {e}")
+
+    result = _current_config()
+    result["restarted"] = restarted
+    return JSONResponse(content=result)
+
+
+# ---------------------------------------------------------------------------
+# 文件上传检测：辅助函数
+# ---------------------------------------------------------------------------
+def _cleanup_expired_results() -> None:
+    """删除 tmp 目录中超过过期时间的视频结果文件"""
+    now = time.time()
+    for f in _TMP_DIR.iterdir():
+        if f.is_file() and f.suffix == ".mp4":
+            try:
+                age = now - f.stat().st_mtime
+                if age > _VIDEO_RESULT_EXPIRE_S:
+                    f.unlink()
+                    logger.info("已清理过期视频结果: %s", f.name)
+            except OSError:
+                pass
+
+
+def _get_file_extension(filename: str) -> str:
+    """提取文件扩展名（小写，不含点号）"""
+    return filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+
+# ---------------------------------------------------------------------------
+# POST /api/detect/image - 图片上传检测
+# ---------------------------------------------------------------------------
+@router.post("/api/detect/image")
+async def detect_image(file: UploadFile = File(...)) -> JSONResponse:
+    """
+    接收上传图片，使用 YOLOv8 检测车辆，
+    返回 base64 标注图片和检测结果 JSON
+    """
+    # 验证文件类型
+    ext = _get_file_extension(file.filename or "")
+    if ext not in _IMAGE_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的图片格式: .{ext}，允许: {', '.join(sorted(_IMAGE_EXTENSIONS))}",
+        )
+
+    # 读取文件内容并检查大小
+    content = await file.read()
+    if len(content) > _MAX_IMAGE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"图片文件过大: {len(content) / 1024 / 1024:.1f}MB，上限 {_MAX_IMAGE_SIZE // 1024 // 1024}MB",
+        )
+
+    # 解码图片
+    np_arr = np.frombuffer(content, np.uint8)
+    frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    if frame is None:
+        raise HTTPException(status_code=400, detail="无法解码图片，文件可能已损坏")
+
+    # 调用详细检测
+    annotated, car_count, motor_count, inference_ms, objects_list = (
+        detect_vehicles_detailed(frame)
+    )
+
+    # 将标注图片编码为 JPEG base64
+    _, buf = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    b64_str = base64.b64encode(buf.tobytes()).decode("ascii")
+
+    return JSONResponse(content={
+        "success": True,
+        "annotated_image": f"data:image/jpeg;base64,{b64_str}",
+        "detections": {
+            "count_car": car_count,
+            "count_motor": motor_count,
+            "inference_ms": round(inference_ms, 1),
+            "objects": objects_list,
+        },
+    })
+
+
+# ---------------------------------------------------------------------------
+# POST /api/detect/video - 视频上传检测
+# ---------------------------------------------------------------------------
+def _process_video(input_path: Path, output_path: Path) -> dict:
+    """
+    逐帧检测视频并写入标注后的输出视频（同步，在后台线程中调用）
+    返回摘要字典
+    """
+    cap = cv2.VideoCapture(str(input_path))
+    if not cap.isOpened():
+        raise RuntimeError("无法打开视频文件")
+
+    # 读取视频属性
+    fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    # 初始化视频写入器（mp4v 编码）
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(str(output_path), fourcc, fps, (width, height))
+
+    processed = 0
+    sum_car = 0
+    sum_motor = 0
+    sum_ms = 0.0
+    frame_idx = 0
+    last_annotated = None
+
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            if frame_idx % _VIDEO_FRAME_SKIP == 0:
+                # 执行检测
+                annotated, car_c, motor_c, ms, _ = detect_vehicles_detailed(frame)
+                last_annotated = annotated
+                processed += 1
+                sum_car += car_c
+                sum_motor += motor_c
+                sum_ms += ms
+            else:
+                # 非检测帧：复用上一次标注结果或原始帧
+                annotated = last_annotated if last_annotated is not None else frame
+
+            writer.write(annotated)
+            frame_idx += 1
+    finally:
+        cap.release()
+        writer.release()
+        # 清理输入临时文件
+        try:
+            input_path.unlink()
+        except OSError:
+            pass
+
+    duration_s = total_frames / fps if fps > 0 else 0.0
+
+    return {
+        "total_frames": total_frames,
+        "processed_frames": processed,
+        "avg_car_count": round(sum_car / max(processed, 1), 1),
+        "avg_motor_count": round(sum_motor / max(processed, 1), 1),
+        "avg_inference_ms": round(sum_ms / max(processed, 1), 1),
+        "duration_s": round(duration_s, 1),
+    }
+
+
+@router.post("/api/detect/video")
+async def detect_video(file: UploadFile = File(...)) -> JSONResponse:
+    """
+    接收上传视频，逐帧检测车辆，生成标注视频并返回下载链接和摘要
+    """
+    # 验证文件类型
+    ext = _get_file_extension(file.filename or "")
+    if ext not in _VIDEO_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的视频格式: .{ext}，允许: {', '.join(sorted(_VIDEO_EXTENSIONS))}",
+        )
+
+    # 读取文件内容并检查大小
+    content = await file.read()
+    if len(content) > _MAX_VIDEO_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"视频文件过大: {len(content) / 1024 / 1024:.1f}MB，上限 {_MAX_VIDEO_SIZE // 1024 // 1024}MB",
+        )
+
+    # 清理过期的历史结果
+    _cleanup_expired_results()
+
+    # 生成唯一 ID，保存上传文件到临时目录
+    result_id = uuid.uuid4().hex[:12]
+    input_path = _TMP_DIR / f"input_{result_id}.{ext}"
+    output_path = _TMP_DIR / f"result_{result_id}.mp4"
+
+    input_path.write_bytes(content)
+
+    # 同步处理视频（大视频可能耗时较长）
+    try:
+        summary = _process_video(input_path, output_path)
+    except RuntimeError as e:
+        # 清理残留文件
+        for p in (input_path, output_path):
+            try:
+                p.unlink()
+            except OSError:
+                pass
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return JSONResponse(content={
+        "success": True,
+        "video_url": f"/api/detect/video/result/{result_id}",
+        "summary": summary,
+    })
+
+
+# ---------------------------------------------------------------------------
+# GET /api/detect/video/result/{result_id} - 下载标注后的视频
+# ---------------------------------------------------------------------------
+@router.get("/api/detect/video/result/{result_id}")
+async def get_video_result(result_id: str) -> FileResponse:
+    """返回标注后的视频文件供下载"""
+    # 校验 result_id 格式，防止路径遍历
+    if not result_id.isalnum() or len(result_id) != 12:
+        raise HTTPException(status_code=400, detail="无效的结果 ID")
+
+    result_path = _TMP_DIR / f"result_{result_id}.mp4"
+    if not result_path.exists():
+        raise HTTPException(status_code=404, detail="视频结果不存在或已过期")
+
+    return FileResponse(
+        path=str(result_path),
+        media_type="video/mp4",
+        filename=f"detected_{result_id}.mp4",
+    )
