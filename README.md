@@ -120,6 +120,18 @@ pnpm dev
 
 - `GET /admin/resources`（需要 JWT + 管理员角色）
 - `WS /admin/ws/resources`（需要 JWT + 管理员角色）
+- `GET /admin/cameras`（需要 JWT + 管理员角色）
+- `POST /admin/cameras`（需要 JWT + 管理员角色）
+- `PUT /admin/cameras/{id}`（需要 JWT + 管理员角色）
+- `DELETE /admin/cameras/{id}`（需要 JWT + 管理员角色）
+- `GET /admin/users`（需要 JWT + 管理员角色）
+- `PUT /admin/users/{id}/role`（需要 JWT + 管理员角色）
+- `PUT /admin/users/{id}/status`（需要 JWT + 管理员角色）
+
+### 7) 站点设置（Site Settings）
+
+- `GET /site-settings`（公开）
+- `PUT /admin/site-settings`（需要 JWT + 管理员角色）
 
 ## 八、鉴权说明
 
@@ -135,3 +147,48 @@ curl -X POST "http://localhost:8000/api/v1/auth/login" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "username=user@example.com&password=your_password"
 ```
+
+## 十、摄像头端 API 规范（Camera-Side API）
+
+后端每 3 秒轮询每个已配置 `stream_url` 的摄像头。摄像头端需实现以下两个 HTTP 接口：
+
+### 1) 获取交通数据
+
+```
+GET {stream_url}/api/traffic
+Content-Type: application/json
+```
+
+返回 JSON：
+
+```json
+{
+  "count_car": 8,
+  "count_motor": 5,
+  "speed_car": 45,
+  "speed_motor": 35
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `count_car` | number | 当前画面中汽车数量 |
+| `count_motor` | number | 当前画面中摩托车/电动车数量 |
+| `speed_car` | number | 汽车平均速度（km/h） |
+| `speed_motor` | number | 摩托车平均速度（km/h） |
+
+### 2) 获取视频帧
+
+```
+GET {stream_url}/api/frame
+Content-Type: image/jpeg
+```
+
+返回当前摄像头画面的 JPEG 图片（二进制）。
+
+### 3) 配置说明
+
+- 在管理面板「摄像头管理」中设置每个摄像头的「接入地址」（如 `http://192.168.1.100:8080`）
+- 留空则使用模拟数据（随机生成）
+- 超时设置：连接 2 秒，读取 2 秒
+- 轮询间隔：3 秒

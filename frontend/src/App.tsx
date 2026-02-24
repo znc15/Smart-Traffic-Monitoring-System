@@ -100,7 +100,7 @@ function AppContent() {
           return;
         }
         const data = await res.json();
-        setIsAdmin(data?.roleId === 0);
+        setIsAdmin(data?.role_id === 0);
       } catch {
         setIsAdmin(false);
       }
@@ -112,7 +112,7 @@ function AppContent() {
   useEffect(() => {
     fetch(endpoints.siteSettings)
       .then((r) => r.ok ? r.json() : Promise.reject())
-      .then((d) => { if (d.siteName) setSiteName(d.siteName); })
+      .then((d) => { if (d.site_name) setSiteName(d.site_name); })
       .catch(() => {});
   }, []);
 

@@ -7,7 +7,9 @@ import com.smarttraffic.backend.repository.CameraRepository;
 import com.smarttraffic.backend.repository.UserRepository;
 import com.smarttraffic.backend.security.CurrentUser;
 import com.smarttraffic.backend.security.SecurityUtils;
+import com.smarttraffic.backend.config.TrafficProperties;
 import com.smarttraffic.backend.service.SystemMetricsService;
+import com.smarttraffic.backend.service.TrafficService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,11 +23,17 @@ public class AdminController {
     private final SystemMetricsService systemMetricsService;
     private final CameraRepository cameraRepository;
     private final UserRepository userRepository;
+    private final TrafficService trafficService;
+    private final TrafficProperties trafficProperties;
 
-    public AdminController(SystemMetricsService systemMetricsService, CameraRepository cameraRepository, UserRepository userRepository) {
+    public AdminController(SystemMetricsService systemMetricsService, CameraRepository cameraRepository,
+                           UserRepository userRepository, TrafficService trafficService,
+                           TrafficProperties trafficProperties) {
         this.systemMetricsService = systemMetricsService;
         this.cameraRepository = cameraRepository;
         this.userRepository = userRepository;
+        this.trafficService = trafficService;
+        this.trafficProperties = trafficProperties;
     }
 
     @GetMapping("/resources")
@@ -54,7 +62,9 @@ public class AdminController {
     public CameraEntity createCamera(@RequestBody CameraEntity camera) {
         requireAdmin();
         camera.setId(null);
-        return cameraRepository.save(camera);
+        CameraEntity saved = cameraRepository.save(camera);
+        trafficService.reloadCameras(trafficProperties);
+        return saved;
     }
 
     @PutMapping("/cameras/{id}")
@@ -65,7 +75,10 @@ public class AdminController {
         if (body.containsKey("name")) cam.setName((String) body.get("name"));
         if (body.containsKey("location")) cam.setLocation((String) body.get("location"));
         if (body.containsKey("enabled")) cam.setEnabled((Boolean) body.get("enabled"));
-        return cameraRepository.save(cam);
+        if (body.containsKey("streamUrl")) cam.setStreamUrl((String) body.get("streamUrl"));
+        CameraEntity saved = cameraRepository.save(cam);
+        trafficService.reloadCameras(trafficProperties);
+        return saved;
     }
 
     @DeleteMapping("/cameras/{id}")
@@ -75,6 +88,7 @@ public class AdminController {
             throw new AppException(HttpStatus.NOT_FOUND, "Camera not found");
         }
         cameraRepository.deleteById(id);
+        trafficService.reloadCameras(trafficProperties);
         return Map.of("detail", "Deleted");
     }
 
@@ -92,7 +106,7 @@ public class AdminController {
     public Map<String, String> updateUserRole(@PathVariable Long id, @RequestBody Map<String, Integer> body) {
         requireAdmin();
         CurrentUser current = SecurityUtils.requireCurrentUser();
-        if (current.getUid().equals(id)) {
+        if (current.id().equals(id)) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Cannot modify your own account");
         }
         Integer roleId = body.get("roleId");
@@ -113,7 +127,7 @@ public class AdminController {
     public Map<String, Object> toggleUserStatus(@PathVariable Long id) {
         requireAdmin();
         CurrentUser current = SecurityUtils.requireCurrentUser();
-        if (current.getUid().equals(id)) {
+        if (current.id().equals(id)) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Cannot modify your own account");
         }
         UserEntity user = userRepository.findById(id)

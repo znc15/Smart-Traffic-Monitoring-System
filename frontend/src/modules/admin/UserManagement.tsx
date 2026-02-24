@@ -6,8 +6,8 @@ type User = {
   id: number;
   username: string;
   email: string;
-  phoneNumber: string;
-  roleId: number;
+  phone_number: string;
+  role_id: number;
   enabled: boolean;
   createdAt: string;
 };
@@ -30,7 +30,7 @@ export default function UserManagement() {
   const toggleRole = async (u: User) => {
     await authFetch(`${adminConfig.USERS_URL}/${u.id}/role`, {
       method: "PUT",
-      body: JSON.stringify({ roleId: u.roleId === 0 ? 1 : 0 }),
+      body: JSON.stringify({ roleId: u.role_id === 0 ? 1 : 0 }),
     });
     fetchUsers();
   };
@@ -64,10 +64,10 @@ export default function UserManagement() {
               <tr key={u.id} className="border-b border-border/20 last:border-0">
                 <td className="px-4 py-2.5">{u.username}</td>
                 <td className="px-4 py-2.5 text-muted-foreground">{u.email}</td>
-                <td className="px-4 py-2.5 text-muted-foreground">{u.phoneNumber || "-"}</td>
+                <td className="px-4 py-2.5 text-muted-foreground">{u.phone_number || "-"}</td>
                 <td className="px-4 py-2.5">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${u.roleId === 0 ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"}`}>
-                    {u.roleId === 0 ? "管理员" : "用户"}
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${u.role_id === 0 ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"}`}>
+                    {u.role_id === 0 ? "管理员" : "用户"}
                   </span>
                 </td>
                 <td className="px-4 py-2.5">
@@ -77,7 +77,7 @@ export default function UserManagement() {
                 </td>
                 <td className="px-4 py-2.5 text-right space-x-1">
                   <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => toggleRole(u)}>
-                    {u.roleId === 0 ? "设为用户" : "设为管理员"}
+                    {u.role_id === 0 ? "设为用户" : "设为管理员"}
                   </Button>
                   <Button variant="ghost" size="sm" className={`h-7 text-xs ${u.enabled ? "text-destructive" : ""}`} onClick={() => toggleStatus(u)}>
                     {u.enabled ? "禁用" : "启用"}

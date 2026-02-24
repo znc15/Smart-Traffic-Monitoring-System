@@ -23,8 +23,11 @@ public class TrafficService {
     );
 
     private final ConcurrentMap<String, Snapshot> snapshots = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, byte[]> frameCache = new ConcurrentHashMap<>();
+    private final CameraRepository cameraRepository;
 
     public TrafficService(TrafficProperties trafficProperties, CameraRepository cameraRepository) {
+        this.cameraRepository = cameraRepository;
         List<CameraEntity> cameras = cameraRepository.findByEnabledTrue();
         List<String> names = cameras.isEmpty()
                 ? trafficProperties.roadsAsList()
@@ -69,7 +72,31 @@ public class TrafficService {
         if (!snapshots.containsKey(roadName)) {
             throw new AppException(HttpStatus.NOT_FOUND, "Không tìm thấy đường");
         }
-        return SAMPLE_JPEG;
+        return frameCache.getOrDefault(roadName, SAMPLE_JPEG);
+    }
+
+    public void updateFromRemote(String roadName, Map<String, Object> data, byte[] frameBytes) {
+        Snapshot snapshot = snapshots.get(roadName);
+        if (snapshot == null) {
+            snapshot = new Snapshot(0, 0, 0, 0);
+            snapshots.put(roadName, snapshot);
+        }
+        snapshot.updateFrom(data);
+        if (frameBytes != null) frameCache.put(roadName, frameBytes);
+    }
+
+    public void reloadCameras(TrafficProperties trafficProperties) {
+        List<CameraEntity> cameras = cameraRepository.findByEnabledTrue();
+        List<String> names = cameras.isEmpty()
+                ? trafficProperties.roadsAsList()
+                : cameras.stream().map(CameraEntity::getName).toList();
+        // Add new cameras
+        for (String name : names) {
+            snapshots.putIfAbsent(name, new Snapshot(randomCount(), randomCount(), randomSpeed(), randomSpeed()));
+        }
+        // Remove deleted cameras
+        snapshots.keySet().retainAll(new java.util.HashSet<>(names));
+        frameCache.keySet().retainAll(new java.util.HashSet<>(names));
     }
 
     private static long randomCount() {
@@ -98,6 +125,13 @@ public class TrafficService {
             countMotor = clamp(countMotor + ThreadLocalRandom.current().nextLong(-2, 3), 0, 40);
             speedCar = clamp(speedCar + ThreadLocalRandom.current().nextLong(-5, 6), 0, 100);
             speedMotor = clamp(speedMotor + ThreadLocalRandom.current().nextLong(-5, 6), 0, 100);
+        }
+
+        private synchronized void updateFrom(Map<String, Object> data) {
+            if (data.containsKey("count_car")) countCar = ((Number) data.get("count_car")).longValue();
+            if (data.containsKey("count_motor")) countMotor = ((Number) data.get("count_motor")).longValue();
+            if (data.containsKey("speed_car")) speedCar = ((Number) data.get("speed_car")).longValue();
+            if (data.containsKey("speed_motor")) speedMotor = ((Number) data.get("speed_motor")).longValue();
         }
 
         private static long clamp(long value, long min, long max) {

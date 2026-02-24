@@ -16,6 +16,9 @@ public class CameraEntity {
 
     private String location;
 
+    @Column(name = "stream_url")
+    private String streamUrl;
+
     private boolean enabled = true;
 
     @Column(name = "created_at")
@@ -34,5 +37,7 @@ public class CameraEntity {
     public void setLocation(String location) { this.location = location; }
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    public String getStreamUrl() { return streamUrl; }
+    public void setStreamUrl(String streamUrl) { this.streamUrl = streamUrl; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 }

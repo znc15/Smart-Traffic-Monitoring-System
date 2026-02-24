@@ -16,6 +16,7 @@ type Camera = {
   id: number;
   name: string;
   location: string;
+  stream_url: string | null;
   enabled: boolean;
 };
 
@@ -24,7 +25,7 @@ export default function CameraManagement() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Camera | null>(null);
-  const [form, setForm] = useState({ name: "", location: "" });
+  const [form, setForm] = useState({ name: "", location: "", streamUrl: "" });
 
   const fetchCameras = async () => {
     try {
@@ -39,13 +40,13 @@ export default function CameraManagement() {
 
   const openAdd = () => {
     setEditing(null);
-    setForm({ name: "", location: "" });
+    setForm({ name: "", location: "", streamUrl: "" });
     setDialogOpen(true);
   };
 
   const openEdit = (c: Camera) => {
     setEditing(c);
-    setForm({ name: c.name, location: c.location });
+    setForm({ name: c.name, location: c.location, streamUrl: c.stream_url ?? "" });
     setDialogOpen(true);
   };
 
@@ -53,7 +54,7 @@ export default function CameraManagement() {
     if (editing) {
       await authFetch(`${adminConfig.CAMERAS_URL}/${editing.id}`, {
         method: "PUT",
-        body: JSON.stringify({ ...form, enabled: editing.enabled }),
+        body: JSON.stringify({ name: form.name, location: form.location, streamUrl: form.streamUrl || null, enabled: editing.enabled }),
       });
     } else {
       await authFetch(adminConfig.CAMERAS_URL, {
@@ -74,7 +75,7 @@ export default function CameraManagement() {
   const toggleEnabled = async (c: Camera) => {
     await authFetch(`${adminConfig.CAMERAS_URL}/${c.id}`, {
       method: "PUT",
-      body: JSON.stringify({ name: c.name, location: c.location, enabled: !c.enabled }),
+      body: JSON.stringify({ name: c.name, location: c.location, streamUrl: c.stream_url, enabled: !c.enabled }),
     });
     fetchCameras();
   };
@@ -96,17 +97,19 @@ export default function CameraManagement() {
             <tr className="border-b border-border/40 bg-muted/50">
               <th className="text-left px-4 py-2.5 font-medium">名称</th>
               <th className="text-left px-4 py-2.5 font-medium">位置</th>
+              <th className="text-left px-4 py-2.5 font-medium">接入地址</th>
               <th className="text-left px-4 py-2.5 font-medium">状态</th>
               <th className="text-right px-4 py-2.5 font-medium">操作</th>
             </tr>
           </thead>
           <tbody>
             {cameras.length === 0 ? (
-              <tr><td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">暂无摄像头</td></tr>
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">暂无摄像头</td></tr>
             ) : cameras.map((c) => (
               <tr key={c.id} className="border-b border-border/20 last:border-0">
                 <td className="px-4 py-2.5">{c.name}</td>
                 <td className="px-4 py-2.5 text-muted-foreground">{c.location}</td>
+                <td className="px-4 py-2.5 text-muted-foreground text-xs font-mono">{c.stream_url || <span className="text-muted-foreground/50 italic">未配置</span>}</td>
                 <td className="px-4 py-2.5">
                   <button
                     onClick={() => toggleEnabled(c)}
@@ -142,6 +145,11 @@ export default function CameraManagement() {
             <div>
               <Label htmlFor="cam-loc">位置</Label>
               <Input id="cam-loc" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="安装位置" />
+            </div>
+            <div>
+              <Label htmlFor="cam-url">接入地址</Label>
+              <Input id="cam-url" value={form.streamUrl} onChange={(e) => setForm({ ...form, streamUrl: e.target.value })} placeholder="http://192.168.1.100:8080" />
+              <p className="text-xs text-muted-foreground mt-1">摄像头 HTTP API 地址，留空则使用模拟数据</p>
             </div>
           </div>
           <DialogFooter>
