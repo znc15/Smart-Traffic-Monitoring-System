@@ -19,7 +19,7 @@ from overlay import draw_overlay
 # 摄像头模式
 # ---------------------------------------------------------------------------
 def camera_loop() -> None:
-    """持续读取视频流并进行 YOLOv8 检测"""
+    """持续读取视频流并进行 YOLOv8 检测，收到停止信号时安全退出"""
     source = config.camera_source
 
     cap = cv2.VideoCapture(source)
@@ -32,52 +32,59 @@ def camera_loop() -> None:
     fps_timer = time.time()
     current_fps = 0.0
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            print("[WARN] 读取帧失败，1秒后重试...")
-            time.sleep(1)
-            cap.release()
-            cap = cv2.VideoCapture(source)
-            continue
+    try:
+        while not state.should_stop():
+            ret, frame = cap.read()
+            if not ret:
+                print("[WARN] 读取帧失败，1秒后重试...")
+                # 等待期间也检查停止信号，避免阻塞退出
+                if state.stop_event.wait(timeout=1.0):
+                    break
+                cap.release()
+                cap = cv2.VideoCapture(source)
+                continue
 
-        # YOLOv8 检测
-        annotated, count_car, count_motor, inference_ms = detect_vehicles(frame)
+            # YOLOv8 检测
+            annotated, count_car, count_motor, inference_ms = detect_vehicles(frame)
 
-        # 计算 FPS
-        fps_counter += 1
-        elapsed = time.time() - fps_timer
-        if elapsed >= 1.0:
-            current_fps = round(fps_counter / elapsed, 1)
-            fps_counter = 0
-            fps_timer = time.time()
+            # 计算 FPS
+            fps_counter += 1
+            elapsed = time.time() - fps_timer
+            if elapsed >= 1.0:
+                current_fps = round(fps_counter / elapsed, 1)
+                fps_counter = 0
+                fps_timer = time.time()
 
-        # 速度估算
-        speed_car = estimate_speed(count_car)
-        speed_motor = estimate_speed(count_motor)
+            # 速度估算
+            speed_car = estimate_speed(count_car)
+            speed_motor = estimate_speed(count_motor)
 
-        # 在帧上叠加信息栏
-        draw_overlay(annotated, count_car, count_motor, speed_car, speed_motor,
-                     inference_ms, current_fps)
+            # 在帧上叠加信息栏
+            draw_overlay(annotated, count_car, count_motor, speed_car, speed_motor,
+                         inference_ms, current_fps)
 
-        # 编码 JPEG 并更新全局状态
-        _, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            # 编码 JPEG 并更新全局状态
+            _, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
 
-        state.update_traffic(count_car, count_motor, speed_car, speed_motor,
-                             inference_ms, current_fps)
-        state.update_frame(jpeg.tobytes())
+            state.update_traffic(count_car, count_motor, speed_car, speed_motor,
+                                 inference_ms, current_fps)
+            state.update_frame(jpeg.tobytes())
+    finally:
+        # 循环退出时释放 VideoCapture 资源
+        cap.release()
+        print("[INFO] camera_loop 已停止，VideoCapture 资源已释放")
 
 
 # ---------------------------------------------------------------------------
 # 模拟模式
 # ---------------------------------------------------------------------------
 def sim_loop() -> None:
-    """生成合成帧和模拟交通数据（演示用）"""
+    """生成合成帧和模拟交通数据（演示用），收到停止信号时安全退出"""
     fps_timer = time.time()
     fps_counter = 0
     current_fps = 0.0
 
-    while True:
+    while not state.should_stop():
         # 随机交通数据
         count_car = random.randint(0, 12)
         count_motor = random.randint(0, 8)
@@ -125,4 +132,7 @@ def sim_loop() -> None:
                              inference_ms, current_fps)
         state.update_frame(jpeg.tobytes())
 
-        time.sleep(1)
+        # 使用 stop_event.wait 代替 time.sleep，可被停止信号中断
+        state.stop_event.wait(timeout=1.0)
+
+    print("[INFO] sim_loop 已停止")

@@ -23,7 +23,57 @@ from fastapi.staticfiles import StaticFiles
 import config
 from routes import router
 from loops import camera_loop, sim_loop
+from state import state
+from detector import reset_model
 from camera_discovery import interactive_select
+
+# ---------------------------------------------------------------------------
+# 模块级变量：当前检测循环线程引用，供 restart_loop 访问
+# ---------------------------------------------------------------------------
+_loop_thread: threading.Thread | None = None
+# 重启锁，防止并发重启导致竞态
+_restart_lock = threading.Lock()
+
+
+# ---------------------------------------------------------------------------
+# 运行时热切换：停止旧循环 → 更新配置 → 启动新循环
+# ---------------------------------------------------------------------------
+def restart_loop(model_changed: bool = False) -> None:
+    """
+    重启检测循环（线程安全）。
+    1. 设置停止事件，等待旧线程退出
+    2. 如果模型变更，清除 detector 缓存
+    3. 根据当前 config.MODE 启动新线程
+    """
+    global _loop_thread
+
+    with _restart_lock:
+        print("[INFO] 正在重启检测循环...")
+
+        # 1. 停止旧线程
+        state.stop()
+        if _loop_thread is not None and _loop_thread.is_alive():
+            _loop_thread.join(timeout=5.0)
+            if _loop_thread.is_alive():
+                print("[WARN] 旧检测线程未在 5 秒内退出，将强制启动新线程")
+
+        # 2. 清除停止事件，为新循环做准备
+        state.reset_stop()
+
+        # 3. 模型变更时清除缓存，强制重新加载
+        if model_changed:
+            reset_model()
+
+        # 4. 根据当前模式启动新线程
+        if config.MODE == "camera":
+            print(f"[INFO] 重启: 摄像头模式，视频源: {config.camera_source}，模型: {config.MODEL_NAME}")
+            _loop_thread = threading.Thread(target=camera_loop, daemon=True)
+        else:
+            print(f"[INFO] 重启: 模拟模式，路段: {config.ROAD_NAME}")
+            _loop_thread = threading.Thread(target=sim_loop, daemon=True)
+
+        _loop_thread.start()
+        print("[INFO] 检测循环已重启")
 
 
 # ---------------------------------------------------------------------------
@@ -64,17 +114,22 @@ def _open_browser(port: int, timeout: float = 10.0) -> None:
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(application: FastAPI):
-    """启动后台检测线程"""
+    """启动后台检测线程，并注册重启回调"""
+    global _loop_thread
+
     # 预初始化 psutil CPU 采样（首次调用返回 0，需要预热）
     psutil.cpu_percent(interval=None)
 
     if config.MODE == "camera":
         print(f"[INFO] 摄像头模式，视频源: {config.camera_source}，模型: {config.MODEL_NAME}")
-        t = threading.Thread(target=camera_loop, daemon=True)
+        _loop_thread = threading.Thread(target=camera_loop, daemon=True)
     else:
         print(f"[INFO] 模拟模式，路段: {config.ROAD_NAME}")
-        t = threading.Thread(target=sim_loop, daemon=True)
-    t.start()
+        _loop_thread = threading.Thread(target=sim_loop, daemon=True)
+    _loop_thread.start()
+
+    # 注册重启回调到 state，供 routes.py 调用（避免循环导入）
+    state.restart_callback = restart_loop
 
     # 打印仪表盘访问地址
     print(f"[INFO] Dashboard: http://localhost:{config.HTTP_PORT}")
@@ -85,6 +140,12 @@ async def lifespan(application: FastAPI):
         bt.start()
 
     yield
+
+    # 应用关闭时，停止检测循环
+    state.stop()
+    if _loop_thread is not None and _loop_thread.is_alive():
+        _loop_thread.join(timeout=5.0)
+    print("[INFO] 应用关闭，检测循环已停止")
 
 
 # ---------------------------------------------------------------------------

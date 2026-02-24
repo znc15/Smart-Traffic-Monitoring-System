@@ -4,6 +4,7 @@
 
 import time
 import threading
+from typing import Callable, Optional
 
 import psutil
 
@@ -23,6 +24,24 @@ class EdgeState:
         self.inference_ms: float = 0.0
         self.fps: float = 0.0
         self.start_time: float = time.time()
+
+        # 停止事件，用于通知检测循环退出
+        self.stop_event = threading.Event()
+
+        # 重启回调，由 main.py 在 lifespan 中注册，供 routes.py 调用
+        self.restart_callback: Optional[Callable] = None
+
+    def stop(self) -> None:
+        """设置停止事件，通知检测循环退出"""
+        self.stop_event.set()
+
+    def reset_stop(self) -> None:
+        """清除停止事件，为新循环做准备"""
+        self.stop_event.clear()
+
+    def should_stop(self) -> bool:
+        """检查是否应该停止循环"""
+        return self.stop_event.is_set()
 
     def update_traffic(self, count_car: int, count_motor: int,
                        speed_car: float, speed_motor: float,
