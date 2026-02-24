@@ -2,6 +2,8 @@ package com.smarttraffic.backend.service;
 
 import com.smarttraffic.backend.config.TrafficProperties;
 import com.smarttraffic.backend.exception.AppException;
+import com.smarttraffic.backend.model.CameraEntity;
+import com.smarttraffic.backend.repository.CameraRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -22,8 +24,12 @@ public class TrafficService {
 
     private final ConcurrentMap<String, Snapshot> snapshots = new ConcurrentHashMap<>();
 
-    public TrafficService(TrafficProperties trafficProperties) {
-        for (String road : trafficProperties.roadsAsList()) {
+    public TrafficService(TrafficProperties trafficProperties, CameraRepository cameraRepository) {
+        List<CameraEntity> cameras = cameraRepository.findByEnabledTrue();
+        List<String> names = cameras.isEmpty()
+                ? trafficProperties.roadsAsList()
+                : cameras.stream().map(CameraEntity::getName).toList();
+        for (String road : names) {
             snapshots.put(road, new Snapshot(randomCount(), randomCount(), randomSpeed(), randomSpeed()));
         }
     }
