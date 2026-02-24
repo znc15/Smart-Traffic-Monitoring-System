@@ -15,13 +15,14 @@ edge/
 ├── routes.py            # FastAPI 路由定义
 ├── state.py             # 线程安全全局状态 + 性能采集
 ├── requirements.txt
+├── environment.yml      # Conda 环境配置
 └── Dockerfile
 ```
 
 ## 环境要求
 
 - Python 3.10+
-- pip
+- pip 或 conda
 - 摄像头模式需要可用的摄像头设备或 RTSP 视频流
 - （可选）NVIDIA GPU + pynvml 用于 GPU 监控上报
 
@@ -29,7 +30,15 @@ edge/
 
 ### 1. 本地部署
 
-**安装依赖：**
+**方式 A — Conda（推荐）：**
+
+```bash
+cd edge
+conda env create -f environment.yml
+conda activate edge-node
+```
+
+**方式 B — pip + venv：**
 
 ```bash
 cd edge
