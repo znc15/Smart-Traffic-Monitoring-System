@@ -38,7 +38,7 @@ import ChatPage from "./pages/ChatPage";
 import ProfilePage from "./pages/ProfilePage";
 import ProtectedRoute from "@/modules/features/auth/guards/ProtectedRoute";
 import AdminPage from "@/pages/AdminPage";
-import { authConfig } from "@/config";
+import { authConfig, endpoints } from "@/config";
 import "./App.css";
 import { TrafficProvider } from "@/hooks/useTrafficStore";
 export default function App() {
@@ -62,6 +62,7 @@ function AppContent() {
     return !!token;
   });
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [siteName, setSiteName] = useState("智能交通监控系统");
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
 
@@ -107,6 +108,14 @@ function AppContent() {
     fetchMe();
   }, [authed]);
 
+  // Fetch site name
+  useEffect(() => {
+    fetch(endpoints.siteSettings)
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((d) => { if (d.siteName) setSiteName(d.siteName); })
+      .catch(() => {});
+  }, []);
+
   const navItemClass = ({ isActive }: { isActive: boolean }) =>
     cn(
       "flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-1.5 rounded-xl font-semibold text-sm transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -145,11 +154,8 @@ function AppContent() {
           </a>
           <div className="flex flex-col justify-center min-w-0">
             <h1 className="text-sm sm:text-base lg:text-lg font-bold text-primary truncate leading-tight">
-              智能交通监控系统
+              {siteName}
             </h1>
-            <p className="text-muted-foreground text-xs sm:text-sm hidden sm:block leading-tight">
-              实时监控与分析
-            </p>
           </div>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center max-w-md mx-auto">

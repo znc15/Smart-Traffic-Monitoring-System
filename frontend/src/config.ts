@@ -149,4 +149,5 @@ export const endpoints = {
   framesWs: (roadName: string) => wsConfig.framesWs(roadName),
   infoWs: (roadName: string) => wsConfig.infoWs(roadName),
   chatWs: wsConfig.CHAT_WS,
+  siteSettings: `${apiConfig.API_HTTP_BASE}/site-settings`,
 };

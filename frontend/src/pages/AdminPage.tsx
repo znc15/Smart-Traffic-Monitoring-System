@@ -82,7 +82,7 @@ export default function AdminPage() {
         <TabsContent value="cameras"><CameraManagement /></TabsContent>
         <TabsContent value="monitor"><SystemMonitor /></TabsContent>
         <TabsContent value="users"><UserManagement /></TabsContent>
-        <TabsContent value="settings"><div className="py-8 text-center text-muted-foreground">待实现</div></TabsContent>
+        <TabsContent value="settings"><SiteSettings /></TabsContent>
       </Tabs>
     </div>
   );
