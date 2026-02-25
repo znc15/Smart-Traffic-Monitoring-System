@@ -60,6 +60,9 @@ def restart_loop(model_changed: bool = False) -> None:
         # 2. 清除停止事件，为新循环做准备
         state.reset_stop()
 
+        # 2.5 清空旧帧缓存，避免模式切换时花屏
+        state.clear_frame()
+
         # 3. 模型变更时清除缓存，强制重新加载
         if model_changed:
             reset_model()
