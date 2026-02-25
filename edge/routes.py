@@ -13,7 +13,7 @@ from typing import AsyncGenerator, Optional
 
 import cv2
 import numpy as np
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -300,6 +300,68 @@ async def probe_camera(body: ProbeRequest) -> JSONResponse:
         "reachable": False,
         "message": "无法连接到指定地址",
     })
+
+
+# ---------------------------------------------------------------------------
+# 摄像头预览测试 API
+# ---------------------------------------------------------------------------
+def _capture_and_detect(source: str) -> dict | None:
+    """同步函数：打开摄像头，抓帧，检测，返回结果"""
+    # 尝试解析为整数（设备索引）
+    try:
+        src = int(source)
+    except ValueError:
+        src = source
+
+    cap = cv2.VideoCapture(src)
+    try:
+        if not cap.isOpened():
+            return None
+        # 丢弃前 3 帧，让编解码器稳定
+        for _ in range(3):
+            cap.read()
+        ret, frame = cap.read()
+        if not ret or frame is None or frame.size == 0:
+            return None
+    finally:
+        cap.release()
+
+    annotated, count_car, count_motor, inference_ms, details = detect_vehicles_detailed(frame)
+    success, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    if not success:
+        return None
+    return {
+        "jpeg": jpeg.tobytes(),
+        "count_car": count_car,
+        "count_motor": count_motor,
+        "inference_ms": inference_ms,
+    }
+
+
+@router.get("/api/cameras/preview", response_model=None)
+async def preview_camera(source: str = Query(..., description="摄像头源（设备索引或 URL）")) -> Response:
+    """抓取一帧并运行检测，用于测试摄像头是否正常"""
+    loop = asyncio.get_running_loop()
+    try:
+        result = await asyncio.wait_for(
+            loop.run_in_executor(None, _capture_and_detect, source),
+            timeout=10.0,
+        )
+    except asyncio.TimeoutError:
+        return JSONResponse(status_code=408, content={"detail": "抓帧超时（10秒）"})
+
+    if result is None:
+        return JSONResponse(status_code=400, content={"detail": "无法打开摄像头或抓取帧失败"})
+
+    return Response(
+        content=result["jpeg"],
+        media_type="image/jpeg",
+        headers={
+            "X-Count-Car": str(result["count_car"]),
+            "X-Count-Motor": str(result["count_motor"]),
+            "X-Inference-Ms": str(round(result["inference_ms"], 1)),
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
