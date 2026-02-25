@@ -311,6 +311,23 @@ function ExpandedNodeDialog({ node, streamUrl }: { node: NodeInfo; streamUrl: st
   );
 }
 
+/** Stat card for CPU/RAM/Disk usage — defined outside SystemMonitor to avoid re-creation on every render */
+function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <Card className="p-4 shadow-sm border-border/50">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-sm text-muted-foreground">{label}</div>
+          <div className="text-2xl font-bold text-foreground">{value}%</div>
+        </div>
+        <div className="w-24 h-6 bg-secondary rounded-full overflow-hidden">
+          <div className={`h-full ${color} rounded-full transition-all duration-500`} style={{ width: `${value}%` }} />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export default function SystemMonitor() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [history, setHistory] = useState<{ time: string; cpu: number; mem: number; disk: number }[]>([]);
@@ -392,20 +409,6 @@ export default function SystemMonitor() {
       }];
     });
   }, [metrics]);
-
-  const StatCard = ({ label, value, color }: { label: string; value: number; color: string }) => (
-    <Card className="p-4 shadow-sm border-border/50">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-sm text-muted-foreground">{label}</div>
-          <div className="text-2xl font-bold text-foreground">{value}%</div>
-        </div>
-        <div className="w-24 h-6 bg-secondary rounded-full overflow-hidden">
-          <div className={`h-full ${color} rounded-full transition-all duration-500`} style={{ width: `${value}%` }} />
-        </div>
-      </div>
-    </Card>
-  );
 
   return (
     <div className="space-y-6">

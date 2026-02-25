@@ -28,12 +28,37 @@ public class SiteSettingsController {
         });
     }
 
+    private static final int MAX_TEXT_LENGTH = 1000;
+
     @PutMapping("/api/v1/admin/site-settings")
     public SiteSettingsEntity update(@RequestBody Map<String, String> body) {
         var user = SecurityUtils.requireCurrentUser();
         if (!user.isAdmin()) {
             throw new AppException(HttpStatus.FORBIDDEN, "Admin only");
         }
+
+        // Validate logoUrl: must be empty or start with http:// / https://
+        if (body.containsKey("logoUrl")) {
+            String logoUrl = body.get("logoUrl");
+            if (logoUrl != null && !logoUrl.isEmpty()
+                    && !logoUrl.startsWith("http://") && !logoUrl.startsWith("https://")) {
+                throw new AppException(HttpStatus.BAD_REQUEST,
+                        "logoUrl must be empty or start with http:// or https://");
+            }
+        }
+
+        // Validate text field lengths
+        if (body.containsKey("footerText") && body.get("footerText") != null
+                && body.get("footerText").length() > MAX_TEXT_LENGTH) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "footerText must not exceed " + MAX_TEXT_LENGTH + " characters");
+        }
+        if (body.containsKey("announcement") && body.get("announcement") != null
+                && body.get("announcement").length() > MAX_TEXT_LENGTH) {
+            throw new AppException(HttpStatus.BAD_REQUEST,
+                    "announcement must not exceed " + MAX_TEXT_LENGTH + " characters");
+        }
+
         SiteSettingsEntity settings = repo.findById(1L).orElseGet(SiteSettingsEntity::new);
         if (body.containsKey("siteName")) settings.setSiteName(body.get("siteName"));
         if (body.containsKey("announcement")) settings.setAnnouncement(body.get("announcement"));

@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/ui/dialog";
 import { adminConfig, authFetch } from "@/config";
+import { toast } from "sonner";
 import {
   Camera,
   Eye,
@@ -58,6 +59,7 @@ export default function CameraManagement() {
   const [editing, setEditing] = useState<CameraItem | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const mjpegRef = useRef<HTMLImageElement>(null);
 
   const fetchCameras = async () => {
     try {
@@ -92,46 +94,64 @@ export default function CameraManagement() {
   };
 
   const handleSave = async () => {
-    const body = {
-      name: form.name,
-      location: form.location,
-      stream_url: form.streamUrl || null,
-      road_name: form.roadName || null,
-      enabled: editing ? form.enabled : true,
-    };
-    if (editing) {
-      await authFetch(`${adminConfig.CAMERAS_URL}/${editing.id}`, {
-        method: "PUT",
-        body: JSON.stringify(body),
-      });
-    } else {
-      await authFetch(adminConfig.CAMERAS_URL, {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
+    try {
+      const body = {
+        name: form.name,
+        location: form.location,
+        stream_url: form.streamUrl || null,
+        road_name: form.roadName || null,
+        enabled: editing ? form.enabled : true,
+      };
+      if (editing) {
+        const res = await authFetch(`${adminConfig.CAMERAS_URL}/${editing.id}`, {
+          method: "PUT",
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error("保存失败");
+      } else {
+        const res = await authFetch(adminConfig.CAMERAS_URL, {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error("添加失败");
+      }
+      setDialogOpen(false);
+      toast.success(editing ? "摄像头已更新" : "摄像头已添加");
+      fetchCameras();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "操作失败，请重试");
     }
-    setDialogOpen(false);
-    fetchCameras();
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm("确定删除该摄像头？")) return;
-    await authFetch(`${adminConfig.CAMERAS_URL}/${id}`, { method: "DELETE" });
-    fetchCameras();
+    try {
+      const res = await authFetch(`${adminConfig.CAMERAS_URL}/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("删除失败");
+      toast.success("摄像头已删除");
+      fetchCameras();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "删除失败，请重试");
+    }
   };
 
   const toggleEnabled = async (c: CameraItem) => {
-    await authFetch(`${adminConfig.CAMERAS_URL}/${c.id}`, {
-      method: "PUT",
-      body: JSON.stringify({
-        name: c.name,
-        location: c.location,
-        stream_url: c.stream_url,
-        road_name: c.road_name,
-        enabled: !c.enabled,
-      }),
-    });
-    fetchCameras();
+    try {
+      const res = await authFetch(`${adminConfig.CAMERAS_URL}/${c.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          name: c.name,
+          location: c.location,
+          stream_url: c.stream_url,
+          road_name: c.road_name,
+          enabled: !c.enabled,
+        }),
+      });
+      if (!res.ok) throw new Error("状态切换失败");
+      fetchCameras();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "状态切换失败，请重试");
+    }
   };
 
   // --- Preview handlers ---
@@ -147,6 +167,10 @@ export default function CameraManagement() {
       videoRef.current.pause();
       videoRef.current.removeAttribute("src");
       videoRef.current.load();
+    }
+    // Clean up MJPEG img stream on close
+    if (mjpegRef.current) {
+      mjpegRef.current.src = "";
     }
     setPreviewOpen(false);
     setPreviewCamera(null);
@@ -294,6 +318,7 @@ export default function CameraManagement() {
               />
             ) : previewCamera?.stream_url && videoError ? (
               <img
+                ref={mjpegRef}
                 src={`${previewCamera.stream_url}/api/stream`}
                 alt={`${previewCamera.name} 视频流`}
                 className="w-full h-full object-contain"
@@ -335,12 +360,36 @@ function CameraCard({
   onPreview: (c: CameraItem) => void;
   onToggle: (c: CameraItem) => void;
 }) {
+  const thumbRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  // IntersectionObserver: only load MJPEG stream when card is visible
+  useEffect(() => {
+    const el = thumbRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsVisible(entry.isIntersecting),
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Clean up MJPEG img src when card scrolls out of view
+  useEffect(() => {
+    if (!isVisible && imgRef.current) {
+      imgRef.current.src = "";
+    }
+  }, [isVisible]);
+
   return (
     <div className="group relative rounded-lg border border-border/40 bg-card shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
       {/* Thumbnail area */}
-      <div className="relative h-36 bg-muted/30 flex items-center justify-center overflow-hidden">
-        {camera.stream_url ? (
+      <div ref={thumbRef} className="relative h-36 bg-muted/30 flex items-center justify-center overflow-hidden">
+        {camera.stream_url && isVisible ? (
           <img
+            ref={imgRef}
             src={`${camera.stream_url}/api/stream`}
             alt={camera.name}
             className="w-full h-full object-cover"
@@ -353,7 +402,7 @@ function CameraCard({
           />
         ) : null}
         <div
-          className={`flex flex-col items-center justify-center text-muted-foreground/40 ${camera.stream_url ? "hidden" : ""}`}
+          className={`flex flex-col items-center justify-center text-muted-foreground/40 ${camera.stream_url && isVisible ? "hidden" : ""}`}
         >
           <Camera className="h-10 w-10" />
           <span className="text-xs mt-1">无视频源</span>
@@ -367,7 +416,7 @@ function CameraCard({
             className="h-8 w-8 rounded-full"
             onClick={() => onPreview(camera)}
             disabled={!camera.stream_url}
-            title="预览"
+            aria-label="预览"
           >
             <Eye className="h-4 w-4" />
           </Button>
@@ -376,7 +425,7 @@ function CameraCard({
             size="icon"
             className="h-8 w-8 rounded-full"
             onClick={() => onEdit(camera)}
-            title="编辑"
+            aria-label="编辑"
           >
             <Pencil className="h-3.5 w-3.5" />
           </Button>
@@ -385,7 +434,7 @@ function CameraCard({
             size="icon"
             className="h-8 w-8 rounded-full"
             onClick={() => onDelete(camera.id)}
-            title="删除"
+            aria-label="删除"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>

@@ -28,7 +28,25 @@ export default function SiteSettings() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [logoError, setLogoError] = useState(false);
+  const [debouncedLogoUrl, setDebouncedLogoUrl] = useState("");
   const msgTimer = useRef<ReturnType<typeof setTimeout>>();
+  const logoDebounceTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Cleanup msgTimer on unmount (I4)
+  useEffect(() => {
+    return () => {
+      clearTimeout(msgTimer.current);
+      clearTimeout(logoDebounceTimer.current);
+    };
+  }, []);
+
+  // Debounce logo preview URL (W1) — only render preview after 500ms idle
+  useEffect(() => {
+    clearTimeout(logoDebounceTimer.current);
+    logoDebounceTimer.current = setTimeout(() => {
+      setDebouncedLogoUrl(form.logoUrl);
+    }, 500);
+  }, [form.logoUrl]);
 
   // Dirty check
   const isDirty =
@@ -132,17 +150,17 @@ export default function SiteSettings() {
               value={form.logoUrl}
               onChange={(e) => update("logoUrl", e.target.value)}
             />
-            {form.logoUrl && !logoError && (
+            {debouncedLogoUrl && !logoError && (
               <div className="mt-2 rounded-md border bg-muted/30 p-3 flex items-center justify-center">
                 <img
-                  src={form.logoUrl}
+                  src={debouncedLogoUrl}
                   alt="Logo 预览"
                   className="max-h-20 object-contain"
                   onError={() => setLogoError(true)}
                 />
               </div>
             )}
-            {form.logoUrl && logoError && (
+            {debouncedLogoUrl && logoError && (
               <p className="text-xs text-muted-foreground">无法加载图片，请检查 URL 是否正确</p>
             )}
           </div>

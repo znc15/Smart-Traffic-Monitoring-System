@@ -17,7 +17,7 @@ type User = {
   id: number;
   username: string;
   email: string;
-  phone_number: string;
+  phoneNumber: string;
   role_id: number;
   enabled: boolean;
   createdAt: string;
@@ -32,6 +32,7 @@ type ActionState = { loading: boolean; success: boolean };
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Search & filter state
   const [search, setSearch] = useState("");
@@ -45,8 +46,17 @@ export default function UserManagement() {
 
   const fetchUsers = useCallback(async () => {
     try {
+      setError(null);
       const res = await authFetch(adminConfig.USERS_URL);
-      if (res.ok) setUsers(await res.json());
+      if (res.ok) {
+        setUsers(await res.json());
+      } else {
+        setError(`加载用户列表失败 (HTTP ${res.status})`);
+        toast.error("加载用户列表失败");
+      }
+    } catch {
+      setError("网络错误，无法加载用户列表");
+      toast.error("网络错误，无法加载用户列表");
     } finally {
       setLoading(false);
     }
@@ -141,6 +151,18 @@ export default function UserManagement() {
 
   if (loading) return <p className="py-4 text-muted-foreground">加载中...</p>;
 
+  if (error) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-12 text-muted-foreground">
+        <UserX className="h-8 w-8 opacity-40" />
+        <p className="text-sm text-destructive">{error}</p>
+        <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchUsers(); }}>
+          重试
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold">用户列表</h3>
@@ -224,7 +246,7 @@ export default function UserManagement() {
                       >
                         <td className="px-4 py-2.5 font-medium">{u.username}</td>
                         <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">{u.email}</td>
-                        <td className="px-4 py-2.5 text-muted-foreground hidden lg:table-cell">{u.phone_number || "-"}</td>
+                        <td className="px-4 py-2.5 text-muted-foreground hidden lg:table-cell">{u.phoneNumber || "-"}</td>
                         <td className="px-4 py-2.5">
                           <span
                             className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
