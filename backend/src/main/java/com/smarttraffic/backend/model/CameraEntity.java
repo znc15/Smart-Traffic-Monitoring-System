@@ -19,6 +19,9 @@ public class CameraEntity {
     @Column(name = "stream_url")
     private String streamUrl;
 
+    @Column(name = "road_name")
+    private String roadName;
+
     private boolean enabled = true;
 
     @Column(name = "created_at")
@@ -39,5 +42,7 @@ public class CameraEntity {
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
     public String getStreamUrl() { return streamUrl; }
     public void setStreamUrl(String streamUrl) { this.streamUrl = streamUrl; }
+    public String getRoadName() { return roadName; }
+    public void setRoadName(String roadName) { this.roadName = roadName; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 }

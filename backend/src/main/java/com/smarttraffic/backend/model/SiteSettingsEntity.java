@@ -17,6 +17,12 @@ public class SiteSettingsEntity {
     @Column(name = "announcement", columnDefinition = "TEXT")
     private String announcement = "";
 
+    @Column(name = "logo_url")
+    private String logoUrl;
+
+    @Column(name = "footer_text", columnDefinition = "TEXT")
+    private String footerText;
+
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
@@ -32,6 +38,10 @@ public class SiteSettingsEntity {
     public void setSiteName(String siteName) { this.siteName = siteName; }
     public String getAnnouncement() { return announcement; }
     public void setAnnouncement(String announcement) { this.announcement = announcement; }
+    public String getLogoUrl() { return logoUrl; }
+    public void setLogoUrl(String logoUrl) { this.logoUrl = logoUrl; }
+    public String getFooterText() { return footerText; }
+    public void setFooterText(String footerText) { this.footerText = footerText; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }
