@@ -37,6 +37,8 @@ public class SiteSettingsController {
         SiteSettingsEntity settings = repo.findById(1L).orElseGet(SiteSettingsEntity::new);
         if (body.containsKey("siteName")) settings.setSiteName(body.get("siteName"));
         if (body.containsKey("announcement")) settings.setAnnouncement(body.get("announcement"));
+        if (body.containsKey("logoUrl")) settings.setLogoUrl(body.get("logoUrl"));
+        if (body.containsKey("footerText")) settings.setFooterText(body.get("footerText"));
         return repo.save(settings);
     }
 }

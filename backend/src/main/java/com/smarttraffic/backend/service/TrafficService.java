@@ -25,9 +25,11 @@ public class TrafficService {
     private final ConcurrentMap<String, Snapshot> snapshots = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, byte[]> frameCache = new ConcurrentHashMap<>();
     private final CameraRepository cameraRepository;
+    private final TrafficProperties trafficProperties;
 
     public TrafficService(TrafficProperties trafficProperties, CameraRepository cameraRepository) {
         this.cameraRepository = cameraRepository;
+        this.trafficProperties = trafficProperties;
         List<CameraEntity> cameras = cameraRepository.findByEnabledTrue();
         if (cameras.isEmpty()) {
             for (String road : trafficProperties.roadsAsList()) {
@@ -49,6 +51,18 @@ public class TrafficService {
 
     public List<String> roadNames() {
         return snapshots.keySet().stream().sorted().toList();
+    }
+
+    /**
+     * 从数据库读取所有不重复的 roadName 作为道路列表。
+     * 如果数据库中没有 roadName 数据，则 fallback 到 TrafficProperties 的配置。
+     */
+    public List<String> distinctRoadNames() {
+        List<String> dbRoads = cameraRepository.findDistinctRoadNames();
+        if (dbRoads != null && !dbRoads.isEmpty()) {
+            return dbRoads.stream().sorted().toList();
+        }
+        return trafficProperties.roadsAsList();
     }
 
     public Map<String, Object> info(String roadName) {
