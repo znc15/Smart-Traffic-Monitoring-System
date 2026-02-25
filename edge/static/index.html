@@ -24,7 +24,7 @@
     .card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
     /* 视频流容器 */
     .stream-container { position: relative; background: #0f172a; border-radius: 0.75rem; overflow: hidden; }
-    .stream-container canvas { width: 100%; height: auto; display: block; min-height: 240px; }
+    .stream-container video, .stream-container img.stream-fallback { width: 100%; height: auto; display: block; min-height: 240px; }
     .stream-overlay { position: absolute; bottom: 0; left: 0; right: 0; padding: 8px 12px;
       background: rgba(0,0,0,0.5); display: flex; justify-content: space-between; }
     /* 视频流离线占位 */
@@ -226,7 +226,11 @@
       <!-- 左侧：视频流区域 (3/5宽度) -->
       <div class="lg:col-span-3">
         <div class="stream-container border border-slate-200">
-          <canvas id="videoCanvas" style="width:100%;display:block;min-height:240px;background:#0f172a;border-radius:0.5rem;"></canvas>
+          <video id="videoStream" autoplay muted playsinline
+                 style="width:100%;display:block;min-height:240px;background:#0f172a;border-radius:0.5rem;">
+          </video>
+          <img id="videoStreamFallback" class="stream-fallback"
+               style="width:100%;display:none;min-height:240px;background:#0f172a;border-radius:0.5rem;" alt="实时视频流">
           <div id="streamPlaceholder" class="stream-placeholder" style="display:none;">
             <svg class="w-16 h-16 mb-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
@@ -674,19 +678,19 @@
     isOnline = online;
   }
 
-  /** ===== 视频渲染引擎（MJPEG 流解析） ===== */
+  /** ===== 视频渲染引擎（WebM 视频流 + MJPEG 回退） ===== */
   const VideoRenderer = {
-    canvas: null,
-    ctx: null,
+    video: null,       // <video> 元素
+    fallbackImg: null, // <img> 回退元素（用于 MJPEG）
     running: false,
-    abortController: null, // 用于中断 fetch 流连接
     failCount: 0,
-    maxFails: 5,
+    maxFails: 3,
+    useMJPEG: false,   // 是否已回退到 MJPEG
 
-    /** 初始化 canvas 并启动流连接 */
+    /** 初始化并启动流连接 */
     init() {
-      this.canvas = $('videoCanvas');
-      this.ctx = this.canvas.getContext('2d');
+      this.video = $('videoStream');
+      this.fallbackImg = $('videoStreamFallback');
       this.start();
     },
 
@@ -695,140 +699,92 @@
       if (this.running) return;
       this.running = true;
       this.failCount = 0;
-      $('videoCanvas').style.display = 'block';
-      $('streamPlaceholder').style.display = 'none';
-      this._connectStream();
+      this._connect();
     },
 
     /** 停止流连接 */
     stop() {
       this.running = false;
-      if (this.abortController) {
-        this.abortController.abort();
-        this.abortController = null;
+      if (this.video) {
+        this.video.pause();
+        this.video.removeAttribute('src');
+        this.video.load();
+      }
+      if (this.fallbackImg) {
+        this.fallbackImg.removeAttribute('src');
       }
     },
 
-    /** 连接 MJPEG 流并持续解析帧 */
-    async _connectStream() {
-      this.abortController = new AbortController();
-      try {
-        const resp = await fetch('/api/stream', { signal: this.abortController.signal });
-        if (!resp.ok || !resp.body) throw new Error('HTTP ' + resp.status);
-
-        const reader = resp.body.getReader();
-        let buffer = new Uint8Array(0);
-
-        // JPEG 标记: SOI = 0xFFD8, EOI = 0xFFD9
-        const SOI = [0xFF, 0xD8];
-        const EOI = [0xFF, 0xD9];
-
-        while (this.running) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          // 拼接到缓冲区
-          const newBuf = new Uint8Array(buffer.length + value.length);
-          newBuf.set(buffer);
-          newBuf.set(value, buffer.length);
-          buffer = newBuf;
-
-          // 在缓冲区中查找完整的 JPEG 帧 (SOI...EOI)
-          while (true) {
-            const soiIdx = this._findMarker(buffer, SOI);
-            if (soiIdx < 0) break;
-            const eoiIdx = this._findMarker(buffer, EOI, soiIdx + 2);
-            if (eoiIdx < 0) break; // 帧不完整，等待更多数据
-
-            // 提取完整 JPEG（包含 SOI 和 EOI）
-            const jpegData = buffer.slice(soiIdx, eoiIdx + 2);
-            // 移除已处理的数据
-            buffer = buffer.slice(eoiIdx + 2);
-
-            // 渲染帧
-            await this._drawFrame(jpegData);
-          }
-
-          // 防止缓冲区无限增长（丢弃 SOI 之前的数据）
-          const nextSoi = this._findMarker(buffer, SOI);
-          if (nextSoi > 0) {
-            buffer = buffer.slice(nextSoi);
-          } else if (nextSoi < 0 && buffer.length > 100000) {
-            buffer = new Uint8Array(0); // 缓冲区过大且无 SOI，清空
-          }
-        }
-      } catch (err) {
-        if (err.name === 'AbortError') return; // 正常停止
-        console.error('[VideoRenderer] 流连接失败:', err);
-        this.failCount++;
-        if (this.failCount < this.maxFails && this.running) {
-          // 自动重连，间隔 1 秒
-          setTimeout(() => this._connectStream(), 1000);
-        } else {
-          this._showPlaceholder();
-        }
-      }
-    },
-
-    /** 在缓冲区中查找双字节标记（SOI/EOI） */
-    _findMarker(buf, marker, startFrom = 0) {
-      for (let i = startFrom; i < buf.length - 1; i++) {
-        if (buf[i] === marker[0] && buf[i + 1] === marker[1]) return i;
-      }
-      return -1;
-    },
-
-    /** 将 JPEG 二进制数据渲染到 canvas */
-    async _drawFrame(jpegData) {
-      try {
-        const blob = new Blob([jpegData], { type: 'image/jpeg' });
-        let img;
-        if (typeof createImageBitmap === 'function') {
-          img = await createImageBitmap(blob);
-        } else {
-          // 回退方案：通过 Image 对象加载
-          img = await new Promise((resolve, reject) => {
-            const url = URL.createObjectURL(blob);
-            const image = new Image();
-            image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
-            image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片加载失败')); };
-            image.src = url;
-          });
-        }
-
-        // 自适应 canvas 尺寸（仅在分辨率变化时调整）
-        if (this.canvas.width !== img.width || this.canvas.height !== img.height) {
-          this.canvas.width = img.width;
-          this.canvas.height = img.height;
-        }
-        this.ctx.drawImage(img, 0, 0);
-        if (img.close) img.close(); // ImageBitmap 需要手动释放
-
-        this.failCount = 0;
-        if ($('streamPlaceholder').style.display !== 'none') {
-          $('videoCanvas').style.display = 'block';
-          $('streamPlaceholder').style.display = 'none';
-        }
-      } catch (e) {
-        // 单帧解码失败，跳过
-      }
-    },
-
-    /** 显示离线占位符并停止流连接 */
-    _showPlaceholder() {
-      this.running = false;
-      if (this.abortController) {
-        this.abortController.abort();
-        this.abortController = null;
-      }
-      $('videoCanvas').style.display = 'none';
-      $('streamPlaceholder').style.display = 'flex';
-    },
-
-    /** 重新连接：断开当前流并重新建立连接 */
+    /** 重新连接 */
     reconnect() {
       this.stop();
-      setTimeout(() => this.start(), 300);
+      this.useMJPEG = false; // 重连时重新尝试视频流
+      setTimeout(() => this.start(), 500);
+    },
+
+    /** 建立流连接（优先 WebM，回退 MJPEG） */
+    _connect() {
+      if (!this.running) return;
+
+      if (this.useMJPEG) {
+        // MJPEG 回退：用 <img> 标签显示（浏览器原生支持 MJPEG）
+        this.video.style.display = 'none';
+        this.fallbackImg.style.display = 'block';
+        this.fallbackImg.src = '/api/stream?t=' + Date.now();
+        $('streamPlaceholder').style.display = 'none';
+
+        this.fallbackImg.onload = () => { this.failCount = 0; };
+        this.fallbackImg.onerror = () => this._onFallbackError();
+        return;
+      }
+
+      // 优先尝试 WebM 视频流
+      this.fallbackImg.style.display = 'none';
+      this.video.style.display = 'block';
+      $('streamPlaceholder').style.display = 'none';
+
+      this.video.src = '/api/video?t=' + Date.now();
+
+      this.video.onloadeddata = () => {
+        this.failCount = 0;
+        this.video.play().catch(() => {});
+      };
+
+      this.video.onerror = () => this._onVideoError();
+    },
+
+    /** 视频流错误处理：回退到 MJPEG */
+    _onVideoError() {
+      this.failCount++;
+      if (this.failCount >= 2) {
+        // 视频流不可用（FFmpeg 未安装等），回退到 MJPEG
+        console.warn('[VideoRenderer] WebM 视频流不可用，回退到 MJPEG');
+        this.useMJPEG = true;
+        this.failCount = 0;
+        this._connect();
+        return;
+      }
+      if (this.running) {
+        setTimeout(() => this._connect(), 1000);
+      }
+    },
+
+    /** MJPEG 回退错误处理 */
+    _onFallbackError() {
+      this.failCount++;
+      if (this.failCount >= this.maxFails) {
+        this._showPlaceholder();
+      } else if (this.running) {
+        setTimeout(() => this._connect(), 1000);
+      }
+    },
+
+    /** 显示离线占位符 */
+    _showPlaceholder() {
+      this.running = false;
+      this.video.style.display = 'none';
+      this.fallbackImg.style.display = 'none';
+      $('streamPlaceholder').style.display = 'flex';
     }
   };
 

@@ -5,6 +5,9 @@ FastAPI 路由定义
 import asyncio
 import base64
 import logging
+import shutil
+import subprocess
+import threading
 import time
 import uuid
 from datetime import datetime
@@ -172,6 +175,122 @@ async def stream_mjpeg() -> StreamingResponse | JSONResponse:
     return StreamingResponse(
         _mjpeg_generator(),
         media_type="multipart/x-mixed-replace; boundary=frame",
+    )
+
+
+# ---------------------------------------------------------------------------
+# WebM 视频流（FFmpeg 编码）
+# ---------------------------------------------------------------------------
+def _ffmpeg_available() -> bool:
+    """检查 FFmpeg 是否可用"""
+    return shutil.which("ffmpeg") is not None
+
+
+async def _video_generator() -> AsyncGenerator[bytes, None]:
+    """使用 FFmpeg 将 JPEG 帧编码为 WebM (VP8) 视频流"""
+    # 先获取一帧确定分辨率
+    frame_data = state.get_frame()
+    if not frame_data:
+        await asyncio.sleep(1)
+        frame_data = state.get_frame()
+    if not frame_data:
+        return
+
+    # 解码获取分辨率
+    nparr = np.frombuffer(frame_data, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if img is None:
+        return
+    h, w = img.shape[:2]
+
+    # 启动 FFmpeg: 接收 raw BGR 帧，输出 WebM (VP8)
+    cmd = [
+        "ffmpeg",
+        "-f", "rawvideo",
+        "-pixel_format", "bgr24",
+        "-video_size", f"{w}x{h}",
+        "-framerate", "20",
+        "-i", "pipe:0",
+        "-c:v", "libvpx",
+        "-b:v", "1M",
+        "-deadline", "realtime",
+        "-cpu-used", "8",
+        "-f", "webm",
+        "-cluster_size_limit", "65536",
+        "-cluster_time_limit", "100",
+        "pipe:1",
+    ]
+
+    proc = subprocess.Popen(
+        cmd,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+
+    stop = threading.Event()
+
+    def _writer():
+        """写入线程：持续将帧写入 FFmpeg stdin"""
+        while not stop.is_set():
+            jpeg = state.get_frame()
+            if not jpeg:
+                stop.wait(0.05)
+                continue
+            arr = np.frombuffer(jpeg, np.uint8)
+            frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+            if frame is None:
+                stop.wait(0.05)
+                continue
+            # 确保分辨率一致
+            if frame.shape[1] != w or frame.shape[0] != h:
+                frame = cv2.resize(frame, (w, h))
+            try:
+                proc.stdin.write(frame.tobytes())
+                proc.stdin.flush()
+            except (BrokenPipeError, OSError):
+                break
+            stop.wait(0.05)  # ~20fps
+
+    writer_thread = threading.Thread(target=_writer, daemon=True)
+    writer_thread.start()
+
+    try:
+        # 读取 FFmpeg 输出并 yield
+        loop = asyncio.get_running_loop()
+        while True:
+            chunk = await loop.run_in_executor(
+                None, proc.stdout.read, 4096
+            )
+            if not chunk:
+                break
+            yield chunk
+    except (asyncio.CancelledError, GeneratorExit):
+        pass
+    finally:
+        stop.set()
+        try:
+            proc.stdin.close()
+        except OSError:
+            pass
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
+@router.get("/api/video", response_model=None)
+async def video_stream() -> StreamingResponse | JSONResponse:
+    """真正的视频流（WebM/VP8 编码），需要 FFmpeg"""
+    if not _ffmpeg_available():
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "FFmpeg 未安装，无法提供视频流。请使用 /api/stream (MJPEG)"},
+        )
+    return StreamingResponse(
+        _video_generator(),
+        media_type="video/webm",
     )
 
 
