@@ -1,11 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
 import { Badge } from "@/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/ui/dialog";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { getApiUrl, getWsUrl } from "@/config/settings";
 import { authConfig } from "@/config";
-import { Server, Cpu, Timer, Activity } from "lucide-react";
+import { Server, Cpu, Timer, Activity, VideoOff, Maximize2 } from "lucide-react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -60,6 +67,15 @@ type Metrics = {
   error?: string;
 };
 
+type CameraInfo = {
+  id: number;
+  name: string;
+  streamUrl: string | null;
+  location: string | null;
+  roadName: string | null;
+  enabled: boolean;
+};
+
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -80,10 +96,229 @@ function formatUptime(ms: number): string {
   return parts.join(" ");
 }
 
+/** Video preview thumbnail for a single node. Uses IntersectionObserver to only load when visible. */
+function NodeVideoPreview({
+  streamUrl,
+  online,
+  onClick,
+}: {
+  streamUrl: string | null;
+  online: boolean;
+  onClick: () => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const [videoError, setVideoError] = useState(false);
+
+  // IntersectionObserver: only load video when the card is visible
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsVisible(entry.isIntersecting),
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Cleanup video src when not visible to free resources
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (!isVisible) {
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    }
+  }, [isVisible]);
+
+  const baseUrl = streamUrl?.replace(/\/+$/, "");
+
+  // Offline placeholder
+  if (!online || !baseUrl) {
+    return (
+      <div
+        ref={containerRef}
+        className="w-full h-[150px] rounded-md bg-slate-800 flex flex-col items-center justify-center text-slate-500 gap-2"
+      >
+        <VideoOff className="h-8 w-8" />
+        <span className="text-xs">{!baseUrl ? "未配置流地址" : "离线"}</span>
+      </div>
+    );
+  }
+
+  // Online: show video (or fallback to MJPEG img on error)
+  return (
+    <div
+      ref={containerRef}
+      className="relative w-full h-[150px] rounded-md bg-slate-900 overflow-hidden cursor-pointer group"
+      onClick={onClick}
+    >
+      {isVisible && (
+        <>
+          {!videoError ? (
+            <video
+              ref={videoRef}
+              src={`${baseUrl}/api/video`}
+              autoPlay
+              muted
+              playsInline
+              className="w-full h-full object-cover"
+              onError={() => setVideoError(true)}
+            />
+          ) : (
+            <img
+              src={`${baseUrl}/api/stream`}
+              alt="视频流"
+              className="w-full h-full object-cover"
+            />
+          )}
+          {/* Hover overlay with expand icon */}
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+            <Maximize2 className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Expanded video dialog content — rendered inside <Dialog> */
+function ExpandedNodeDialog({ node, streamUrl }: { node: NodeInfo; streamUrl: string | null }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoError, setVideoError] = useState(false);
+  const baseUrl = streamUrl?.replace(/\/+$/, "");
+
+  // Cleanup video when dialog unmounts
+  useEffect(() => {
+    return () => {
+      const v = videoRef.current;
+      if (v) { v.pause(); v.removeAttribute("src"); v.load(); }
+    };
+  }, []);
+
+  return (
+    <DialogContent className="sm:max-w-3xl">
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          {node.name}
+          {node.online ? (
+            <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25">
+              在线
+            </Badge>
+          ) : (
+            <Badge className="bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/25">
+              离线
+            </Badge>
+          )}
+        </DialogTitle>
+        <DialogDescription>节点视频预览与详细信息</DialogDescription>
+      </DialogHeader>
+
+      {/* Video area */}
+      {node.online && baseUrl ? (
+        <div className="w-full aspect-video rounded-md bg-slate-900 overflow-hidden">
+          {!videoError ? (
+            <video
+              ref={videoRef}
+              src={`${baseUrl}/api/video`}
+              autoPlay
+              muted
+              playsInline
+              className="w-full h-full object-contain"
+              onError={() => setVideoError(true)}
+            />
+          ) : (
+            <img
+              src={`${baseUrl}/api/stream`}
+              alt="视频流"
+              className="w-full h-full object-contain"
+            />
+          )}
+        </div>
+      ) : (
+        <div className="w-full aspect-video rounded-md bg-slate-800 flex flex-col items-center justify-center text-slate-500 gap-2">
+          <VideoOff className="h-12 w-12" />
+          <span className="text-sm">{!baseUrl ? "未配置流地址" : "节点离线"}</span>
+        </div>
+      )}
+
+      {/* Node detail info */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+        <div>
+          <div className="text-muted-foreground text-xs">延迟</div>
+          <div className="font-medium">{node.latency_ms} ms</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground text-xs">错误次数</div>
+          <div className="font-medium">{node.error_count}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground text-xs">最后成功</div>
+          <div className="font-medium">
+            {node.last_success_time ? new Date(node.last_success_time).toLocaleString("zh-CN") : "-"}
+          </div>
+        </div>
+        {node.last_error && (
+          <div className="col-span-2 sm:col-span-3">
+            <div className="text-muted-foreground text-xs">最近错误</div>
+            <div className="font-medium text-destructive truncate">{node.last_error}</div>
+          </div>
+        )}
+      </div>
+
+      {/* Edge metrics in dialog */}
+      {node.edge_metrics && (
+        <div className="border-t border-border/50 pt-3">
+          <div className="text-xs text-muted-foreground mb-2">边缘节点指标</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+            <div>
+              <div className="text-muted-foreground text-xs">CPU</div>
+              <div className="font-medium">{node.edge_metrics.cpu_percent}%</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs">内存</div>
+              <div className="font-medium">{node.edge_metrics.memory_percent}%</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs">GPU</div>
+              <div className="font-medium">
+                {node.edge_metrics.gpu_percent != null ? `${node.edge_metrics.gpu_percent}%` : "N/A"}
+              </div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs">推理延迟</div>
+              <div className="font-medium">{node.edge_metrics.inference_ms} ms</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs">FPS</div>
+              <div className="font-medium">{node.edge_metrics.fps}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs">模型</div>
+              <div className="font-medium">{node.edge_metrics.model}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-xs">运行时间</div>
+              <div className="font-medium">{formatUptime(node.edge_metrics.uptime_s * 1000)}</div>
+            </div>
+          </div>
+        </div>
+      )}
+    </DialogContent>
+  );
+}
+
 export default function SystemMonitor() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [history, setHistory] = useState<{ time: string; cpu: number; mem: number; disk: number }[]>([]);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+  // Map: camera name -> streamUrl (base URL of the edge node)
+  const [cameraUrlMap, setCameraUrlMap] = useState<Record<string, string>>({});
+  // Dialog state for expanded video view
+  const [expandedNode, setExpandedNode] = useState<{ node: NodeInfo; streamUrl: string | null } | null>(null);
 
   const token = useMemo(
     () => (typeof window !== "undefined" ? localStorage.getItem(authConfig.TOKEN_KEY) : null),
@@ -104,7 +339,25 @@ export default function SystemMonitor() {
     } catch { /* ignore */ }
   };
 
-  useEffect(() => { fetchMetrics(); }, []);
+  const fetchCameraUrls = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(getApiUrl("/admin/cameras"), {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
+      });
+      if (res.ok) {
+        const cameras = (await res.json()) as CameraInfo[];
+        const map: Record<string, string> = {};
+        for (const cam of cameras) {
+          if (cam.streamUrl) map[cam.name] = cam.streamUrl;
+        }
+        setCameraUrlMap(map);
+      }
+    } catch { /* ignore */ }
+  }, [token]);
+
+  useEffect(() => { fetchMetrics(); fetchCameraUrls(); }, []);
 
   const wsUrl = useMemo(() => getWsUrl("/admin/ws/resources"), []);
   const { data: wsData, isConnected } = useWebSocket(wsUrl, {
@@ -251,75 +504,61 @@ export default function SystemMonitor() {
         </Card>
       )}
 
-      {/* Camera Node Health Table */}
+      {/* Camera Node Health Cards with Video Preview */}
       <Card>
         <CardHeader>
           <CardTitle>摄像头节点状态</CardTitle>
         </CardHeader>
         <CardContent>
           {metrics?.nodes && Object.keys(metrics.nodes).length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-muted-foreground">
-                    <th className="pb-2 pr-4 font-medium">名称</th>
-                    <th className="pb-2 pr-4 font-medium">状态</th>
-                    <th className="pb-2 pr-4 font-medium">延迟</th>
-                    <th className="pb-2 pr-4 font-medium">最后成功时间</th>
-                    <th className="pb-2 pr-4 font-medium">错误次数</th>
-                    <th className="pb-2 font-medium">最近错误</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(metrics.nodes).map(([key, node]) => (
-                    <tr key={key} className="border-b border-border/50 last:border-0">
-                      <td className="py-2.5 pr-4 font-medium">{node.name}</td>
-                      <td className="py-2.5 pr-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(metrics.nodes).map(([key, node]) => {
+                const streamUrl = cameraUrlMap[node.name] ?? null;
+                return (
+                  <div
+                    key={key}
+                    className="rounded-lg border border-border/50 bg-card overflow-hidden"
+                  >
+                    {/* Video preview area */}
+                    <NodeVideoPreview
+                      streamUrl={streamUrl}
+                      online={node.online}
+                      onClick={() => setExpandedNode({ node, streamUrl })}
+                    />
+
+                    {/* Node info */}
+                    <div className="p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-sm truncate">{node.name}</span>
                         {node.online ? (
-                          <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25">
+                          <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 shrink-0">
                             在线
                           </Badge>
                         ) : (
-                          <Badge className="bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/25">
+                          <Badge className="bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/25 shrink-0">
                             离线
                           </Badge>
                         )}
-                      </td>
-                      <td className="py-2.5 pr-4">{node.latency_ms} ms</td>
-                      <td className="py-2.5 pr-4 text-muted-foreground">
-                        {node.last_success_time
-                          ? new Date(node.last_success_time).toLocaleString("zh-CN")
-                          : "-"}
-                      </td>
-                      <td className="py-2.5 pr-4">{node.error_count}</td>
-                      <td className="py-2.5 text-muted-foreground max-w-[200px] truncate">
-                        {node.last_error ?? "-"}
-                      </td>
-                    </tr>
-                  )).flatMap((row, i) => {
-                    const entries = Object.entries(metrics.nodes!);
-                    const [, node] = entries[i];
-                    if (!node.edge_metrics) return [row];
-                    const em = node.edge_metrics;
-                    return [
-                      row,
-                      <tr key={`${entries[i][0]}-edge`} className="border-b border-border/50 last:border-0">
-                        <td colSpan={6} className="py-1.5 px-4 bg-muted/30">
-                          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                            <span>CPU: <span className="text-foreground font-medium">{em.cpu_percent}%</span></span>
-                            <span>内存: <span className="text-foreground font-medium">{em.memory_percent}%</span></span>
-                            <span>GPU: <span className="text-foreground font-medium">{em.gpu_percent != null ? `${em.gpu_percent}%` : "N/A"}</span></span>
-                            <span>推理: <span className="text-foreground font-medium">{em.inference_ms}ms</span></span>
-                            <span>FPS: <span className="text-foreground font-medium">{em.fps}</span></span>
-                            <span>模型: <span className="text-foreground font-medium">{em.model}</span></span>
-                            <span>运行: <span className="text-foreground font-medium">{formatUptime(em.uptime_s * 1000)}</span></span>
-                          </div>
-                        </td>
-                      </tr>,
-                    ];
-                  })}
-                </tbody>
-              </table>
+                      </div>
+
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <span>延迟: <span className="text-foreground">{node.latency_ms}ms</span></span>
+                        <span>错误: <span className="text-foreground">{node.error_count}</span></span>
+                      </div>
+
+                      {/* Edge metrics row */}
+                      {node.edge_metrics && (
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground pt-1 border-t border-border/30">
+                          <span>CPU: <span className="text-foreground font-medium">{node.edge_metrics.cpu_percent}%</span></span>
+                          <span>RAM: <span className="text-foreground font-medium">{node.edge_metrics.memory_percent}%</span></span>
+                          <span>FPS: <span className="text-foreground font-medium">{node.edge_metrics.fps}</span></span>
+                          <span>{node.edge_metrics.inference_ms}ms</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">暂无节点数据</p>
@@ -365,6 +604,19 @@ export default function SystemMonitor() {
           <CardContent><p>{metrics.error}</p></CardContent>
         </Card>
       )}
+
+      {/* Expanded video dialog */}
+      <Dialog
+        open={expandedNode !== null}
+        onOpenChange={(open) => { if (!open) setExpandedNode(null); }}
+      >
+        {expandedNode && (
+          <ExpandedNodeDialog
+            node={expandedNode.node}
+            streamUrl={expandedNode.streamUrl}
+          />
+        )}
+      </Dialog>
     </div>
   );
 }
