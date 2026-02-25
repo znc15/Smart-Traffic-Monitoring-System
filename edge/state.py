@@ -67,6 +67,11 @@ class EdgeState:
                 "speed_motor": self.speed_motor,
             }
 
+    def clear_frame(self) -> None:
+        """清空帧缓存（模式切换时调用，避免残留旧模式的帧导致花屏）"""
+        with self._lock:
+            self.frame_jpeg = b""
+
     def get_frame(self) -> bytes:
         with self._lock:
             return self.frame_jpeg
