@@ -28,6 +28,10 @@ def camera_loop() -> None:
         print(f"[ERROR] 无法打开视频源: {source}")
         return
 
+    # 丢弃前 5 帧，让编解码器稳定（避免 I-frame 未到达导致花屏）
+    for _ in range(5):
+        cap.read()
+
     print(f"[INFO] 视频源已连接: {source}")
     fps_counter = 0
     fps_timer = time.time()
@@ -36,13 +40,16 @@ def camera_loop() -> None:
     try:
         while not state.should_stop():
             ret, frame = cap.read()
-            if not ret:
-                print("[WARN] 读取帧失败，1秒后重试...")
+            if not ret or frame is None or frame.size == 0:
+                print("[WARN] 读取帧失败或帧无效，1秒后重试...")
                 # 等待期间也检查停止信号，避免阻塞退出
                 if state.stop_event.wait(timeout=1.0):
                     break
                 cap.release()
                 cap = cv2.VideoCapture(source)
+                # 重连后同样丢弃前几帧
+                for _ in range(5):
+                    cap.read()
                 continue
 
             # YOLOv8 检测
@@ -65,7 +72,9 @@ def camera_loop() -> None:
                          inference_ms, current_fps)
 
             # 编码 JPEG 并更新全局状态
-            _, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            success, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            if not success:
+                continue  # 跳过编码失败的帧
 
             state.update_traffic(count_car, count_motor, speed_car, speed_motor,
                                  inference_ms, current_fps)
@@ -157,7 +166,9 @@ def _sim_video_loop(videos: list[Path]) -> None:
                              inference_ms, current_fps)
 
                 # 编码 JPEG 并更新全局状态
-                _, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                success, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                if not success:
+                    continue  # 跳过编码失败的帧
                 state.update_traffic(count_car, count_motor, speed_car, speed_motor,
                                      inference_ms, current_fps)
                 state.update_frame(jpeg.tobytes())
@@ -212,7 +223,10 @@ def _sim_image_loop(images: list[Path]) -> None:
                      inference_ms, current_fps)
 
         # 编码 JPEG 并更新全局状态
-        _, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        success, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        if not success:
+            img_idx += 1
+            continue  # 跳过编码失败的帧
         state.update_traffic(count_car, count_motor, speed_car, speed_motor,
                              inference_ms, current_fps)
         state.update_frame(jpeg.tobytes())
@@ -275,7 +289,9 @@ def _sim_random_loop() -> None:
                      inference_ms, current_fps)
 
         # 编码 JPEG 并更新全局状态
-        _, jpeg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        success, jpeg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        if not success:
+            continue  # 跳过编码失败的帧
 
         state.update_traffic(count_car, count_motor, speed_car, speed_motor,
                              inference_ms, current_fps)
