@@ -399,6 +399,18 @@
               <button type="button" class="btn-test" id="probeBtn" onclick="settings_probeConnection()" disabled>测试</button>
             </div>
             <div id="probeResult" style="display:none;"></div>
+            <!-- 摄像头预览测试 -->
+            <div id="cameraPreviewSection" style="margin-top:12px;">
+              <button type="button" class="btn-test" onclick="settings_previewCamera()" id="previewBtn">
+                抓帧测试
+              </button>
+              <div id="previewResult" style="display:none; margin-top:10px;">
+                <div style="display:flex; gap:8px; align-items:start; flex-wrap:wrap;">
+                  <img id="previewImage" style="max-width:100%; border-radius:8px; border:1px solid #e2e8f0;" />
+                </div>
+                <div id="previewStats" style="margin-top:8px; font-size:0.8rem; color:#64748b;"></div>
+              </div>
+            </div>
             <p class="text-xs text-slate-400 mt-1" id="cameraSourceHint">模拟模式下无需配置摄像头源</p>
           </div>
         </div>
@@ -1290,6 +1302,41 @@
     settings_updateTestBtn();
     // 3秒后自动隐藏结果
     setTimeout(() => { resultEl.style.display = 'none'; }, 3000);
+  }
+
+  /** 抓帧测试：抓取一帧并运行 YOLO 检测 */
+  async function settings_previewCamera() {
+    const source = $('settingCameraSource').value.trim();
+    if (!source) { showToast('请先输入摄像头源', 'error'); return; }
+
+    const btn = $('previewBtn');
+    const resultEl = $('previewResult');
+    btn.disabled = true;
+    btn.textContent = '抓帧中...';
+    resultEl.style.display = 'none';
+
+    try {
+      const resp = await fetch('/api/cameras/preview?source=' + encodeURIComponent(source));
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.detail || 'HTTP ' + resp.status);
+      }
+
+      const blob = await resp.blob();
+      const countCar = resp.headers.get('X-Count-Car') || '0';
+      const countMotor = resp.headers.get('X-Count-Motor') || '0';
+      const inferenceMs = resp.headers.get('X-Inference-Ms') || '0';
+
+      $('previewImage').src = URL.createObjectURL(blob);
+      $('previewStats').textContent = '检测结果: 汽车 ' + countCar + ' 辆, 摩托/自行车 ' + countMotor + ' 辆, 推理耗时 ' + inferenceMs + 'ms';
+      resultEl.style.display = 'block';
+      showToast('抓帧测试成功', 'success');
+    } catch (err) {
+      showToast('抓帧测试失败: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '抓帧测试';
+    }
   }
 
   // ========== 置信度滑块实时更新 ==========
