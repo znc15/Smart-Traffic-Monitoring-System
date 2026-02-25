@@ -24,7 +24,7 @@
     .card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
     /* 视频流容器 */
     .stream-container { position: relative; background: #0f172a; border-radius: 0.75rem; overflow: hidden; }
-    .stream-container img { width: 100%; height: auto; display: block; min-height: 240px; object-fit: contain; }
+    .stream-container canvas { width: 100%; height: auto; display: block; min-height: 240px; }
     .stream-overlay { position: absolute; bottom: 0; left: 0; right: 0; padding: 8px 12px;
       background: rgba(0,0,0,0.5); display: flex; justify-content: space-between; }
     /* 视频流离线占位 */
@@ -226,8 +226,7 @@
       <!-- 左侧：视频流区域 (3/5宽度) -->
       <div class="lg:col-span-3">
         <div class="stream-container border border-slate-200">
-          <img id="videoStream" src="/api/stream" alt="实时视频流"
-               onerror="this.style.display='none'; document.getElementById('streamPlaceholder').style.display='flex';">
+          <canvas id="videoCanvas" style="width:100%;display:block;min-height:240px;background:#0f172a;border-radius:0.5rem;"></canvas>
           <div id="streamPlaceholder" class="stream-placeholder" style="display:none;">
             <svg class="w-16 h-16 mb-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
@@ -235,7 +234,7 @@
             </svg>
             <p class="text-base font-medium">视频流未连接</p>
             <p class="text-sm text-slate-500 mt-1">等待边缘节点启动...</p>
-            <button onclick="reconnectStream()" class="mt-3 px-4 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm transition">
+            <button onclick="VideoRenderer.reconnect()" class="mt-3 px-4 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm transition">
               重新连接
             </button>
           </div>
@@ -675,19 +674,167 @@
     isOnline = online;
   }
 
-  /** 重新连接视频流 */
+  /** ===== 视频渲染引擎（MJPEG 流解析） ===== */
+  const VideoRenderer = {
+    canvas: null,
+    ctx: null,
+    running: false,
+    abortController: null, // 用于中断 fetch 流连接
+    failCount: 0,
+    maxFails: 5,
+
+    /** 初始化 canvas 并启动流连接 */
+    init() {
+      this.canvas = $('videoCanvas');
+      this.ctx = this.canvas.getContext('2d');
+      this.start();
+    },
+
+    /** 开始流连接 */
+    start() {
+      if (this.running) return;
+      this.running = true;
+      this.failCount = 0;
+      $('videoCanvas').style.display = 'block';
+      $('streamPlaceholder').style.display = 'none';
+      this._connectStream();
+    },
+
+    /** 停止流连接 */
+    stop() {
+      this.running = false;
+      if (this.abortController) {
+        this.abortController.abort();
+        this.abortController = null;
+      }
+    },
+
+    /** 连接 MJPEG 流并持续解析帧 */
+    async _connectStream() {
+      this.abortController = new AbortController();
+      try {
+        const resp = await fetch('/api/stream', { signal: this.abortController.signal });
+        if (!resp.ok || !resp.body) throw new Error('HTTP ' + resp.status);
+
+        const reader = resp.body.getReader();
+        let buffer = new Uint8Array(0);
+
+        // JPEG 标记: SOI = 0xFFD8, EOI = 0xFFD9
+        const SOI = [0xFF, 0xD8];
+        const EOI = [0xFF, 0xD9];
+
+        while (this.running) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          // 拼接到缓冲区
+          const newBuf = new Uint8Array(buffer.length + value.length);
+          newBuf.set(buffer);
+          newBuf.set(value, buffer.length);
+          buffer = newBuf;
+
+          // 在缓冲区中查找完整的 JPEG 帧 (SOI...EOI)
+          while (true) {
+            const soiIdx = this._findMarker(buffer, SOI);
+            if (soiIdx < 0) break;
+            const eoiIdx = this._findMarker(buffer, EOI, soiIdx + 2);
+            if (eoiIdx < 0) break; // 帧不完整，等待更多数据
+
+            // 提取完整 JPEG（包含 SOI 和 EOI）
+            const jpegData = buffer.slice(soiIdx, eoiIdx + 2);
+            // 移除已处理的数据
+            buffer = buffer.slice(eoiIdx + 2);
+
+            // 渲染帧
+            await this._drawFrame(jpegData);
+          }
+
+          // 防止缓冲区无限增长（丢弃 SOI 之前的数据）
+          const nextSoi = this._findMarker(buffer, SOI);
+          if (nextSoi > 0) {
+            buffer = buffer.slice(nextSoi);
+          } else if (nextSoi < 0 && buffer.length > 100000) {
+            buffer = new Uint8Array(0); // 缓冲区过大且无 SOI，清空
+          }
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') return; // 正常停止
+        console.error('[VideoRenderer] 流连接失败:', err);
+        this.failCount++;
+        if (this.failCount < this.maxFails && this.running) {
+          // 自动重连，间隔 1 秒
+          setTimeout(() => this._connectStream(), 1000);
+        } else {
+          this._showPlaceholder();
+        }
+      }
+    },
+
+    /** 在缓冲区中查找双字节标记（SOI/EOI） */
+    _findMarker(buf, marker, startFrom = 0) {
+      for (let i = startFrom; i < buf.length - 1; i++) {
+        if (buf[i] === marker[0] && buf[i + 1] === marker[1]) return i;
+      }
+      return -1;
+    },
+
+    /** 将 JPEG 二进制数据渲染到 canvas */
+    async _drawFrame(jpegData) {
+      try {
+        const blob = new Blob([jpegData], { type: 'image/jpeg' });
+        let img;
+        if (typeof createImageBitmap === 'function') {
+          img = await createImageBitmap(blob);
+        } else {
+          // 回退方案：通过 Image 对象加载
+          img = await new Promise((resolve, reject) => {
+            const url = URL.createObjectURL(blob);
+            const image = new Image();
+            image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
+            image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片加载失败')); };
+            image.src = url;
+          });
+        }
+
+        // 自适应 canvas 尺寸（仅在分辨率变化时调整）
+        if (this.canvas.width !== img.width || this.canvas.height !== img.height) {
+          this.canvas.width = img.width;
+          this.canvas.height = img.height;
+        }
+        this.ctx.drawImage(img, 0, 0);
+        if (img.close) img.close(); // ImageBitmap 需要手动释放
+
+        this.failCount = 0;
+        if ($('streamPlaceholder').style.display !== 'none') {
+          $('videoCanvas').style.display = 'block';
+          $('streamPlaceholder').style.display = 'none';
+        }
+      } catch (e) {
+        // 单帧解码失败，跳过
+      }
+    },
+
+    /** 显示离线占位符并停止流连接 */
+    _showPlaceholder() {
+      this.running = false;
+      if (this.abortController) {
+        this.abortController.abort();
+        this.abortController = null;
+      }
+      $('videoCanvas').style.display = 'none';
+      $('streamPlaceholder').style.display = 'flex';
+    },
+
+    /** 重新连接：断开当前流并重新建立连接 */
+    reconnect() {
+      this.stop();
+      setTimeout(() => this.start(), 300);
+    }
+  };
+
+  /** 兼容旧调用点 */
   function reconnectStream() {
-    const img = $('videoStream');
-    const placeholder = $('streamPlaceholder');
-    // 添加时间戳避免缓存
-    img.src = '/api/stream?t=' + Date.now();
-    img.style.display = 'block';
-    placeholder.style.display = 'none';
-    // 如果加载失败会再次触发 onerror
-    img.onerror = function() {
-      this.style.display = 'none';
-      placeholder.style.display = 'flex';
-    };
+    VideoRenderer.reconnect();
   }
 
   // ========== Chart.js 初始化 ==========
@@ -1685,6 +1832,9 @@
     initChart();
     fetchTrafficData();
     setInterval(fetchTrafficData, POLL_INTERVAL);
+
+    // ===== 初始化视频渲染引擎 =====
+    VideoRenderer.init();
 
     // ===== 测试面板：拖拽和文件选择事件绑定 =====
     test_initDropZone();
