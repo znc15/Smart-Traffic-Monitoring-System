@@ -1,25 +1,69 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { Textarea } from "@/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/ui/card";
+import { Label } from "@/ui/label";
 import { authFetch, endpoints, adminConfig } from "@/config";
+import { ImageIcon, Megaphone, Palette, Save, Loader2, AlertCircle } from "lucide-react";
+
+interface Settings {
+  siteName: string;
+  logoUrl: string;
+  announcement: string;
+  footerText: string;
+}
+
+const defaultSettings: Settings = {
+  siteName: "",
+  logoUrl: "",
+  announcement: "",
+  footerText: "",
+};
 
 export default function SiteSettings() {
-  const [siteName, setSiteName] = useState("");
-  const [announcement, setAnnouncement] = useState("");
+  const [form, setForm] = useState<Settings>(defaultSettings);
+  const [saved, setSaved] = useState<Settings>(defaultSettings);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [logoError, setLogoError] = useState(false);
+  const msgTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Dirty check
+  const isDirty =
+    form.siteName !== saved.siteName ||
+    form.logoUrl !== saved.logoUrl ||
+    form.announcement !== saved.announcement ||
+    form.footerText !== saved.footerText;
+
+  const showMsg = useCallback((text: string, ok: boolean) => {
+    setMsg({ text, ok });
+    clearTimeout(msgTimer.current);
+    msgTimer.current = setTimeout(() => setMsg(null), 3000);
+  }, []);
 
   useEffect(() => {
     fetch(endpoints.siteSettings)
-      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => {
-        setSiteName(d.siteName ?? "");
-        setAnnouncement(d.announcement ?? "");
+        const loaded: Settings = {
+          siteName: d.siteName ?? "",
+          logoUrl: d.logoUrl ?? "",
+          announcement: d.announcement ?? "",
+          footerText: d.footerText ?? "",
+        };
+        setForm(loaded);
+        setSaved(loaded);
       })
-      .catch(() => setMsg({ text: "加载设置失败", ok: false }));
-  }, []);
+      .catch(() => showMsg("加载设置失败", false))
+      .finally(() => setLoading(false));
+  }, [showMsg]);
+
+  const update = (key: keyof Settings, value: string) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    if (key === "logoUrl") setLogoError(false);
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -27,31 +71,150 @@ export default function SiteSettings() {
     try {
       const res = await authFetch(adminConfig.SITE_SETTINGS_URL, {
         method: "PUT",
-        body: JSON.stringify({ siteName, announcement }),
+        body: JSON.stringify(form),
       });
-      setMsg(res.ok ? { text: "保存成功", ok: true } : { text: "保存失败", ok: false });
+      if (res.ok) {
+        setSaved({ ...form });
+        showMsg("保存成功", true);
+      } else {
+        showMsg("保存失败", false);
+      }
     } catch {
-      setMsg({ text: "网络错误", ok: false });
+      showMsg("网络错误", false);
     } finally {
       setSaving(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+        加载设置中...
+      </div>
+    );
+  }
+
   return (
-    <Card className="max-w-xl mt-4">
-      <CardHeader><CardTitle>网站设置</CardTitle></CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-1">
-          <label className="text-sm font-medium">站点名称</label>
-          <Input value={siteName} onChange={(e) => setSiteName(e.target.value)} />
+    <div className="max-w-2xl space-y-6">
+      {/* Unsaved banner */}
+      {isDirty && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-400">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          有未保存的更改
         </div>
-        <div className="space-y-1">
-          <label className="text-sm font-medium">公告</label>
-          <Textarea value={announcement} onChange={(e) => setAnnouncement(e.target.value)} rows={3} />
-        </div>
-        {msg && <p className={msg.ok ? "text-green-600 text-sm" : "text-red-600 text-sm"}>{msg.text}</p>}
-        <Button onClick={handleSave} disabled={saving}>{saving ? "保存中..." : "保存"}</Button>
-      </CardContent>
-    </Card>
+      )}
+
+      {/* Card 1: Basic Info */}
+      <Card className="rounded-lg border p-6 space-y-4">
+        <CardHeader className="p-0">
+          <div className="flex items-center gap-2">
+            <ImageIcon className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base">基本信息</CardTitle>
+          </div>
+          <CardDescription>设置站点名称和 Logo</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0 space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="siteName">站点名称</Label>
+            <Input
+              id="siteName"
+              placeholder="输入站点名称"
+              value={form.siteName}
+              onChange={(e) => update("siteName", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="logoUrl">Logo URL</Label>
+            <Input
+              id="logoUrl"
+              placeholder="https://example.com/logo.png"
+              value={form.logoUrl}
+              onChange={(e) => update("logoUrl", e.target.value)}
+            />
+            {form.logoUrl && !logoError && (
+              <div className="mt-2 rounded-md border bg-muted/30 p-3 flex items-center justify-center">
+                <img
+                  src={form.logoUrl}
+                  alt="Logo 预览"
+                  className="max-h-20 object-contain"
+                  onError={() => setLogoError(true)}
+                />
+              </div>
+            )}
+            {form.logoUrl && logoError && (
+              <p className="text-xs text-muted-foreground">无法加载图片，请检查 URL 是否正确</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Card 2: Announcement */}
+      <Card className="rounded-lg border p-6 space-y-4">
+        <CardHeader className="p-0">
+          <div className="flex items-center gap-2">
+            <Megaphone className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base">公告管理</CardTitle>
+          </div>
+          <CardDescription>设置站点公告内容，留空则不显示</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0 space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="announcement">公告内容</Label>
+            <Textarea
+              id="announcement"
+              placeholder="输入公告内容..."
+              value={form.announcement}
+              onChange={(e) => update("announcement", e.target.value)}
+              rows={4}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Card 3: Appearance */}
+      <Card className="rounded-lg border p-6 space-y-4">
+        <CardHeader className="p-0">
+          <div className="flex items-center gap-2">
+            <Palette className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base">外观设置</CardTitle>
+          </div>
+          <CardDescription>自定义页面外观元素</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0 space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="footerText">页脚文字</Label>
+            <Input
+              id="footerText"
+              placeholder="例如: (c) 2026 智能交通监控系统"
+              value={form.footerText}
+              onChange={(e) => update("footerText", e.target.value)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Save area */}
+      <div className="flex items-center gap-3">
+        <Button onClick={handleSave} disabled={saving || !isDirty}>
+          {saving ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+              保存中...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4 mr-1.5" />
+              保存设置
+            </>
+          )}
+        </Button>
+        {msg && (
+          <span className={msg.ok ? "text-green-600 text-sm" : "text-red-600 text-sm"}>
+            {msg.text}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
