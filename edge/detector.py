@@ -35,6 +35,19 @@ def reset_model() -> None:
     print("[INFO] 模型缓存已清除，下次检测时将重新加载")
 
 
+def _get_ultralytics_export_path() -> Path:
+    """Return the directory name ultralytics actually produces after export.
+
+    Ultralytics does NOT include imgsz in the directory name.  Its naming
+    convention is:
+      - INT8:        {stem}_int8_openvino_model/
+      - FP16/default: {stem}_openvino_model/
+    """
+    model_path = config.get_model_path()
+    quant_tag = "_int8" if config.QUANTIZE == "int8" else ""
+    return model_path.parent / f"{model_path.stem}{quant_tag}_openvino_model"
+
+
 def _get_openvino_path() -> Path:
     """Return the OpenVINO IR model directory path.
 
@@ -89,6 +102,18 @@ def _load_model() -> YOLO:
                     print("[INFO] 启用 INT8 量化导出")
                 print(f"[INFO] 导出参数: imgsz={config.IMGSZ}, quantize={config.QUANTIZE}")
                 pt_model.export(**export_kwargs)
+
+                # Ultralytics does not include imgsz in the export directory
+                # name, but we need it for cache isolation across different
+                # input sizes.  Rename the actual output to our target path.
+                actual_dir = _get_ultralytics_export_path()
+                if actual_dir.exists() and not ov_dir.exists():
+                    actual_dir.rename(ov_dir)
+                    print(f"[INFO] Renamed export dir: {actual_dir.name} → {ov_dir.name}")
+                elif not ov_dir.exists():
+                    print(f"[WARN] Expected export dir not found: {actual_dir} — "
+                          f"falling back to target path check")
+
                 print(f"[INFO] OpenVINO 导出完成: {ov_dir}")
 
             print(f"[INFO] 加载 OpenVINO 模型: {ov_dir}")
