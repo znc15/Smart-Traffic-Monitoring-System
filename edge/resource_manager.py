@@ -2,9 +2,10 @@
 Resource manager: auto-detect hardware capabilities and apply resource-level presets.
 
 Levels:
-  - low:    <=2 cores OR <=2 GB RAM  → aggressive throttling
-  - medium: default
-  - high:   >=8 cores AND >=8 GB RAM → allow larger models
+  - ultra_low: 1 core OR <=1 GB RAM  → extreme throttling for industrial PCs
+  - low:       <=2 cores OR <=2 GB RAM → aggressive throttling
+  - medium:    default
+  - high:      >=8 cores AND >=8 GB RAM → allow larger models
 """
 
 import logging
@@ -21,6 +22,13 @@ _resource_level: str = "medium"
 
 # Preset overrides per level (only fields that differ from config defaults)
 _PRESETS = {
+    "ultra_low": {
+        "FRAME_SKIP": 5,
+        "IMGSZ": 160,
+        "JPEG_QUALITY": 40,
+        "MAX_MJPEG_CLIENTS": 1,
+        "CONF_THRESHOLD": 0.3,
+    },
     "low": {
         "FRAME_SKIP": 3,
         "IMGSZ": 320,
@@ -48,6 +56,9 @@ def _detect_level() -> str:
 
     logger.info("Hardware: %d CPU cores, %.1f GB RAM", cpu_count, mem_gb)
 
+    # Ultra-low: single core or <= 1 GB RAM (typical industrial PC / thin client)
+    if cpu_count <= 1 or mem_gb <= 1.0:
+        return "ultra_low"
     if cpu_count <= 2 or mem_gb <= 2.0:
         return "low"
     if cpu_count >= 8 and mem_gb >= 8.0:
@@ -73,6 +84,7 @@ def get_resource_params() -> dict:
         "IMGSZ": config.IMGSZ,
         "JPEG_QUALITY": config.JPEG_QUALITY,
         "MAX_MJPEG_CLIENTS": config.MAX_MJPEG_CLIENTS,
+        "CONF_THRESHOLD": config.CONF_THRESHOLD,
     }
 
 
@@ -93,12 +105,14 @@ def init_resource_manager() -> str:
         setattr(config, key, value)
 
     logger.info(
-        "Resource level: %s | FRAME_SKIP=%d, IMGSZ=%d, JPEG_QUALITY=%d, MAX_MJPEG_CLIENTS=%d",
+        "Resource level: %s | FRAME_SKIP=%d, IMGSZ=%d, JPEG_QUALITY=%d, "
+        "MAX_MJPEG_CLIENTS=%d, CONF=%.2f",
         _resource_level,
         config.FRAME_SKIP,
         config.IMGSZ,
         config.JPEG_QUALITY,
         config.MAX_MJPEG_CLIENTS,
+        config.CONF_THRESHOLD,
     )
 
     return _resource_level

@@ -6,27 +6,27 @@ services:
     ports:
       - "8000:8000"
 
-    # Resource limits: 2 CPU cores + 2 GB RAM
+    # Resource limits: 2 CPU cores + 1.5 GB RAM (leave headroom for host OS)
     deploy:
       resources:
         limits:
           cpus: "2.0"
-          memory: 2G
+          memory: 1.5G
         reservations:
-          cpus: "1.0"
-          memory: 512M
+          cpus: "0.5"
+          memory: 256M
 
     environment:
       # Runtime mode: sim (simulated) or camera (real RTSP/device)
       - MODE=sim
-      # Detection confidence threshold
-      - CONF=0.35
-      # Inference frame skip (1 = every frame)
-      - FRAME_SKIP=2
-      # YOLO input resolution
-      - IMGSZ=320
-      # Quantization: int8 / fp16 / none
-      - QUANTIZE=none
+      # Detection confidence threshold (lower to compensate small IMGSZ)
+      - CONF=0.3
+      # Inference frame skip (aggressive skip for weak CPU)
+      - FRAME_SKIP=4
+      # YOLO input resolution (minimum viable for detection)
+      - IMGSZ=160
+      # Quantization: INT8 mandatory on industrial PCs
+      - QUANTIZE=int8
       # Model file name (auto-downloaded on first run)
       - MODEL=yolov8n.pt
       # Enable OpenVINO acceleration
@@ -39,10 +39,26 @@ services:
       - CAMERA_URL=
       # Disable browser auto-open in container
       - NO_BROWSER=true
-      # JPEG encoding quality for MJPEG stream
-      - JPEG_QUALITY=80
-      # Max concurrent MJPEG clients
-      - MAX_MJPEG_CLIENTS=5
+      # JPEG encoding quality (low to save bandwidth)
+      - JPEG_QUALITY=50
+      # Max concurrent MJPEG clients (limit for weak hardware)
+      - MAX_MJPEG_CLIENTS=1
+      # Uvicorn workers (single worker for low-spec machines)
+      - UVICORN_WORKERS=1
+      # OpenVINO / OpenMP thread control
+      - OMP_NUM_THREADS=2
+      - OPENVINO_THREADING=SEQ
+
+    # Reduce disk I/O: mount /tmp as tmpfs (useful for eMMC / slow HDD)
+    tmpfs:
+      - /tmp:size=64M
+
+    # Suppress noisy container logs
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
 
     volumes:
       # Persist exported models across rebuilds

@@ -286,4 +286,9 @@ if __name__ == "__main__":
 
     args = parse_args()
     port = apply_args(args)
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=port,
+        workers=config.UVICORN_WORKERS,
+    )

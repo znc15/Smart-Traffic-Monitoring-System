@@ -44,11 +44,14 @@ QUANTIZE = os.environ.get("QUANTIZE", "none").lower()       # 量化模式: "int
 if QUANTIZE not in ("int8", "fp16", "none"):
     QUANTIZE = "none"
 
-# JPEG encoding quality for live frames (overridden by resource_manager in low mode)
+# JPEG encoding quality for live frames (overridden by resource_manager in low/ultra_low mode)
 JPEG_QUALITY = int(os.environ.get("JPEG_QUALITY", "80"))
 
-# Max concurrent MJPEG stream clients (overridden by resource_manager in low mode)
+# Max concurrent MJPEG stream clients (overridden by resource_manager in low/ultra_low mode)
 MAX_MJPEG_CLIENTS = int(os.environ.get("MAX_MJPEG_CLIENTS", "5"))
+
+# Uvicorn worker count (keep at 1 for low-spec industrial PCs)
+UVICORN_WORKERS = int(os.environ.get("UVICORN_WORKERS", "1"))
 
 # COCO 类别映射
 CAR_CLASSES = {2, 5, 7}       # car, bus, truck → 归为"汽车"
