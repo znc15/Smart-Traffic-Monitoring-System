@@ -24,6 +24,7 @@ import camera_discovery
 import config
 from detector import detect_vehicles_detailed
 from state import state
+from resource_manager import get_resource_level, get_resource_params
 
 logger = logging.getLogger(__name__)
 
@@ -98,10 +99,11 @@ _, _placeholder_buf = cv2.imencode(".jpg", _placeholder_img)
 _PLACEHOLDER_JPEG: bytes = _placeholder_buf.tobytes()
 
 # ---------------------------------------------------------------------------
-# MJPEG 流并发限制
+# MJPEG 流并发限制（动态读取 config.MAX_MJPEG_CLIENTS）
 # ---------------------------------------------------------------------------
-_MAX_STREAM_CLIENTS = 5
-_stream_semaphore = asyncio.Semaphore(_MAX_STREAM_CLIENTS)
+# Semaphore is initialized with the config value; resource_manager may have
+# already adjusted config.MAX_MJPEG_CLIENTS before routes are imported.
+_stream_semaphore = asyncio.Semaphore(config.MAX_MJPEG_CLIENTS)
 
 
 @router.get("/api/traffic", response_model=None)
@@ -140,6 +142,12 @@ def health_check() -> JSONResponse:
     })
 
 
+@router.get("/api/resource-mode", response_model=None)
+def get_resource_mode() -> JSONResponse:
+    """Return current resource level and active resource-aware parameters."""
+    return JSONResponse(content=get_resource_params())
+
+
 @router.get("/", response_model=None)
 def root_redirect() -> RedirectResponse:
     """根路由重定向到仪表盘页面"""
@@ -170,12 +178,12 @@ async def _mjpeg_generator() -> AsyncGenerator[bytes, None]:
 
 @router.get("/api/stream", response_model=None)
 async def stream_mjpeg() -> StreamingResponse | JSONResponse:
-    """MJPEG 视频流端点，持续推送检测帧（最多 5 个并发客户端）"""
+    """MJPEG 视频流端点，持续推送检测帧（并发数由 resource_manager 动态控制）"""
     # 非阻塞方式获取信号量，超出限制立即返回 503
     if not _stream_semaphore._value:
         return JSONResponse(
             status_code=503,
-            content={"error": "流客户端数已达上限", "max": _MAX_STREAM_CLIENTS},
+            content={"error": "流客户端数已达上限", "max": config.MAX_MJPEG_CLIENTS},
         )
     await _stream_semaphore.acquire()
     return StreamingResponse(

@@ -90,7 +90,7 @@ def camera_loop() -> None:
                          inference_ms, current_fps)
 
             # 编码 JPEG 并更新全局状态
-            success, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            success, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, config.JPEG_QUALITY])
             if not success:
                 continue
 
@@ -197,7 +197,7 @@ def _sim_video_loop(videos: list[Path]) -> None:
                 draw_overlay(annotated, count_car, count_motor, speed_car, speed_motor,
                              inference_ms, current_fps)
 
-                success, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                success, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, config.JPEG_QUALITY])
                 if not success:
                     continue
                 state.update_traffic(count_car, count_motor, speed_car, speed_motor,
@@ -267,7 +267,7 @@ def _sim_image_loop(images: list[Path]) -> None:
         draw_overlay(annotated, count_car, count_motor, speed_car, speed_motor,
                      inference_ms, current_fps)
 
-        success, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        success, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, config.JPEG_QUALITY])
         if not success:
             img_idx += 1
             continue
@@ -332,7 +332,7 @@ def _sim_random_loop() -> None:
                      inference_ms, current_fps)
 
         # 编码 JPEG 并更新全局状态
-        success, jpeg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        success, jpeg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, config.JPEG_QUALITY])
         if not success:
             continue  # 跳过编码失败的帧
 

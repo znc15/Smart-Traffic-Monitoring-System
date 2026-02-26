@@ -26,6 +26,7 @@ from loops import camera_loop, sim_loop
 from state import state
 from detector import reset_model
 from camera_discovery import interactive_select
+from resource_manager import init_resource_manager
 
 # ---------------------------------------------------------------------------
 # 模块级变量：当前检测循环线程引用，供 restart_loop 访问
@@ -122,6 +123,10 @@ async def lifespan(application: FastAPI):
 
     # 预初始化 psutil CPU 采样（首次调用返回 0，需要预热）
     psutil.cpu_percent(interval=None)
+
+    # Detect hardware and apply resource-level presets before starting loops
+    level = init_resource_manager()
+    print(f"[INFO] Resource level: {level}")
 
     if config.MODE == "camera":
         print(f"[INFO] 摄像头模式，视频源: {config.camera_source}，模型: {config.MODEL_NAME}")
