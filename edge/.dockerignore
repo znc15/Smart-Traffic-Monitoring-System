@@ -1,4 +1,17 @@
 __pycache__
 *.pyc
+*.pyo
 .git
+.gitignore
 .env
+.env.*
+*.md
+Dockerfile
+docker-compose.yml
+.dockerignore
+environment.yml
+.vscode
+.idea
+*.egg-info
+.mypy_cache
+.pytest_cache

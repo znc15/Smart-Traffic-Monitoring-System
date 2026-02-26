@@ -1,0 +1,51 @@
+services:
+  edge-node:
+    build: .
+    container_name: edge-node
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+
+    # Resource limits: 2 CPU cores + 2 GB RAM
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "1.0"
+          memory: 512M
+
+    environment:
+      # Runtime mode: sim (simulated) or camera (real RTSP/device)
+      - MODE=sim
+      # Detection confidence threshold
+      - CONF=0.35
+      # Inference frame skip (1 = every frame)
+      - FRAME_SKIP=2
+      # YOLO input resolution
+      - IMGSZ=320
+      # Quantization: int8 / fp16 / none
+      - QUANTIZE=none
+      # Model file name (auto-downloaded on first run)
+      - MODEL=yolov8n.pt
+      # Enable OpenVINO acceleration
+      - OPENVINO=true
+      # Road segment label
+      - ROAD_NAME=示例路段-Edge01
+      # HTTP port inside container
+      - PORT=8000
+      # RTSP URL or device index (camera mode only)
+      - CAMERA_URL=
+      # Disable browser auto-open in container
+      - NO_BROWSER=true
+      # JPEG encoding quality for MJPEG stream
+      - JPEG_QUALITY=80
+      # Max concurrent MJPEG clients
+      - MAX_MJPEG_CLIENTS=5
+
+    volumes:
+      # Persist exported models across rebuilds
+      - ./models:/app/models
+      # Mount sample files for sim mode
+      - ./samples:/app/samples
