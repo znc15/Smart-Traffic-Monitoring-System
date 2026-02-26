@@ -18,7 +18,7 @@ import cv2
 import numpy as np
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 import camera_discovery
 import config
@@ -70,6 +70,13 @@ class ConfigUpdateRequest(BaseModel):
     quantize: Optional[str] = Field(None, pattern=r"^(int8|fp16|none)$", description="量化模式: int8, fp16, none")
     jpeg_quality: Optional[int] = Field(None, ge=30, le=100, description="JPEG 编码质量 (30-100)")
 
+    @field_validator('imgsz')
+    @classmethod
+    def imgsz_multiple_of_32(cls, v):
+        if v is not None and v % 32 != 0:
+            raise ValueError('imgsz must be a multiple of 32')
+        return v
+
 
 # ---------------------------------------------------------------------------
 # 摄像头探测请求体
@@ -101,11 +108,10 @@ _, _placeholder_buf = cv2.imencode(".jpg", _placeholder_img)
 _PLACEHOLDER_JPEG: bytes = _placeholder_buf.tobytes()
 
 # ---------------------------------------------------------------------------
-# MJPEG 流并发限制（动态读取 config.MAX_MJPEG_CLIENTS）
+# MJPEG stream concurrency control (lock + counter, reads config dynamically)
 # ---------------------------------------------------------------------------
-# Semaphore is initialized with the config value; resource_manager may have
-# already adjusted config.MAX_MJPEG_CLIENTS before routes are imported.
-_stream_semaphore = asyncio.Semaphore(config.MAX_MJPEG_CLIENTS)
+_stream_lock = asyncio.Lock()
+_stream_count = 0
 
 
 @router.get("/api/traffic", response_model=None)
@@ -158,10 +164,11 @@ def root_redirect() -> RedirectResponse:
 
 async def _mjpeg_generator() -> AsyncGenerator[bytes, None]:
     """逐帧生成 MJPEG 流数据，客户端断开时自动终止"""
+    global _stream_count
     try:
         while True:
             frame = state.get_frame()
-            # 无帧可用时使用预计算的占位 JPEG
+            # Fall back to placeholder when no frame is available yet
             payload = frame if frame else _PLACEHOLDER_JPEG
             yield (
                 b"--frame\r\n"
@@ -171,23 +178,23 @@ async def _mjpeg_generator() -> AsyncGenerator[bytes, None]:
             )
             await asyncio.sleep(0.05)  # ~20 FPS
     except asyncio.CancelledError:
-        # 客户端断开连接，正常退出生成器
         logger.info("MJPEG 客户端断开，生成器已终止")
     finally:
-        # 释放信号量，允许新客户端连接
-        _stream_semaphore.release()
+        async with _stream_lock:
+            _stream_count -= 1
 
 
 @router.get("/api/stream", response_model=None)
 async def stream_mjpeg() -> StreamingResponse | JSONResponse:
     """MJPEG 视频流端点，持续推送检测帧（并发数由 resource_manager 动态控制）"""
-    # 非阻塞方式获取信号量，超出限制立即返回 503
-    if not _stream_semaphore._value:
-        return JSONResponse(
-            status_code=503,
-            content={"error": "流客户端数已达上限", "max": config.MAX_MJPEG_CLIENTS},
-        )
-    await _stream_semaphore.acquire()
+    global _stream_count
+    async with _stream_lock:
+        if _stream_count >= config.MAX_MJPEG_CLIENTS:
+            return JSONResponse(
+                status_code=503,
+                content={"error": "流客户端数已达上限", "max": config.MAX_MJPEG_CLIENTS},
+            )
+        _stream_count += 1
     return StreamingResponse(
         _mjpeg_generator(),
         media_type="multipart/x-mixed-replace; boundary=frame",
@@ -402,16 +409,18 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
     if body.quantize is not None:
         config.QUANTIZE = body.quantize
 
-    # 判断模型是否变更（模型文件名、OpenVINO 开关或量化模式变化都需要重新加载）
+    # Determine whether a full restart is needed.
+    # frame_skip, imgsz, jpeg_quality are read dynamically in the loop — no restart required.
+    # Only mode, model, openvino, and quantize changes need a restart.
     model_changed = (
         config.MODEL_NAME != old_model
         or config.USE_OPENVINO != old_openvino
         or (body.quantize is not None and config.QUANTIZE != old_quantize)
     )
+    needs_restart = model_changed or body.mode is not None
 
-    # 触发检测循环热重启
     restarted = False
-    if state.restart_callback is not None:
+    if needs_restart and state.restart_callback is not None:
         try:
             state.restart_callback(model_changed=model_changed)
             restarted = True

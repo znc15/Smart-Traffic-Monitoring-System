@@ -58,7 +58,7 @@ def camera_loop() -> None:
 
             frame_count += 1
 
-            if frame_count % config.FRAME_SKIP == 0 or not last_objects and frame_count == 1:
+            if frame_count % config.FRAME_SKIP == 0 or (not last_objects and frame_count == 1):
                 # 执行推理
                 annotated, count_car, count_motor, inference_ms, objects = \
                     detect_vehicles_detailed(frame)
@@ -170,7 +170,7 @@ def _sim_video_loop(videos: list[Path]) -> None:
                 frame_start = time.time()
                 frame_count += 1
 
-                if frame_count % config.FRAME_SKIP == 0 or not last_objects and frame_count == 1:
+                if frame_count % config.FRAME_SKIP == 0 or (not last_objects and frame_count == 1):
                     annotated, count_car, count_motor, inference_ms, objects = \
                         detect_vehicles_detailed(frame)
                     last_count_car = count_car
@@ -240,7 +240,7 @@ def _sim_image_loop(images: list[Path]) -> None:
 
         frame_count += 1
 
-        if frame_count % config.FRAME_SKIP == 0 or not last_objects and frame_count == 1:
+        if frame_count % config.FRAME_SKIP == 0 or (not last_objects and frame_count == 1):
             annotated, count_car, count_motor, inference_ms, objects = \
                 detect_vehicles_detailed(frame)
             last_count_car = count_car

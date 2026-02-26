@@ -40,7 +40,9 @@ HTTP_PORT = int(os.environ.get("PORT", "8000"))
 # 推理管线优化参数
 FRAME_SKIP = int(os.environ.get("FRAME_SKIP", "2"))      # 每N帧推理一次，1=每帧都推理
 IMGSZ = int(os.environ.get("IMGSZ", "320"))               # YOLO 输入分辨率
-QUANTIZE = os.environ.get("QUANTIZE", "none")              # 量化模式: "int8", "fp16", "none"
+QUANTIZE = os.environ.get("QUANTIZE", "none").lower()       # 量化模式: "int8", "fp16", "none"
+if QUANTIZE not in ("int8", "fp16", "none"):
+    QUANTIZE = "none"
 
 # JPEG encoding quality for live frames (overridden by resource_manager in low mode)
 JPEG_QUALITY = int(os.environ.get("JPEG_QUALITY", "80"))

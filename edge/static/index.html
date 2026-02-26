@@ -1942,14 +1942,22 @@
     const hwInfo = $('perfHardwareInfo');
     if (hwInfo) hwInfo.textContent = cores + ' cores / ' + memGb + ' GB RAM';
 
-    // Resource chips showing current active params
+    // Resource chips showing current active params (use textContent to avoid XSS)
     const chips = $('perfResourceChips');
     if (chips) {
-      chips.innerHTML =
-        '<span class="resource-chip">Frame Skip: ' + (data.FRAME_SKIP || 1) + '</span>' +
-        '<span class="resource-chip">IMGSZ: ' + (data.IMGSZ || 640) + '</span>' +
-        '<span class="resource-chip">JPEG: ' + (data.JPEG_QUALITY || 80) + '</span>' +
-        '<span class="resource-chip">Clients: ' + (data.MAX_MJPEG_CLIENTS || 4) + '</span>';
+      chips.textContent = '';
+      const chipData = [
+        ['Frame Skip', data.FRAME_SKIP || 1],
+        ['IMGSZ', data.IMGSZ || 640],
+        ['JPEG', data.JPEG_QUALITY || 80],
+        ['Clients', data.MAX_MJPEG_CLIENTS || 4]
+      ];
+      chipData.forEach(function(pair) {
+        const span = document.createElement('span');
+        span.className = 'resource-chip';
+        span.textContent = pair[0] + ': ' + pair[1];
+        chips.appendChild(span);
+      });
     }
   }
 

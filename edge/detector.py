@@ -15,6 +15,12 @@ from ultralytics import YOLO
 import config
 
 # ---------------------------------------------------------------------------
+# Color constants for detection overlays
+# ---------------------------------------------------------------------------
+_COLOR_CAR = (255, 120, 40)     # blue-orange for cars
+_COLOR_MOTOR = (40, 220, 120)   # green for motorcycles
+
+# ---------------------------------------------------------------------------
 # 模型加载（懒加载单例，支持 OpenVINO，线程安全）
 # ---------------------------------------------------------------------------
 _model: YOLO | None = None
@@ -129,12 +135,12 @@ def detect_vehicles_detailed(
 
             if cls_id in config.CAR_CLASSES:
                 count_car += 1
-                color = (255, 120, 40)   # 蓝橙色 - 汽车
+                color = _COLOR_CAR
                 label = f"Car {conf:.0%}"
                 cls_name = "car"
             elif cls_id in config.MOTOR_CLASSES:
                 count_motor += 1
-                color = (40, 220, 120)   # 绿色 - 摩托
+                color = _COLOR_MOTOR
                 label = f"Motor {conf:.0%}"
                 cls_name = "motor"
             else:
@@ -163,10 +169,10 @@ def redraw_detections(frame: np.ndarray, objects_list: list[dict]) -> np.ndarray
         x1, y1, x2, y2 = obj["bbox"]
         conf = obj["confidence"]
         if obj["class"] == "car":
-            color = (255, 120, 40)
+            color = _COLOR_CAR
             label = f"Car {conf:.0%}"
         else:
-            color = (40, 220, 120)
+            color = _COLOR_MOTOR
             label = f"Motor {conf:.0%}"
         cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
         cv2.putText(annotated, label, (x1, y1 - 6),
