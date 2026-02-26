@@ -61,6 +61,124 @@ MAVEN_MIRROR_URL=https://repo.maven.apache.org/maven2 docker compose build backe
 - `NODE_BASE_IMAGE`
 - `NGINX_BASE_IMAGE`
 
+## 详细部署教程
+
+本章节按“先可用、再收敛安全”的顺序，给出一套可执行的部署流程。
+
+### 方案 A：单机 Docker Compose（推荐）
+
+适用于 1 台服务器同时部署 `frontend + backend + postgres`。
+
+#### 第 1 步：准备服务器
+
+1. 安装 Docker Engine 与 Docker Compose 插件。
+2. 确保防火墙放行端口：`5173`、`8000`（`5433` 仅内网需要时开放）。
+3. 拉取代码并进入项目目录：
+
+```bash
+git clone <your-repo-url>
+cd Smart-Traffic-Monitoring-System
+```
+
+#### 第 2 步：配置后端生产参数
+
+编辑 `docker-compose.yml` 的 `backend.environment`，至少配置以下项：
+
+- `APP_ENV=production`
+- `JWT_SECRET=<至少 32 位强随机字符串>`
+- `APP_CORS_ALLOWED_ORIGINS=<你的前端域名，多个用逗号分隔>`
+- `APP_WS_ALLOW_QUERY_TOKEN=false`（如需兼容旧前端可临时设为 `true`）
+
+如果你需要首次自动初始化管理员，再额外配置：
+
+- `INIT_ADMIN=true`
+- `INIT_ADMIN_USERNAME=<管理员用户名>`
+- `INIT_ADMIN_EMAIL=<管理员邮箱>`
+- `INIT_ADMIN_PASSWORD=<强密码，至少 8 位且含大小写/数字/特殊字符>`
+
+#### 第 3 步：构建并启动
+
+```bash
+docker compose up -d --build
+```
+
+查看启动日志：
+
+```bash
+docker compose logs -f backend
+docker compose logs -f frontend
+```
+
+#### 第 4 步：部署验收
+
+1. 检查容器状态：
+
+```bash
+docker compose ps
+```
+
+2. 检查后端公开接口：
+
+```bash
+curl http://localhost:8000/api/v1/site-settings
+curl http://localhost:8000/api/v1/roads_name
+```
+
+3. 检查前端页面：
+
+访问 `http://<服务器IP>:5173`，确认页面可打开。
+
+#### 第 5 步：首次上线后的安全收敛
+
+如果第 2 步开启了管理员初始化，首次登录完成后请把 `INIT_ADMIN` 改回 `false`，然后重启后端：
+
+```bash
+docker compose up -d backend
+```
+
+### 方案 B：中心服务 + 多边缘节点
+
+适用于后端集中部署、多个路口各自部署 `edge` 节点。
+
+1. 在中心服务器按“方案 A”部署 `frontend + backend + postgres`。
+2. 在每个路口设备单独部署 `edge`（见 [edge/README.md](edge/README.md) 的生产部署章节）。
+3. 在管理端「摄像头管理」为每个摄像头配置：
+   - `stream_url`：`http://<edge-ip>:<edge-port>`
+   - `road_name`：对应路段名称
+4. 确保中心后端可访问所有边缘节点端口。
+
+### 运维与升级
+
+#### 日常升级
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+#### 数据备份（PostgreSQL）
+
+```bash
+docker exec database pg_dump -U postgres transportation_system > backup_$(date +%F).sql
+```
+
+#### 数据恢复（PostgreSQL）
+
+```bash
+cat backup_2026-02-26.sql | docker exec -i database psql -U postgres -d transportation_system
+```
+
+### 常见部署问题
+
+1. Maven 依赖下载慢或失败：使用镜像参数
+
+```bash
+MAVEN_MIRROR_URL=https://repo.maven.apache.org/maven2 docker compose build backend
+```
+
+2. 浏览器报 CORS：检查 `APP_CORS_ALLOWED_ORIGINS` 是否包含当前前端地址。
+3. WebSocket 认证失败：先确认 Cookie/Header 传递是否正常，再检查 `APP_WS_ALLOW_QUERY_TOKEN` 开关。
+
 ## 本地开发启动
 
 ### 1. Backend

@@ -79,6 +79,111 @@ docker run -p 9000:8000 \
   edge-node
 ```
 
+## 生产部署教程（Edge 节点）
+
+本节给出边缘节点在 Linux 设备上的常驻部署方案（`systemd`）。
+
+### 第 1 步：安装系统依赖
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip ffmpeg
+```
+
+`ffmpeg` 仅用于 `/api/video`，不影响 `/api/stream` 与核心检测流程。
+
+### 第 2 步：准备运行目录与虚拟环境
+
+```bash
+cd /opt
+sudo git clone <your-repo-url> smart-traffic
+cd smart-traffic/edge
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 第 3 步：先手工启动一次验证
+
+```bash
+source .venv/bin/activate
+MODE=camera \
+CAMERA_URL=0 \
+ROAD_NAME="长安街-East" \
+PORT=9000 \
+NO_BROWSER=true \
+python main.py
+```
+
+另开终端验收：
+
+```bash
+curl http://127.0.0.1:9000/health
+curl http://127.0.0.1:9000/api/traffic
+```
+
+### 第 4 步：注册 systemd 服务
+
+创建 `/etc/systemd/system/edge-node.service`：
+
+```ini
+[Unit]
+Description=Smart Traffic Edge Node
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/smart-traffic/edge
+Environment=MODE=camera
+Environment=CAMERA_URL=0
+Environment=ROAD_NAME=长安街-East
+Environment=PORT=9000
+Environment=NO_BROWSER=true
+Environment=OPENVINO=true
+ExecStart=/opt/smart-traffic/edge/.venv/bin/python /opt/smart-traffic/edge/main.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+加载并启动：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable edge-node
+sudo systemctl start edge-node
+sudo systemctl status edge-node
+```
+
+查看日志：
+
+```bash
+sudo journalctl -u edge-node -f
+```
+
+### 第 5 步：接入中心后端
+
+在后端管理端新增摄像头：
+
+- `stream_url`: `http://<edge-ip>:9000`
+- `road_name`: 与本节点 `ROAD_NAME` 保持一致
+
+如需多个路段，建议“一路段一个 edge 进程/容器”。
+
+### 第 6 步：升级流程
+
+```bash
+cd /opt/smart-traffic
+git pull
+cd edge
+source .venv/bin/activate
+pip install -r requirements.txt
+sudo systemctl restart edge-node
+```
+
 ## 配置优先级
 
 `CLI 参数 > 环境变量 > 默认值`
