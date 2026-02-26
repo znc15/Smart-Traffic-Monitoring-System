@@ -136,6 +136,28 @@
       border-radius: 50%; animation: spin 0.6s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ===== Resource level badge ===== */
+    .resource-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; font-weight: 600;
+      padding: 2px 10px; border-radius: 9999px; white-space: nowrap; transition: background 0.25s, color 0.25s; }
+    .resource-badge.low { background: #fee2e2; color: #dc2626; }
+    .resource-badge.medium { background: #fef3c7; color: #d97706; }
+    .resource-badge.high { background: #dcfce7; color: #16a34a; }
+    .resource-badge .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .resource-badge.low .badge-dot { background: #dc2626; }
+    .resource-badge.medium .badge-dot { background: #d97706; }
+    .resource-badge.high .badge-dot { background: #16a34a; }
+
+    /* ===== Performance tuning slider value display ===== */
+    .slider-row { display: flex; align-items: center; gap: 10px; }
+    .slider-row .custom-range { flex: 1; }
+    .slider-value { min-width: 36px; text-align: right; font-size: 0.85rem; font-weight: 600;
+      color: #3b82f6; font-family: 'Courier New', monospace; }
+
+    /* ===== Resource info chips ===== */
+    .resource-info { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+    .resource-chip { font-size: 0.7rem; padding: 2px 8px; border-radius: 4px;
+      background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+
     /* ===== 导航栏模式 Badge ===== */
     .nav-mode-badge { font-size: 0.75rem; font-weight: 600; padding: 2px 10px; border-radius: 9999px;
       white-space: nowrap; transition: background 0.25s, color 0.25s; }
@@ -213,6 +235,11 @@
         </svg>
         <span id="modeStatusText" style="font-size:0.9rem;font-weight:600;color:#1e293b;">当前模式：模拟模式</span>
         <span id="modeStatusDesc" style="font-size:0.8rem;color:#64748b;">使用示例素材进行推理演示</span>
+        <!-- Resource level indicator -->
+        <span id="monitorResourceBadge" class="resource-badge medium" title="资源等级">
+          <span class="badge-dot"></span>
+          <span id="monitorResourceLabel">medium</span>
+        </span>
       </div>
       <div class="mode-status-right">
         <button onclick="switchToSim()" id="switchSimBtn" class="mode-switch-btn active">模拟模式</button>
@@ -456,6 +483,71 @@
           </div>
         </div>
 
+        <!-- Performance Tuning card -->
+        <div class="settings-card">
+          <h4>性能调优 (Performance Tuning)</h4>
+
+          <!-- Resource level badge + hardware info -->
+          <div style="margin-bottom:16px;">
+            <label class="form-label">当前资源等级</label>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span id="perfResourceBadge" class="resource-badge medium">
+                <span class="badge-dot"></span>
+                <span id="perfResourceLabel">medium</span>
+              </span>
+              <span id="perfHardwareInfo" class="text-xs text-slate-400">-- cores / -- GB RAM</span>
+            </div>
+            <div class="resource-info" id="perfResourceChips"></div>
+          </div>
+
+          <!-- Frame Skip slider -->
+          <div class="mb-4">
+            <label class="form-label">帧跳过 (Frame Skip): <span id="perfFrameSkipDisplay" class="text-blue-500 font-mono">1</span></label>
+            <div class="slider-row">
+              <input type="range" id="perfFrameSkip" class="custom-range" min="1" max="10" step="1" value="1">
+              <span class="slider-value" id="perfFrameSkipValue">1</span>
+            </div>
+            <div class="flex justify-between text-xs text-slate-500 mt-1">
+              <span>1 (每帧推理)</span>
+              <span>10 (跳过更多)</span>
+            </div>
+          </div>
+
+          <!-- IMGSZ dropdown -->
+          <div class="mb-4">
+            <label class="form-label">推理分辨率 (IMGSZ)</label>
+            <select id="perfImgsz" class="form-select">
+              <option value="160">160</option>
+              <option value="320">320</option>
+              <option value="480">480</option>
+              <option value="640" selected>640</option>
+            </select>
+          </div>
+
+          <!-- JPEG Quality slider -->
+          <div class="mb-4">
+            <label class="form-label">JPEG 质量: <span id="perfJpegQualityDisplay" class="text-blue-500 font-mono">80</span></label>
+            <div class="slider-row">
+              <input type="range" id="perfJpegQuality" class="custom-range" min="30" max="100" step="5" value="80">
+              <span class="slider-value" id="perfJpegQualityValue">80</span>
+            </div>
+            <div class="flex justify-between text-xs text-slate-500 mt-1">
+              <span>30 (低质量)</span>
+              <span>100 (高质量)</span>
+            </div>
+          </div>
+
+          <!-- Quantize dropdown -->
+          <div>
+            <label class="form-label">量化模式 (Quantize)</label>
+            <select id="perfQuantize" class="form-select">
+              <option value="none">none (无量化)</option>
+              <option value="fp16">fp16 (半精度)</option>
+              <option value="int8">int8 (整数量化)</option>
+            </select>
+          </div>
+        </div>
+
         <!-- 操作按钮卡片 -->
         <div class="settings-card flex items-end justify-end gap-3">
           <button type="button" class="btn-secondary" onclick="resetSettings()">重置</button>
@@ -624,6 +716,10 @@
   let chartMotorData = [];
   let trendChart = null;
 
+  // Resource mode state
+  let currentResourceLevel = 'medium';
+  let resourceParams = {};      // cached /api/resource-mode response
+
   // ========== DOM 元素引用 ==========
   const $ = (id) => document.getElementById(id);
 
@@ -649,6 +745,15 @@
     const div = document.createElement('div');
     div.appendChild(document.createTextNode(str));
     return div.innerHTML;
+  }
+
+  /** Debounce utility: delays fn execution until after wait ms of inactivity */
+  function debounce(fn, wait) {
+    let timer = null;
+    return function(...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), wait);
+    };
   }
 
   /** 更新进度条 */
@@ -949,12 +1054,13 @@
 
   // ========== 设置面板逻辑 ==========
 
-  /** 加载设置数据（配置 + 模型列表） */
+  /** 加载设置数据（配置 + 模型列表 + 资源模式） */
   async function loadSettingsData() {
     try {
-      const [configResp, modelsResp] = await Promise.all([
+      const [configResp, modelsResp, resResp] = await Promise.all([
         fetch('/api/config'),
-        fetch('/api/models')
+        fetch('/api/models'),
+        fetch('/api/resource-mode')
       ]);
       if (!configResp.ok) throw new Error('获取配置失败');
       if (!modelsResp.ok) throw new Error('获取模型列表失败');
@@ -969,6 +1075,17 @@
       populateModels(modelsData.models || [], modelsData.current || config.model);
       // 填充表单
       fillSettingsForm(config);
+
+      // Fill performance tuning form with merged config + resource data
+      if (resResp.ok) {
+        const resData = await resResp.json();
+        resourceParams = resData;
+        currentResourceLevel = resData.level || 'medium';
+        updateResourceUI(resData);
+        fillPerfTuningForm({ ...resData, ...config });
+      } else {
+        fillPerfTuningForm(config);
+      }
     } catch (err) {
       console.error('加载设置失败:', err);
       showToast('加载设置失败: ' + err.message, 'error');
@@ -1783,6 +1900,153 @@
     $('testResultArea').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  // ========== Resource Mode & Performance Tuning ==========
+
+  /** Fetch /api/resource-mode and update all resource-related UI elements */
+  async function fetchResourceMode() {
+    try {
+      const resp = await fetch('/api/resource-mode');
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      resourceParams = data;
+      currentResourceLevel = data.level || 'medium';
+      updateResourceUI(data);
+    } catch (err) {
+      console.warn('Failed to fetch resource mode:', err.message);
+    }
+  }
+
+  /** Update all resource badge and info elements across the page */
+  function updateResourceUI(data) {
+    const level = data.level || 'medium';
+    const cores = data.cpu_cores || '--';
+    const memGb = data.memory_total_gb || '--';
+
+    // Monitor page badge
+    const monBadge = $('monitorResourceBadge');
+    const monLabel = $('monitorResourceLabel');
+    if (monBadge) {
+      monBadge.className = 'resource-badge ' + level;
+      monLabel.textContent = level;
+    }
+
+    // Settings page badge
+    const perfBadge = $('perfResourceBadge');
+    const perfLabel = $('perfResourceLabel');
+    if (perfBadge) {
+      perfBadge.className = 'resource-badge ' + level;
+      perfLabel.textContent = level;
+    }
+
+    // Hardware info text
+    const hwInfo = $('perfHardwareInfo');
+    if (hwInfo) hwInfo.textContent = cores + ' cores / ' + memGb + ' GB RAM';
+
+    // Resource chips showing current active params
+    const chips = $('perfResourceChips');
+    if (chips) {
+      chips.innerHTML =
+        '<span class="resource-chip">Frame Skip: ' + (data.FRAME_SKIP || 1) + '</span>' +
+        '<span class="resource-chip">IMGSZ: ' + (data.IMGSZ || 640) + '</span>' +
+        '<span class="resource-chip">JPEG: ' + (data.JPEG_QUALITY || 80) + '</span>' +
+        '<span class="resource-chip">Clients: ' + (data.MAX_MJPEG_CLIENTS || 4) + '</span>';
+    }
+  }
+
+  /** Fill performance tuning controls with current values from resource-mode or config */
+  function fillPerfTuningForm(cfg) {
+    // Frame Skip
+    const fs = cfg.frame_skip || cfg.FRAME_SKIP || 1;
+    $('perfFrameSkip').value = fs;
+    $('perfFrameSkipDisplay').textContent = fs;
+    $('perfFrameSkipValue').textContent = fs;
+
+    // IMGSZ
+    const imgsz = cfg.imgsz || cfg.IMGSZ || 640;
+    $('perfImgsz').value = String(imgsz);
+
+    // JPEG Quality (read-only display from resource params)
+    const jpegQ = cfg.JPEG_QUALITY || cfg.jpeg_quality || 80;
+    $('perfJpegQuality').value = jpegQ;
+    $('perfJpegQualityDisplay').textContent = jpegQ;
+    $('perfJpegQualityValue').textContent = jpegQ;
+
+    // Quantize
+    const q = cfg.quantize || cfg.QUANTIZE || 'none';
+    $('perfQuantize').value = q;
+  }
+
+  /** Send a single performance parameter update via PUT /api/config */
+  async function updatePerfParam(key, value) {
+    const payload = {};
+    payload[key] = value;
+    try {
+      const resp = await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        throw new Error(errData.detail || 'HTTP ' + resp.status);
+      }
+      const result = await resp.json();
+      currentConfig = result;
+      showToast('参数已更新: ' + key + ' = ' + value, 'success');
+      // Refresh resource mode to keep chips in sync
+      fetchResourceMode();
+    } catch (err) {
+      console.error('Failed to update ' + key + ':', err);
+      showToast('更新失败: ' + err.message, 'error');
+    }
+  }
+
+  // Debounced version for sliders (500ms delay)
+  const debouncedUpdatePerf = debounce(updatePerfParam, 500);
+
+  /** Initialize performance tuning event listeners */
+  function initPerfTuningListeners() {
+    // Frame Skip slider
+    const fsSlider = $('perfFrameSkip');
+    if (fsSlider) {
+      fsSlider.addEventListener('input', function() {
+        $('perfFrameSkipDisplay').textContent = this.value;
+        $('perfFrameSkipValue').textContent = this.value;
+      });
+      fsSlider.addEventListener('change', function() {
+        debouncedUpdatePerf('frame_skip', parseInt(this.value));
+      });
+    }
+
+    // IMGSZ dropdown
+    const imgszSelect = $('perfImgsz');
+    if (imgszSelect) {
+      imgszSelect.addEventListener('change', function() {
+        updatePerfParam('imgsz', parseInt(this.value));
+      });
+    }
+
+    // JPEG Quality slider
+    const jpegSlider = $('perfJpegQuality');
+    if (jpegSlider) {
+      jpegSlider.addEventListener('input', function() {
+        $('perfJpegQualityDisplay').textContent = this.value;
+        $('perfJpegQualityValue').textContent = this.value;
+      });
+      jpegSlider.addEventListener('change', function() {
+        debouncedUpdatePerf('jpeg_quality', parseInt(this.value));
+      });
+    }
+
+    // Quantize dropdown
+    const quantizeSelect = $('perfQuantize');
+    if (quantizeSelect) {
+      quantizeSelect.addEventListener('change', function() {
+        updatePerfParam('quantize', this.value);
+      });
+    }
+  }
+
   // ========== 启动 ==========
   document.addEventListener('DOMContentLoaded', function() {
     initChart();
@@ -1791,6 +2055,15 @@
 
     // ===== 初始化视频渲染引擎 =====
     VideoRenderer.init();
+
+    // ===== Fetch resource mode on startup and init perf tuning controls =====
+    fetchResourceMode().then(() => {
+      // Pre-fill perf tuning form with resource params if available
+      if (resourceParams && Object.keys(resourceParams).length > 0) {
+        fillPerfTuningForm(resourceParams);
+      }
+    });
+    initPerfTuningListeners();
 
     // ===== 测试面板：拖拽和文件选择事件绑定 =====
     test_initDropZone();

@@ -68,6 +68,7 @@ class ConfigUpdateRequest(BaseModel):
     frame_skip: Optional[int] = Field(None, ge=1, le=30, description="每N帧推理一次 (1-30)")
     imgsz: Optional[int] = Field(None, ge=160, le=1280, description="YOLO 输入分辨率 (160-1280)")
     quantize: Optional[str] = Field(None, pattern=r"^(int8|fp16|none)$", description="量化模式: int8, fp16, none")
+    jpeg_quality: Optional[int] = Field(None, ge=30, le=100, description="JPEG 编码质量 (30-100)")
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +90,7 @@ def _current_config() -> dict:
         "frame_skip": config.FRAME_SKIP,
         "imgsz": config.IMGSZ,
         "quantize": config.QUANTIZE,
+        "jpeg_quality": config.JPEG_QUALITY,
     }
 
 # ---------------------------------------------------------------------------
@@ -392,6 +394,9 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
 
     if body.imgsz is not None:
         config.IMGSZ = body.imgsz
+
+    if body.jpeg_quality is not None:
+        config.JPEG_QUALITY = body.jpeg_quality
 
     old_quantize = config.QUANTIZE
     if body.quantize is not None:
