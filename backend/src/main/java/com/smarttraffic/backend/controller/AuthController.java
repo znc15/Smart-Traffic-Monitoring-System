@@ -1,5 +1,6 @@
 package com.smarttraffic.backend.controller;
 
+import com.smarttraffic.backend.config.AppRuntimeProperties;
 import com.smarttraffic.backend.config.JwtProperties;
 import com.smarttraffic.backend.dto.auth.LoginResponse;
 import com.smarttraffic.backend.dto.auth.RegisterRequest;
@@ -7,6 +8,7 @@ import com.smarttraffic.backend.dto.auth.RegisterResponse;
 import com.smarttraffic.backend.dto.auth.UserResponse;
 import com.smarttraffic.backend.service.AuthService;
 import com.smarttraffic.backend.security.SecurityUtils;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
@@ -29,10 +31,12 @@ public class AuthController {
 
     private final AuthService authService;
     private final JwtProperties jwtProperties;
+    private final AppRuntimeProperties appRuntimeProperties;
 
-    public AuthController(AuthService authService, JwtProperties jwtProperties) {
+    public AuthController(AuthService authService, JwtProperties jwtProperties, AppRuntimeProperties appRuntimeProperties) {
         this.authService = authService;
         this.jwtProperties = jwtProperties;
+        this.appRuntimeProperties = appRuntimeProperties;
     }
 
     @PostMapping("/register")
@@ -45,13 +49,15 @@ public class AuthController {
     public ResponseEntity<LoginResponse> login(
             @RequestParam("username") String username,
             @RequestParam("password") String password,
+            HttpServletRequest request,
             HttpServletResponse response
     ) {
         LoginResponse loginResponse = authService.login(username, password);
+        boolean secureCookie = !appRuntimeProperties.isDevelopment() || request.isSecure();
 
         ResponseCookie cookie = ResponseCookie.from("access_token", loginResponse.getAccessToken())
                 .httpOnly(true)
-                .secure(false)
+                .secure(secureCookie)
                 .sameSite("Lax")
                 .path("/")
                 .maxAge(Duration.ofDays(jwtProperties.getAccessTokenExpireDays()))

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Maximize2, Minimize2, Video, Car, Bike, Gauge, Activity } from "lucide-react";
 import { Button } from "@/ui/button";
 import { getThresholdForRoad } from "../../../../config/trafficThresholds";
+import { normalizeDensityStatus, normalizeSpeedStatus } from "@/utils/normalize";
 
 interface VideoModalProps {
   isOpen: boolean;
@@ -46,10 +47,11 @@ const VideoModal = ({
 
   // 计算密度状态
   const getDensity = () => {
-    const d = trafficData?.density_status;
-    if (d === "拥堵") return { text: "拥堵", cls: "bg-red-500/10 text-red-600 dark:text-red-400" };
-    if (d === "较拥挤") return { text: "较拥挤", cls: "bg-amber-500/10 text-amber-600 dark:text-amber-400" };
-    if (d === "畅通") return { text: "畅通", cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" };
+    const density = normalizeDensityStatus(trafficData?.density_status);
+    if (density === "congested") return { text: "拥堵", cls: "bg-red-500/10 text-red-600 dark:text-red-400" };
+    if (density === "busy") return { text: "较拥挤", cls: "bg-amber-500/10 text-amber-600 dark:text-amber-400" };
+    if (density === "clear") return { text: "畅通", cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" };
+    if (density === "offline") return { text: "离线", cls: "bg-muted text-muted-foreground" };
     if (!trafficData) return { text: "未知", cls: "bg-muted text-muted-foreground" };
     const threshold = getThresholdForRoad(roadName);
     const total = (trafficData.count_car ?? 0) + (trafficData.count_motor ?? 0);
@@ -60,9 +62,10 @@ const VideoModal = ({
 
   // 计算速度状态
   const getSpeed = () => {
-    const s = trafficData?.speed_status;
-    if (s === "较快") return { text: "较快", cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" };
-    if (s === "较慢") return { text: "较慢", cls: "bg-amber-500/10 text-amber-600 dark:text-amber-400" };
+    const speed = normalizeSpeedStatus(trafficData?.speed_status);
+    if (speed === "fast") return { text: "较快", cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" };
+    if (speed === "slow") return { text: "较慢", cls: "bg-amber-500/10 text-amber-600 dark:text-amber-400" };
+    if (speed === "unknown") return { text: "未知", cls: "bg-muted text-muted-foreground" };
     if (!trafficData) return { text: "未知", cls: "bg-muted text-muted-foreground" };
     const threshold = getThresholdForRoad(roadName);
     const avg = ((trafficData.speed_car ?? 0) + (trafficData.speed_motor ?? 0)) / 2;

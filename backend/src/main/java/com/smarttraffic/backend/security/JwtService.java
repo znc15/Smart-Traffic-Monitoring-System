@@ -1,5 +1,6 @@
 package com.smarttraffic.backend.security;
 
+import com.smarttraffic.backend.config.AppRuntimeProperties;
 import com.smarttraffic.backend.config.JwtProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -19,10 +20,15 @@ import java.util.Optional;
 @Service
 public class JwtService {
 
-    private final JwtProperties jwtProperties;
+    private static final String DEFAULT_DEV_SECRET = "change-this-dev-secret-change-this-dev-secret";
 
-    public JwtService(JwtProperties jwtProperties) {
+    private final JwtProperties jwtProperties;
+    private final AppRuntimeProperties appRuntimeProperties;
+
+    public JwtService(JwtProperties jwtProperties, AppRuntimeProperties appRuntimeProperties) {
         this.jwtProperties = jwtProperties;
+        this.appRuntimeProperties = appRuntimeProperties;
+        validateSecretConfiguration();
     }
 
     public String createAccessToken(CurrentUser currentUser) {
@@ -77,6 +83,16 @@ public class JwtService {
 
     private SecretKey secretKey() {
         return Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void validateSecretConfiguration() {
+        String secret = jwtProperties.getSecret();
+        if (!StringUtils.hasText(secret) || secret.length() < 32) {
+            throw new IllegalStateException("JWT secret 长度不足，至少需要 32 个字符");
+        }
+        if (!appRuntimeProperties.isDevelopment() && DEFAULT_DEV_SECRET.equals(secret)) {
+            throw new IllegalStateException("非开发环境禁止使用默认 JWT secret");
+        }
     }
 
     private Long toLong(Object value) {

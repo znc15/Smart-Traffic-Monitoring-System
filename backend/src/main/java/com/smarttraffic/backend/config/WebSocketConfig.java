@@ -20,36 +20,52 @@ public class WebSocketConfig implements WebSocketConfigurer {
     private final AdminMetricsWebSocketHandler adminMetricsWebSocketHandler;
     private final TokenExtractionService tokenExtractionService;
     private final JwtService jwtService;
+    private final SecurityProperties securityProperties;
 
     public WebSocketConfig(
             TrafficInfoWebSocketHandler trafficInfoWebSocketHandler,
             FrameWebSocketHandler frameWebSocketHandler,
             AdminMetricsWebSocketHandler adminMetricsWebSocketHandler,
             TokenExtractionService tokenExtractionService,
-            JwtService jwtService
+            JwtService jwtService,
+            SecurityProperties securityProperties
     ) {
         this.trafficInfoWebSocketHandler = trafficInfoWebSocketHandler;
         this.frameWebSocketHandler = frameWebSocketHandler;
         this.adminMetricsWebSocketHandler = adminMetricsWebSocketHandler;
         this.tokenExtractionService = tokenExtractionService;
         this.jwtService = jwtService;
+        this.securityProperties = securityProperties;
     }
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        WebSocketAuthInterceptor userAuth = new WebSocketAuthInterceptor(tokenExtractionService, jwtService, false);
-        WebSocketAuthInterceptor adminAuth = new WebSocketAuthInterceptor(tokenExtractionService, jwtService, true);
+        String[] allowedOrigins = securityProperties.corsAllowedOriginsAsList().toArray(new String[0]);
+        boolean wsAllowQueryToken = securityProperties.isWsAllowQueryToken();
+
+        WebSocketAuthInterceptor userAuth = new WebSocketAuthInterceptor(
+                tokenExtractionService,
+                jwtService,
+                false,
+                wsAllowQueryToken
+        );
+        WebSocketAuthInterceptor adminAuth = new WebSocketAuthInterceptor(
+                tokenExtractionService,
+                jwtService,
+                true,
+                wsAllowQueryToken
+        );
 
         registry.addHandler(trafficInfoWebSocketHandler, "/api/v1/ws/info/*")
                 .addInterceptors(userAuth)
-                .setAllowedOriginPatterns("*");
+                .setAllowedOrigins(allowedOrigins);
 
         registry.addHandler(frameWebSocketHandler, "/api/v1/ws/frames/*")
                 .addInterceptors(userAuth)
-                .setAllowedOriginPatterns("*");
+                .setAllowedOrigins(allowedOrigins);
 
         registry.addHandler(adminMetricsWebSocketHandler, "/api/v1/admin/ws/resources")
                 .addInterceptors(adminAuth)
-                .setAllowedOriginPatterns("*");
+                .setAllowedOrigins(allowedOrigins);
     }
 }

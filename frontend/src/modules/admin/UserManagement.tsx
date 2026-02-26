@@ -12,16 +12,9 @@ import { adminConfig, authFetch } from "@/config";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Loader2, Check, Users, UserX } from "lucide-react";
+import { normalizeAdminUser, type NormalizedAdminUser } from "@/utils/normalize";
 
-type User = {
-  id: number;
-  username: string;
-  email: string;
-  phoneNumber: string;
-  role_id: number;
-  enabled: boolean;
-  createdAt: string;
-};
+type User = NormalizedAdminUser;
 
 type RoleFilter = "all" | "admin" | "user";
 type StatusFilter = "all" | "enabled" | "disabled";
@@ -49,7 +42,9 @@ export default function UserManagement() {
       setError(null);
       const res = await authFetch(adminConfig.USERS_URL);
       if (res.ok) {
-        setUsers(await res.json());
+        const raw = await res.json();
+        const list = Array.isArray(raw) ? raw.map(normalizeAdminUser) : [];
+        setUsers(list);
       } else {
         setError(`加载用户列表失败 (HTTP ${res.status})`);
         toast.error("加载用户列表失败");
@@ -92,10 +87,14 @@ export default function UserManagement() {
     setActionStates((prev) => ({
       ...prev,
       [userId]: {
-        role: { loading: false, success: false },
-        status: { loading: false, success: false },
-        ...prev[userId],
-        [key]: { ...prev[userId]?.[key], ...state },
+        role:
+          key === "role"
+            ? { ...(prev[userId]?.role ?? { loading: false, success: false }), ...state }
+            : (prev[userId]?.role ?? { loading: false, success: false }),
+        status:
+          key === "status"
+            ? { ...(prev[userId]?.status ?? { loading: false, success: false }), ...state }
+            : (prev[userId]?.status ?? { loading: false, success: false }),
       },
     }));
   };
@@ -105,7 +104,7 @@ export default function UserManagement() {
     try {
       const res = await authFetch(`${adminConfig.USERS_URL}/${u.id}/role`, {
         method: "PUT",
-        body: JSON.stringify({ roleId: u.role_id === 0 ? 1 : 0 }),
+        body: JSON.stringify({ role_id: u.role_id === 0 ? 1 : 0 }),
       });
       if (res.ok) {
         setActionState(u.id, "role", { loading: false, success: true });
@@ -246,7 +245,7 @@ export default function UserManagement() {
                       >
                         <td className="px-4 py-2.5 font-medium">{u.username}</td>
                         <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">{u.email}</td>
-                        <td className="px-4 py-2.5 text-muted-foreground hidden lg:table-cell">{u.phoneNumber || "-"}</td>
+                        <td className="px-4 py-2.5 text-muted-foreground hidden lg:table-cell">{u.phone_number || "-"}</td>
                         <td className="px-4 py-2.5">
                           <span
                             className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${

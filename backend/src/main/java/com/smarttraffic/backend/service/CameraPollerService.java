@@ -45,6 +45,7 @@ public class CameraPollerService {
             String name = cam.getName();
             NodeHealth health = nodeHealthMap.computeIfAbsent(name, k -> new NodeHealth());
             health.lastPollTime = Instant.now();
+            boolean wasOnline = health.online;
 
             long start = System.nanoTime();
             try {
@@ -54,11 +55,17 @@ public class CameraPollerService {
                 health.lastSuccessTime = Instant.now();
                 health.latencyMs = elapsed;
                 health.consecutiveFailures = 0;
+                if (!wasOnline) {
+                    log.info("边缘节点已恢复在线: {} ({} ms)", name, elapsed);
+                }
             } catch (Exception e) {
                 health.online = false;
                 health.errorCount++;
                 health.consecutiveFailures++;
                 health.lastError = e.getMessage();
+                if (wasOnline) {
+                    log.warn("边缘节点离线: {} ({})", name, e.getMessage());
+                }
                 log.debug("轮询摄像头 {} 失败: {}", name, e.getMessage());
             }
         }

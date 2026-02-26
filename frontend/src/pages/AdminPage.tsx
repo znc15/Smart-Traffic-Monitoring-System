@@ -42,7 +42,7 @@ const pageVariants = {
 
 const pageTransition = {
   type: "tween" as const,
-  ease: "easeInOut",
+  ease: [0.42, 0, 0.58, 1] as const,
   duration: 0.2,
 };
 
@@ -78,7 +78,11 @@ export default function AdminPage() {
         }
         const me = await res.json();
         if (!cancelled) {
-          const admin = me?.role_id === 0;
+          const roleId =
+            typeof me?.role_id === "number"
+              ? me.role_id
+              : (typeof me?.roleId === "number" ? me.roleId : 1);
+          const admin = roleId === 0;
           setIsAdmin(admin);
           if (!admin) setError("你无权访问此页面");
           if (me?.username) setUsername(me.username);

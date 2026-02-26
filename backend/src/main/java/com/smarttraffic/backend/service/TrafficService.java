@@ -73,20 +73,23 @@ public class TrafficService {
 
         snapshot.tick();
 
-        long countThreshold = 12;
+        long busyThreshold = 8;
+        long congestedThreshold = 12;
         long speedThreshold = 40;
 
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("online", snapshot.isOnline());
+        boolean online = snapshot.isOnline();
+        response.put("online", online);
         response.put("count_car", snapshot.countCar);
         response.put("count_motor", snapshot.countMotor);
         response.put("speed_car", snapshot.speedCar);
         response.put("speed_motor", snapshot.speedMotor);
-        response.put("density_status", (snapshot.countCar + snapshot.countMotor) > countThreshold ? "high" : "normal");
-        response.put("speed_status", (snapshot.speedCar + snapshot.speedMotor) / 2 > speedThreshold ? "fast" : "slow");
+        response.put("density_status", computeDensityStatus(snapshot, online, busyThreshold, congestedThreshold));
+        response.put("speed_status", computeSpeedStatus(snapshot, online, speedThreshold));
 
         Map<String, Object> thresholds = new LinkedHashMap<>();
-        thresholds.put("count_threshold", countThreshold);
+        thresholds.put("busy_threshold", busyThreshold);
+        thresholds.put("congested_threshold", congestedThreshold);
         thresholds.put("speed_threshold", speedThreshold);
         response.put("thresholds", thresholds);
 
@@ -134,6 +137,31 @@ public class TrafficService {
         // Remove deleted cameras
         snapshots.keySet().retainAll(new java.util.HashSet<>(names));
         frameCache.keySet().retainAll(new java.util.HashSet<>(names));
+    }
+
+    private static String computeDensityStatus(Snapshot snapshot, boolean online, long busyThreshold, long congestedThreshold) {
+        if (!online) {
+            return "offline";
+        }
+        long total = snapshot.countCar + snapshot.countMotor;
+        if (total > congestedThreshold) {
+            return "congested";
+        }
+        if (total > busyThreshold) {
+            return "busy";
+        }
+        return "clear";
+    }
+
+    private static String computeSpeedStatus(Snapshot snapshot, boolean online, long speedThreshold) {
+        if (!online) {
+            return "unknown";
+        }
+        if (snapshot.hasRemote && snapshot.speedCar == 0 && snapshot.speedMotor == 0) {
+            return "unknown";
+        }
+        long averageSpeed = (snapshot.speedCar + snapshot.speedMotor) / 2;
+        return averageSpeed > speedThreshold ? "fast" : "slow";
     }
 
     private static long randomCount() {

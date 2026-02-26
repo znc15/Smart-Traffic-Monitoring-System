@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/ui/
 import { Label } from "@/ui/label";
 import { authFetch, endpoints, adminConfig } from "@/config";
 import { ImageIcon, Megaphone, Palette, Save, Loader2, AlertCircle } from "lucide-react";
+import { normalizeSiteSettings } from "@/utils/normalize";
 
 interface Settings {
   siteName: string;
@@ -29,20 +30,20 @@ export default function SiteSettings() {
   const [loading, setLoading] = useState(true);
   const [logoError, setLogoError] = useState(false);
   const [debouncedLogoUrl, setDebouncedLogoUrl] = useState("");
-  const msgTimer = useRef<ReturnType<typeof setTimeout>>();
-  const logoDebounceTimer = useRef<ReturnType<typeof setTimeout>>();
+  const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const logoDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cleanup msgTimer on unmount (I4)
   useEffect(() => {
     return () => {
-      clearTimeout(msgTimer.current);
-      clearTimeout(logoDebounceTimer.current);
+      if (msgTimer.current) clearTimeout(msgTimer.current);
+      if (logoDebounceTimer.current) clearTimeout(logoDebounceTimer.current);
     };
   }, []);
 
   // Debounce logo preview URL (W1) — only render preview after 500ms idle
   useEffect(() => {
-    clearTimeout(logoDebounceTimer.current);
+    if (logoDebounceTimer.current) clearTimeout(logoDebounceTimer.current);
     logoDebounceTimer.current = setTimeout(() => {
       setDebouncedLogoUrl(form.logoUrl);
     }, 500);
@@ -57,7 +58,7 @@ export default function SiteSettings() {
 
   const showMsg = useCallback((text: string, ok: boolean) => {
     setMsg({ text, ok });
-    clearTimeout(msgTimer.current);
+    if (msgTimer.current) clearTimeout(msgTimer.current);
     msgTimer.current = setTimeout(() => setMsg(null), 3000);
   }, []);
 
@@ -65,11 +66,12 @@ export default function SiteSettings() {
     fetch(endpoints.siteSettings)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => {
+        const normalized = normalizeSiteSettings(d);
         const loaded: Settings = {
-          siteName: d.siteName ?? "",
-          logoUrl: d.logoUrl ?? "",
-          announcement: d.announcement ?? "",
-          footerText: d.footerText ?? "",
+          siteName: normalized.site_name,
+          logoUrl: normalized.logo_url,
+          announcement: normalized.announcement,
+          footerText: normalized.footer_text,
         };
         setForm(loaded);
         setSaved(loaded);
@@ -89,7 +91,12 @@ export default function SiteSettings() {
     try {
       const res = await authFetch(adminConfig.SITE_SETTINGS_URL, {
         method: "PUT",
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          site_name: form.siteName,
+          logo_url: form.logoUrl,
+          announcement: form.announcement,
+          footer_text: form.footerText,
+        }),
       });
       if (res.ok) {
         setSaved({ ...form });

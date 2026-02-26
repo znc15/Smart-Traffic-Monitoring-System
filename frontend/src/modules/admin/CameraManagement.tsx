@@ -13,6 +13,7 @@ import {
 } from "@/ui/dialog";
 import { adminConfig, authFetch } from "@/config";
 import { toast } from "sonner";
+import { normalizeCamera, type NormalizedCamera } from "@/utils/normalize";
 import {
   Camera,
   Eye,
@@ -21,17 +22,9 @@ import {
   Plus,
   Trash2,
   Video,
-  X,
 } from "lucide-react";
 
-type CameraItem = {
-  id: number;
-  name: string;
-  location: string;
-  stream_url: string | null;
-  road_name: string | null;
-  enabled: boolean;
-};
+type CameraItem = NormalizedCamera;
 
 type FormState = {
   name: string;
@@ -64,7 +57,11 @@ export default function CameraManagement() {
   const fetchCameras = async () => {
     try {
       const res = await authFetch(adminConfig.CAMERAS_URL);
-      if (res.ok) setCameras(await res.json());
+      if (res.ok) {
+        const raw = await res.json();
+        const list = Array.isArray(raw) ? raw.map(normalizeCamera) : [];
+        setCameras(list);
+      }
     } finally {
       setLoading(false);
     }

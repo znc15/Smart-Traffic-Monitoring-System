@@ -21,15 +21,10 @@ public class TokenExtractionService {
         }
 
         Optional<String> cookie = extractFromCookies(request.getCookies());
-        if (cookie.isPresent()) {
-            return cookie;
-        }
-
-        String queryToken = request.getParameter("token");
-        return Optional.ofNullable(StringUtils.hasText(queryToken) ? queryToken : null);
+        return cookie;
     }
 
-    public Optional<String> extractFromWebSocket(URI uri, List<String> authorizationHeaders, List<String> cookieHeaders) {
+    public Optional<String> extractFromWebSocket(URI uri, List<String> authorizationHeaders, List<String> cookieHeaders, boolean allowQueryToken) {
         if (authorizationHeaders != null && !authorizationHeaders.isEmpty()) {
             Optional<String> bearer = extractBearer(authorizationHeaders.get(0));
             if (bearer.isPresent()) {
@@ -43,6 +38,10 @@ public class TokenExtractionService {
         }
 
         if (uri == null) {
+            return Optional.empty();
+        }
+
+        if (!allowQueryToken) {
             return Optional.empty();
         }
 

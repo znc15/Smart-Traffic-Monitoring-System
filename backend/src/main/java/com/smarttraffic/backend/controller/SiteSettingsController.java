@@ -37,33 +37,53 @@ public class SiteSettingsController {
             throw new AppException(HttpStatus.FORBIDDEN, "Admin only");
         }
 
-        // Validate logoUrl: must be empty or start with http:// / https://
-        if (body.containsKey("logoUrl")) {
-            String logoUrl = body.get("logoUrl");
+        String logoUrl = firstValue(body, "logo_url", "logoUrl");
+        String footerText = firstValue(body, "footer_text", "footerText");
+        String announcement = body.get("announcement");
+        String siteName = firstValue(body, "site_name", "siteName");
+
+        // Validate logoUrl/logo_url: must be empty or start with http:// / https://
+        if (containsAny(body, "logo_url", "logoUrl")) {
             if (logoUrl != null && !logoUrl.isEmpty()
                     && !logoUrl.startsWith("http://") && !logoUrl.startsWith("https://")) {
                 throw new AppException(HttpStatus.BAD_REQUEST,
-                        "logoUrl must be empty or start with http:// or https://");
+                        "logo_url must be empty or start with http:// or https://");
             }
         }
 
         // Validate text field lengths
-        if (body.containsKey("footerText") && body.get("footerText") != null
-                && body.get("footerText").length() > MAX_TEXT_LENGTH) {
+        if (containsAny(body, "footer_text", "footerText") && footerText != null
+                && footerText.length() > MAX_TEXT_LENGTH) {
             throw new AppException(HttpStatus.BAD_REQUEST,
-                    "footerText must not exceed " + MAX_TEXT_LENGTH + " characters");
+                    "footer_text must not exceed " + MAX_TEXT_LENGTH + " characters");
         }
-        if (body.containsKey("announcement") && body.get("announcement") != null
-                && body.get("announcement").length() > MAX_TEXT_LENGTH) {
+        if (body.containsKey("announcement") && announcement != null
+                && announcement.length() > MAX_TEXT_LENGTH) {
             throw new AppException(HttpStatus.BAD_REQUEST,
                     "announcement must not exceed " + MAX_TEXT_LENGTH + " characters");
         }
 
         SiteSettingsEntity settings = repo.findById(1L).orElseGet(SiteSettingsEntity::new);
-        if (body.containsKey("siteName")) settings.setSiteName(body.get("siteName"));
-        if (body.containsKey("announcement")) settings.setAnnouncement(body.get("announcement"));
-        if (body.containsKey("logoUrl")) settings.setLogoUrl(body.get("logoUrl"));
-        if (body.containsKey("footerText")) settings.setFooterText(body.get("footerText"));
+        if (containsAny(body, "site_name", "siteName")) settings.setSiteName(siteName);
+        if (body.containsKey("announcement")) settings.setAnnouncement(announcement);
+        if (containsAny(body, "logo_url", "logoUrl")) settings.setLogoUrl(logoUrl);
+        if (containsAny(body, "footer_text", "footerText")) settings.setFooterText(footerText);
         return repo.save(settings);
+    }
+
+    private static boolean containsAny(Map<String, String> body, String... keys) {
+        for (String key : keys) {
+            if (body.containsKey(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String firstValue(Map<String, String> body, String primary, String fallback) {
+        if (body.containsKey(primary)) {
+            return body.get(primary);
+        }
+        return body.get(fallback);
     }
 }

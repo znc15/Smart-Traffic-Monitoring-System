@@ -15,12 +15,17 @@ import {
 import VideoMonitor from "../../video/components/VideoMonitor";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  useMultipleTrafficInfo,
   useMultipleFrameStreams,
 } from "../../../../hooks/useWebSocket";
 import { endpoints } from "../../../../config";
 import { getThresholdForRoad } from "../../../../config/trafficThresholds";
 import { Info } from "lucide-react";
+import { useTrafficStore } from "@/hooks/useTrafficStore";
+import {
+  normalizeDensityStatus,
+  normalizeSiteSettings,
+  normalizeSpeedStatus,
+} from "@/utils/normalize";
 
 // Import types from the WebSocket hook
 type VehicleData = {
@@ -31,56 +36,24 @@ type VehicleData = {
   online?: boolean;
 };
 
-type TrafficBackendData = VehicleData & {
-  density_status?: string;
-  speed_status?: string;
-};
-
 const TrafficDashboard = () => {
   const [selectedRoad, setSelectedRoad] = useState<string | null>(null);
   const [localFullscreen] = useState(false);
-
-  const [allowedRoads, setAllowedRoads] = useState<string[]>([]);
   const [announcement, setAnnouncement] = useState("");
 
+  const { allowedRoads, trafficData, isAnyConnected } = useTrafficStore();
+
   useEffect(() => {
-    const fetchRoads = async () => {
-      try {
-        // roads_name 端点不需要认证
-        const res = await fetch(endpoints.roadNames);
-        if (!res.ok) {
-          console.error("Failed to fetch road names");
-          setAllowedRoads([
-            "文富",
-            "阮廌路",
-            "四所交叉口",
-            "郎路",
-          ]);
-          return;
-        }
-        const json = await res.json();
-        const names: string[] = json?.road_names ?? [];
-        setAllowedRoads(names);
-      } catch (error) {
-        console.error("Error fetching roads:", error);
-        setAllowedRoads([
-          "文富",
-          "阮廌路",
-          "四所交叉口",
-          "郎路",
-          "文馆",
-        ]);
-      }
-    };
-    fetchRoads();
     fetch(endpoints.siteSettings)
       .then((r) => r.ok ? r.json() : Promise.reject())
-      .then((d) => { if (d.announcement) setAnnouncement(d.announcement); })
+      .then((d) => {
+        const settings = normalizeSiteSettings(d);
+        if (settings.announcement) setAnnouncement(settings.announcement);
+      })
       .catch(() => {});
   }, []);
 
-  // Use WebSocket for traffic data
-  const { trafficData, isAnyConnected } = useMultipleTrafficInfo(allowedRoads);
+  // Frame stream remains independent; traffic info is provided by TrafficProvider
   const { frameData: frames } = useMultipleFrameStreams(allowedRoads);
 
   const loading = !isAnyConnected;
@@ -89,15 +62,15 @@ const TrafficDashboard = () => {
     const data = trafficData[roadName] as VehicleData | undefined;
     if (!data) return { status: "unknown", color: "gray", icon: Clock };
     if (data.online === false) return { status: "offline", color: "gray", icon: AlertTriangle };
-    // Prefer backend-provided classification when available
-    const densityFromBackend = (data as TrafficBackendData).density_status;
-    if (densityFromBackend) {
-      if (densityFromBackend === "拥堵")
-        return { status: "congested", color: "red", icon: AlertTriangle };
-      if (densityFromBackend === "较拥挤")
-        return { status: "busy", color: "yellow", icon: Clock };
-      if (densityFromBackend === "畅通")
-        return { status: "clear", color: "green", icon: CheckCircle };
+    const density = normalizeDensityStatus(
+      (data as { density_status?: string }).density_status
+    );
+    if (density === "congested") return { status: "congested", color: "red", icon: AlertTriangle };
+    if (density === "busy") return { status: "busy", color: "yellow", icon: Clock };
+    if (density === "clear") return { status: "clear", color: "green", icon: CheckCircle };
+    if (density === "offline") return { status: "offline", color: "gray", icon: AlertTriangle };
+    if (density) {
+      return { status: density, color: "gray", icon: Clock };
     }
     // Fallback: compute from local thresholds when backend doesn't provide classification
     const threshold = getThresholdForRoad(roadName);
@@ -112,13 +85,12 @@ const TrafficDashboard = () => {
   const getSpeedStatus = (roadName: string) => {
     const data = trafficData[roadName] as VehicleData | undefined;
     if (!data) return { speedText: "未知", speedColor: "gray" };
-    const speedFromBackend = (data as TrafficBackendData).speed_status;
-    if (speedFromBackend) {
-      if (speedFromBackend === "较快")
-        return { speedText: "较快", speedColor: "green" };
-      if (speedFromBackend === "较慢")
-        return { speedText: "较慢", speedColor: "orange" };
-    }
+    const speedStatus = normalizeSpeedStatus(
+      (data as { speed_status?: string }).speed_status
+    );
+    if (speedStatus === "fast") return { speedText: "较快", speedColor: "green" };
+    if (speedStatus === "slow") return { speedText: "较慢", speedColor: "orange" };
+    if (speedStatus === "unknown") return { speedText: "未知", speedColor: "gray" };
     // Fallback: compute from local thresholds
     const threshold = getThresholdForRoad(roadName);
     const avgSpeed = ((data.speed_car ?? 0) + (data.speed_motor ?? 0)) / 2;

@@ -36,6 +36,7 @@ import ProfilePage from "./pages/ProfilePage";
 import ProtectedRoute from "@/modules/features/auth/guards/ProtectedRoute";
 import AdminPage from "@/pages/AdminPage";
 import { authConfig, endpoints } from "@/config";
+import { normalizeSiteSettings } from "@/utils/normalize";
 import "./App.css";
 import { TrafficProvider } from "@/hooks/useTrafficStore";
 export default function App() {
@@ -95,7 +96,11 @@ function AppContent() {
           return;
         }
         const data = await res.json();
-        setIsAdmin(data?.role_id === 0);
+        const roleId =
+          typeof data?.role_id === "number"
+            ? data.role_id
+            : (typeof data?.roleId === "number" ? data.roleId : 1);
+        setIsAdmin(roleId === 0);
       } catch {
         setIsAdmin(false);
       }
@@ -107,7 +112,10 @@ function AppContent() {
   useEffect(() => {
     fetch(endpoints.siteSettings)
       .then((r) => r.ok ? r.json() : Promise.reject())
-      .then((d) => { if (d.site_name) setSiteName(d.site_name); })
+      .then((d) => {
+        const settings = normalizeSiteSettings(d);
+        if (settings.site_name) setSiteName(settings.site_name);
+      })
       .catch(() => {});
   }, []);
 

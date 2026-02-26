@@ -13,6 +13,7 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 import { getApiUrl, getWsUrl } from "@/config/settings";
 import { authConfig } from "@/config";
 import { Server, Cpu, Timer, Activity, VideoOff, Maximize2 } from "lucide-react";
+import { normalizeCamera } from "@/utils/normalize";
 import {
   ResponsiveContainer,
   LineChart,
@@ -70,9 +71,9 @@ type Metrics = {
 type CameraInfo = {
   id: number;
   name: string;
-  streamUrl: string | null;
+  stream_url: string | null;
   location: string | null;
-  roadName: string | null;
+  road_name: string | null;
   enabled: boolean;
 };
 
@@ -193,9 +194,13 @@ function ExpandedNodeDialog({ node, streamUrl }: { node: NodeInfo; streamUrl: st
 
   // Cleanup video when dialog unmounts
   useEffect(() => {
+    const video = videoRef.current;
     return () => {
-      const v = videoRef.current;
-      if (v) { v.pause(); v.removeAttribute("src"); v.load(); }
+      if (video) {
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      }
     };
   }, []);
 
@@ -342,7 +347,7 @@ export default function SystemMonitor() {
     []
   );
 
-  const fetchMetrics = async () => {
+  const fetchMetrics = useCallback(async () => {
     if (!token) return;
     try {
       const res = await fetch(getApiUrl("/admin/resources"), {
@@ -354,7 +359,7 @@ export default function SystemMonitor() {
         setLastUpdate(new Date().toLocaleTimeString("zh-CN"));
       }
     } catch { /* ignore */ }
-  };
+  }, [token]);
 
   const fetchCameraUrls = useCallback(async () => {
     if (!token) return;
@@ -364,17 +369,23 @@ export default function SystemMonitor() {
         credentials: "include",
       });
       if (res.ok) {
-        const cameras = (await res.json()) as CameraInfo[];
+        const raw = await res.json();
+        const cameras = (Array.isArray(raw) ? raw : []).map((item) =>
+          normalizeCamera(item)
+        ) as CameraInfo[];
         const map: Record<string, string> = {};
         for (const cam of cameras) {
-          if (cam.streamUrl) map[cam.name] = cam.streamUrl;
+          if (cam.stream_url) map[cam.name] = cam.stream_url;
         }
         setCameraUrlMap(map);
       }
     } catch { /* ignore */ }
   }, [token]);
 
-  useEffect(() => { fetchMetrics(); fetchCameraUrls(); }, []);
+  useEffect(() => {
+    fetchMetrics();
+    fetchCameraUrls();
+  }, [fetchMetrics, fetchCameraUrls]);
 
   const wsUrl = useMemo(() => getWsUrl("/admin/ws/resources"), []);
   const { data: wsData, isConnected } = useWebSocket(wsUrl, {

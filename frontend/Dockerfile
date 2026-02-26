@@ -1,21 +1,25 @@
 ARG NODE_VERSION=20.17.0
 ARG PNPM_VERSION=9.14.4
 ARG NODE_BASE_IMAGE=docker.m.daocloud.io/library/node:${NODE_VERSION}-alpine
+ARG NGINX_BASE_IMAGE=docker.m.daocloud.io/library/nginx:1.27-alpine
 
-FROM ${NODE_BASE_IMAGE}
+FROM ${NODE_BASE_IMAGE} AS builder
 
-ENV NODE_ENV=development
-
-RUN npm install -g pnpm@${PNPM_VERSION}
+RUN npm config set registry https://registry.npmmirror.com \
+    && npm install -g pnpm@${PNPM_VERSION}
 
 WORKDIR /frontend
 
-COPY package.json ./
-
-RUN pnpm install --no-frozen-lockfile
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 COPY . .
+RUN pnpm build
 
-EXPOSE 5173
+FROM ${NGINX_BASE_IMAGE}
 
-CMD ["pnpm", "dev", "--host", "0.0.0.0"]
+COPY --from=builder /frontend/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

@@ -7,7 +7,7 @@ from datetime import datetime
 import cv2
 import numpy as np
 
-from config import ROAD_NAME
+import config
 
 
 def draw_overlay(frame: np.ndarray, count_car: int, count_motor: int,
@@ -22,7 +22,7 @@ def draw_overlay(frame: np.ndarray, count_car: int, count_motor: int,
     cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
 
     # 路段名称
-    cv2.putText(frame, ROAD_NAME, (10, 20),
+    cv2.putText(frame, config.ROAD_NAME, (10, 20),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
     # 车辆计数和速度

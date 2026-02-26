@@ -5,6 +5,9 @@ export type VehicleData = {
   count_motor: number;
   speed_car: number;
   speed_motor: number;
+  online?: boolean;
+  density_status?: string;
+  speed_status?: string;
 };
 
 export type HistoricalDataPoint = {

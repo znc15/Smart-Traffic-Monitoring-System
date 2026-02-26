@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   database:
     image: postgres:16
@@ -21,6 +19,8 @@ services:
       args:
         MAVEN_BASE_IMAGE: ${MAVEN_BASE_IMAGE:-docker.m.daocloud.io/library/maven:3.9.9-eclipse-temurin-17}
         JRE_BASE_IMAGE: ${JRE_BASE_IMAGE:-docker.m.daocloud.io/library/eclipse-temurin:17-jre}
+        MAVEN_MIRROR_URL: ${MAVEN_MIRROR_URL:-https://maven.aliyun.com/repository/public}
+        MAVEN_MIRROR_ID: ${MAVEN_MIRROR_ID:-aliyun-public}
     container_name: backend
     ports:
       - "8000:8000"
@@ -42,9 +42,10 @@ services:
       dockerfile: Dockerfile
       args:
         NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-docker.m.daocloud.io/library/node:20.17.0-alpine}
+        NGINX_BASE_IMAGE: ${NGINX_BASE_IMAGE:-docker.m.daocloud.io/library/nginx:1.27-alpine}
     container_name: frontend
     ports:
-      - "5173:5173"
+      - "5173:80"
     depends_on:
       - backend
     networks:

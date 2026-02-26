@@ -1,5 +1,6 @@
 package com.smarttraffic.backend.controller;
 
+import com.smarttraffic.backend.dto.admin.AdminUserResponse;
 import com.smarttraffic.backend.exception.AppException;
 import com.smarttraffic.backend.model.CameraEntity;
 import com.smarttraffic.backend.model.UserEntity;
@@ -84,8 +85,14 @@ public class AdminController {
         if (body.containsKey("name")) cam.setName((String) body.get("name"));
         if (body.containsKey("location")) cam.setLocation((String) body.get("location"));
         if (body.containsKey("enabled")) cam.setEnabled((Boolean) body.get("enabled"));
-        if (body.containsKey("stream_url")) cam.setStreamUrl((String) body.get("stream_url"));
-        if (body.containsKey("road_name")) cam.setRoadName((String) body.get("road_name"));
+        if (body.containsKey("stream_url") || body.containsKey("streamUrl")) {
+            Object streamUrl = body.getOrDefault("stream_url", body.get("streamUrl"));
+            cam.setStreamUrl(streamUrl != null ? String.valueOf(streamUrl) : null);
+        }
+        if (body.containsKey("road_name") || body.containsKey("roadName")) {
+            Object roadName = body.getOrDefault("road_name", body.get("roadName"));
+            cam.setRoadName(roadName != null ? String.valueOf(roadName) : null);
+        }
         CameraEntity saved = cameraRepository.save(cam);
         trafficService.reloadCameras(trafficProperties);
         return saved;
@@ -103,28 +110,26 @@ public class AdminController {
     }
 
     @GetMapping("/users")
-    public List<Map<String, Object>> listUsers() {
+    public List<AdminUserResponse> listUsers() {
         requireAdmin();
-        return userRepository.findAll().stream().map(u -> Map.<String, Object>of(
-                "id", u.getId(), "username", u.getUsername(), "email", u.getEmail(),
-                "phoneNumber", u.getPhoneNumber(), "roleId", u.getRoleId(),
-                "enabled", u.isEnabled(), "createdAt", u.getCreatedAt() != null ? u.getCreatedAt().toString() : ""
-        )).toList();
+        return userRepository.findAll().stream()
+                .map(AdminUserResponse::fromEntity)
+                .toList();
     }
 
     @PutMapping("/users/{id}/role")
-    public Map<String, String> updateUserRole(@PathVariable Long id, @RequestBody Map<String, Integer> body) {
+    public Map<String, String> updateUserRole(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         requireAdmin();
         CurrentUser current = SecurityUtils.requireCurrentUser();
         if (current.id().equals(id)) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Cannot modify your own account");
         }
-        Integer roleId = body.get("roleId");
+        Integer roleId = parseRoleId(body.getOrDefault("role_id", body.get("roleId")));
         if (roleId == null) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "roleId is required");
+            throw new AppException(HttpStatus.BAD_REQUEST, "role_id is required");
         }
         if (roleId != 0 && roleId != 1) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "roleId must be 0 or 1");
+            throw new AppException(HttpStatus.BAD_REQUEST, "role_id must be 0 or 1");
         }
         UserEntity user = userRepository.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
@@ -145,5 +150,19 @@ public class AdminController {
         user.setEnabled(!user.isEnabled());
         userRepository.save(user);
         return Map.of("enabled", user.isEnabled());
+    }
+
+    private Integer parseRoleId(Object raw) {
+        if (raw instanceof Number number) {
+            return number.intValue();
+        }
+        if (raw instanceof String text) {
+            try {
+                return Integer.parseInt(text.trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 }

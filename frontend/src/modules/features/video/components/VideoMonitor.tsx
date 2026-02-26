@@ -16,6 +16,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import VideoModal from "./VideoModal";
 import { getThresholdForRoad } from "../../../../config/trafficThresholds";
+import { normalizeDensityStatus, normalizeSpeedStatus } from "@/utils/normalize";
 
 interface VehicleData {
   count_car: number;
@@ -104,29 +105,18 @@ const VideoMonitor = ({
       };
 
     // Prefer backend-provided classification when available
-    const densityFromBackend = data.density_status;
-    if (densityFromBackend) {
-      if (densityFromBackend === "拥堵")
-        return {
-          status: "congested",
-          color: "red",
-          icon: AlertTriangle,
-          text: "拥堵",
-        };
-      if (densityFromBackend === "较拥挤")
-        return {
-          status: "busy",
-          color: "yellow",
-          icon: Clock,
-          text: "较拥挤",
-        };
-      if (densityFromBackend === "畅通")
-        return {
-          status: "clear",
-          color: "green",
-          icon: CheckCircle,
-          text: "畅通",
-        };
+    const density = normalizeDensityStatus(data.density_status);
+    if (density === "congested") {
+      return { status: "congested", color: "red", icon: AlertTriangle, text: "拥堵" };
+    }
+    if (density === "busy") {
+      return { status: "busy", color: "yellow", icon: Clock, text: "较拥挤" };
+    }
+    if (density === "clear") {
+      return { status: "clear", color: "green", icon: CheckCircle, text: "畅通" };
+    }
+    if (density === "offline") {
+      return { status: "offline", color: "gray", icon: WifiOff, text: "离线" };
     }
 
     // Fallback to previous local thresholds if backend not providing
@@ -159,13 +149,10 @@ const VideoMonitor = ({
     const data = trafficData[roadName];
     if (!data) return { speedText: "未知", speedColor: "gray" };
 
-    const speedFromBackend = data.speed_status;
-    if (speedFromBackend) {
-      if (speedFromBackend === "较快")
-        return { speedText: "较快", speedColor: "green" };
-      if (speedFromBackend === "较慢")
-        return { speedText: "较慢", speedColor: "orange" };
-    }
+    const speed = normalizeSpeedStatus(data.speed_status);
+    if (speed === "fast") return { speedText: "较快", speedColor: "green" };
+    if (speed === "slow") return { speedText: "较慢", speedColor: "orange" };
+    if (speed === "unknown") return { speedText: "未知", speedColor: "gray" };
 
     // Fallback
     const threshold = getThresholdForRoad(roadName);
@@ -319,7 +306,17 @@ const VideoMonitor = ({
                         {data && (
                           <>
                             <span className="text-muted-foreground/40">·</span>
-                            <span className={`text-xs ${speedColor === "green" ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>{speedText}</span>
+                            <span
+                              className={`text-xs ${
+                                speedColor === "green"
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : speedColor === "gray"
+                                  ? "text-muted-foreground"
+                                  : "text-amber-600 dark:text-amber-400"
+                              }`}
+                            >
+                              {speedText}
+                            </span>
                           </>
                         )}
                       </div>

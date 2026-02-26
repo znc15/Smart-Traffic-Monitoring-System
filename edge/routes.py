@@ -25,6 +25,7 @@ import config
 from detector import detect_vehicles_detailed
 from state import state
 from resource_manager import get_resource_level, get_resource_params
+from validators import validate_probe_source, has_openvino_cache
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,12 @@ class ConfigUpdateRequest(BaseModel):
 # 摄像头探测请求体
 # ---------------------------------------------------------------------------
 class ProbeRequest(BaseModel):
-    url: str = Field(..., pattern=r"^(rtsp://|rtsps://|http://|https://|/dev/|\d+$).+", max_length=2048, description="RTSP 或视频流地址")
+    url: str = Field(..., max_length=2048, description="RTSP/HTTP 视频流地址、本地设备号或 /dev/... 设备路径")
+
+    @field_validator("url")
+    @classmethod
+    def validate_source(cls, value: str) -> str:
+        return validate_probe_source(value)
 
 
 def _current_config() -> dict:
@@ -337,10 +343,8 @@ def get_models() -> JSONResponse:
 
     # 扫描 models/ 目录下所有 .pt 文件
     for pt_file in sorted(models_dir.glob("*.pt")):
-        # 检查是否存在对应的 OpenVINO 模型目录
-        # 命名约定: yolov8n.pt → yolov8n_openvino_model/
         stem = pt_file.stem  # 例如 "yolov8n"
-        has_openvino = (models_dir / f"{stem}_openvino_model").is_dir()
+        has_openvino = has_openvino_cache(models_dir, stem)
 
         try:
             size_mb = round(pt_file.stat().st_size / (1024 * 1024), 1)
@@ -357,8 +361,6 @@ def get_models() -> JSONResponse:
         "models": models,
         "current": config.MODEL_NAME,
     })
-
-
 @router.put("/api/config", response_model=None)
 def update_config(body: ConfigUpdateRequest) -> JSONResponse:
     """更新运行配置（仅更新传入的字段，未传入的保持不变），并触发检测循环热重启"""
@@ -367,6 +369,8 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
     old_openvino = config.USE_OPENVINO
     old_imgsz = config.IMGSZ
     old_quantize = config.QUANTIZE
+    old_mode = config.MODE
+    old_road_name = config.ROAD_NAME
 
     # 逐字段检查并更新 config 模块变量
     if body.mode is not None:
@@ -388,12 +392,15 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
                 detail=f"模型文件不存在: {body.model}",
             )
         config.MODEL_NAME = body.model
+        logger.info("模型切换请求: %s -> %s", old_model, config.MODEL_NAME)
 
     if body.confidence is not None:
         config.CONF_THRESHOLD = body.confidence
 
     if body.road_name is not None:
         config.ROAD_NAME = body.road_name
+        if old_road_name != config.ROAD_NAME:
+            logger.info("路段名称已更新: %s -> %s", old_road_name, config.ROAD_NAME)
 
     if body.use_openvino is not None:
         config.USE_OPENVINO = body.use_openvino
@@ -428,6 +435,15 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
         try:
             state.restart_callback(model_changed=model_changed)
             restarted = True
+            logger.info(
+                "检测循环热重启完成: mode=%s->%s, model_changed=%s, openvino=%s, quantize=%s, imgsz=%s",
+                old_mode,
+                config.MODE,
+                model_changed,
+                config.USE_OPENVINO,
+                config.QUANTIZE,
+                config.IMGSZ,
+            )
         except Exception as e:
             logger.error(f"重启检测循环失败: {e}")
 
