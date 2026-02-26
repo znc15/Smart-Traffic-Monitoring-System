@@ -64,6 +64,9 @@ class ConfigUpdateRequest(BaseModel):
     confidence: Optional[float] = Field(None, ge=0.1, le=0.9, description="检测置信度阈值 (0.1-0.9)")
     road_name: Optional[str] = Field(None, description="路段名称")
     use_openvino: Optional[bool] = Field(None, description="是否启用 OpenVINO 加速")
+    frame_skip: Optional[int] = Field(None, ge=1, le=30, description="每N帧推理一次 (1-30)")
+    imgsz: Optional[int] = Field(None, ge=160, le=1280, description="YOLO 输入分辨率 (160-1280)")
+    quantize: Optional[str] = Field(None, pattern=r"^(int8|fp16|none)$", description="量化模式: int8, fp16, none")
 
 
 # ---------------------------------------------------------------------------
@@ -82,6 +85,9 @@ def _current_config() -> dict:
         "confidence": config.CONF_THRESHOLD,
         "road_name": config.ROAD_NAME,
         "use_openvino": config.USE_OPENVINO,
+        "frame_skip": config.FRAME_SKIP,
+        "imgsz": config.IMGSZ,
+        "quantize": config.QUANTIZE,
     }
 
 # ---------------------------------------------------------------------------
@@ -373,9 +379,21 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
     if body.use_openvino is not None:
         config.USE_OPENVINO = body.use_openvino
 
-    # 判断模型是否变更（模型文件名或 OpenVINO 开关变化都需要重新加载）
+    if body.frame_skip is not None:
+        config.FRAME_SKIP = body.frame_skip
+
+    if body.imgsz is not None:
+        config.IMGSZ = body.imgsz
+
+    old_quantize = config.QUANTIZE
+    if body.quantize is not None:
+        config.QUANTIZE = body.quantize
+
+    # 判断模型是否变更（模型文件名、OpenVINO 开关或量化模式变化都需要重新加载）
     model_changed = (
-        config.MODEL_NAME != old_model or config.USE_OPENVINO != old_openvino
+        config.MODEL_NAME != old_model
+        or config.USE_OPENVINO != old_openvino
+        or (body.quantize is not None and config.QUANTIZE != old_quantize)
     )
 
     # 触发检测循环热重启

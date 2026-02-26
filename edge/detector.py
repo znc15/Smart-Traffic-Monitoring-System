@@ -30,9 +30,14 @@ def reset_model() -> None:
 
 
 def _get_openvino_path() -> Path:
-    """获取 OpenVINO IR 模型目录路径，与原始模型同目录（models/ 子目录下）"""
+    """获取 OpenVINO IR 模型目录路径，根据量化模式添加后缀区分"""
     model_path = config.get_model_path()
-    return model_path.parent / f"{model_path.stem}_openvino_model"
+    suffix = ""
+    if config.QUANTIZE == "fp16":
+        suffix = "_fp16"
+    elif config.QUANTIZE == "int8":
+        suffix = "_int8"
+    return model_path.parent / f"{model_path.stem}_openvino{suffix}_model"
 
 
 def _load_model() -> YOLO:
@@ -59,7 +64,14 @@ def _load_model() -> YOLO:
             if not ov_dir.exists():
                 print(f"[INFO] 首次运行，导出 OpenVINO 模型: {model_path} → {ov_dir}")
                 pt_model = YOLO(str(model_path))
-                pt_model.export(format="openvino")
+                export_kwargs: dict = {"format": "openvino"}
+                if config.QUANTIZE == "fp16":
+                    export_kwargs["half"] = True
+                    print("[INFO] 启用 FP16 半精度量化导出")
+                elif config.QUANTIZE == "int8":
+                    export_kwargs["int8"] = True
+                    print("[INFO] 启用 INT8 量化导出")
+                pt_model.export(**export_kwargs)
                 print(f"[INFO] OpenVINO 导出完成: {ov_dir}")
 
             print(f"[INFO] 加载 OpenVINO 模型: {ov_dir}")
@@ -98,7 +110,7 @@ def detect_vehicles_detailed(
     model = _load_model()
 
     t0 = time.time()
-    results = model(frame, conf=config.CONF_THRESHOLD, verbose=False)
+    results = model(frame, conf=config.CONF_THRESHOLD, imgsz=config.IMGSZ, verbose=False)
     inference_ms = (time.time() - t0) * 1000
 
     count_car = 0
@@ -139,6 +151,27 @@ def detect_vehicles_detailed(
             })
 
     return annotated, count_car, count_motor, inference_ms, objects_list
+
+
+def redraw_detections(frame: np.ndarray, objects_list: list[dict]) -> np.ndarray:
+    """
+    在新帧上重绘检测框（帧跳过时复用上次检测结果）
+    返回: 标注后的帧副本
+    """
+    annotated = frame.copy()
+    for obj in objects_list:
+        x1, y1, x2, y2 = obj["bbox"]
+        conf = obj["confidence"]
+        if obj["class"] == "car":
+            color = (255, 120, 40)
+            label = f"Car {conf:.0%}"
+        else:
+            color = (40, 220, 120)
+            label = f"Motor {conf:.0%}"
+        cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
+        cv2.putText(annotated, label, (x1, y1 - 6),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
+    return annotated
 
 
 # ---------------------------------------------------------------------------

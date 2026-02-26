@@ -37,6 +37,11 @@ NO_BROWSER = os.environ.get("NO_BROWSER", "false").lower() in ("1", "true", "yes
 # HTTP 服务端口（CLI 参数 > 环境变量 > 默认 8000）
 HTTP_PORT = int(os.environ.get("PORT", "8000"))
 
+# 推理管线优化参数
+FRAME_SKIP = int(os.environ.get("FRAME_SKIP", "2"))      # 每N帧推理一次，1=每帧都推理
+IMGSZ = int(os.environ.get("IMGSZ", "320"))               # YOLO 输入分辨率
+QUANTIZE = os.environ.get("QUANTIZE", "none")              # 量化模式: "int8", "fp16", "none"
+
 # COCO 类别映射
 CAR_CLASSES = {2, 5, 7}       # car, bus, truck → 归为"汽车"
 MOTOR_CLASSES = {1, 3}        # bicycle, motorcycle → 归为"摩托/非机动车"

@@ -12,7 +12,7 @@ import numpy as np
 
 import config
 from state import state
-from detector import detect_vehicles, estimate_speed
+from detector import detect_vehicles_detailed, redraw_detections, estimate_speed
 from overlay import draw_overlay
 
 
@@ -36,24 +36,42 @@ def camera_loop() -> None:
     fps_counter = 0
     fps_timer = time.time()
     current_fps = 0.0
+    frame_count = 0
+    # 帧跳过：缓存上次推理结果
+    last_count_car = 0
+    last_count_motor = 0
+    last_inference_ms = 0.0
+    last_objects: list[dict] = []
 
     try:
         while not state.should_stop():
             ret, frame = cap.read()
             if not ret or frame is None or frame.size == 0:
                 print("[WARN] 读取帧失败或帧无效，1秒后重试...")
-                # 等待期间也检查停止信号，避免阻塞退出
                 if state.stop_event.wait(timeout=1.0):
                     break
                 cap.release()
                 cap = cv2.VideoCapture(source)
-                # 重连后同样丢弃前几帧
                 for _ in range(5):
                     cap.read()
                 continue
 
-            # YOLOv8 检测
-            annotated, count_car, count_motor, inference_ms = detect_vehicles(frame)
+            frame_count += 1
+
+            if frame_count % config.FRAME_SKIP == 0 or not last_objects and frame_count == 1:
+                # 执行推理
+                annotated, count_car, count_motor, inference_ms, objects = \
+                    detect_vehicles_detailed(frame)
+                last_count_car = count_car
+                last_count_motor = count_motor
+                last_inference_ms = inference_ms
+                last_objects = objects
+            else:
+                # 跳过推理，复用上次检测结果在新帧上重绘
+                annotated = redraw_detections(frame, last_objects)
+                count_car = last_count_car
+                count_motor = last_count_motor
+                inference_ms = last_inference_ms
 
             # 计算 FPS
             fps_counter += 1
@@ -74,7 +92,7 @@ def camera_loop() -> None:
             # 编码 JPEG 并更新全局状态
             success, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
             if not success:
-                continue  # 跳过编码失败的帧
+                continue
 
             state.update_traffic(count_car, count_motor, speed_car, speed_motor,
                                  inference_ms, current_fps)
@@ -117,7 +135,7 @@ def sim_loop() -> None:
 # 模拟模式 - 视频循环推理
 # ---------------------------------------------------------------------------
 def _sim_video_loop(videos: list[Path]) -> None:
-    """循环播放视频列表，对每帧做真实 YOLO 推理"""
+    """循环播放视频列表，对每帧做真实 YOLO 推理（支持帧跳过）"""
     fps_counter = 0
     fps_timer = time.time()
     current_fps = 0.0
@@ -137,17 +155,33 @@ def _sim_video_loop(videos: list[Path]) -> None:
         src_fps = cap.get(cv2.CAP_PROP_FPS)
         frame_delay = 1.0 / src_fps if src_fps > 0 else 1.0 / 25.0
 
+        frame_count = 0
+        last_count_car = 0
+        last_count_motor = 0
+        last_inference_ms = 0.0
+        last_objects: list[dict] = []
+
         try:
             while not state.should_stop():
                 ret, frame = cap.read()
                 if not ret:
-                    # 当前视频播放完毕，切换到下一个
                     break
 
                 frame_start = time.time()
+                frame_count += 1
 
-                # 真实 YOLO 推理
-                annotated, count_car, count_motor, inference_ms = detect_vehicles(frame)
+                if frame_count % config.FRAME_SKIP == 0 or not last_objects and frame_count == 1:
+                    annotated, count_car, count_motor, inference_ms, objects = \
+                        detect_vehicles_detailed(frame)
+                    last_count_car = count_car
+                    last_count_motor = count_motor
+                    last_inference_ms = inference_ms
+                    last_objects = objects
+                else:
+                    annotated = redraw_detections(frame, last_objects)
+                    count_car = last_count_car
+                    count_motor = last_count_motor
+                    inference_ms = last_inference_ms
 
                 # 计算实际 FPS
                 fps_counter += 1
@@ -157,23 +191,19 @@ def _sim_video_loop(videos: list[Path]) -> None:
                     fps_counter = 0
                     fps_timer = time.time()
 
-                # 速度估算
                 speed_car = estimate_speed(count_car)
                 speed_motor = estimate_speed(count_motor)
 
-                # 叠加信息栏
                 draw_overlay(annotated, count_car, count_motor, speed_car, speed_motor,
                              inference_ms, current_fps)
 
-                # 编码 JPEG 并更新全局状态
                 success, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
                 if not success:
-                    continue  # 跳过编码失败的帧
+                    continue
                 state.update_traffic(count_car, count_motor, speed_car, speed_motor,
                                      inference_ms, current_fps)
                 state.update_frame(jpeg.tobytes())
 
-                # 按视频原始帧率控制播放节奏（扣除推理耗时）
                 processing_time = time.time() - frame_start
                 wait_time = max(0.0, frame_delay - processing_time)
                 if wait_time > 0 and state.stop_event.wait(timeout=wait_time):
@@ -188,11 +218,16 @@ def _sim_video_loop(videos: list[Path]) -> None:
 # 模拟模式 - 图片循环推理
 # ---------------------------------------------------------------------------
 def _sim_image_loop(images: list[Path]) -> None:
-    """循环遍历图片列表，对每张图片做真实 YOLO 推理，每张停留约 2 秒"""
+    """循环遍历图片列表，对每张图片做真实 YOLO 推理（支持帧跳过），每张停留约 2 秒"""
     fps_counter = 0
     fps_timer = time.time()
     current_fps = 0.0
     img_idx = 0
+    frame_count = 0
+    last_count_car = 0
+    last_count_motor = 0
+    last_inference_ms = 0.0
+    last_objects: list[dict] = []
 
     while not state.should_stop():
         img_path = images[img_idx % len(images)]
@@ -203,8 +238,20 @@ def _sim_image_loop(images: list[Path]) -> None:
             img_idx += 1
             continue
 
-        # 真实 YOLO 推理
-        annotated, count_car, count_motor, inference_ms = detect_vehicles(frame)
+        frame_count += 1
+
+        if frame_count % config.FRAME_SKIP == 0 or not last_objects and frame_count == 1:
+            annotated, count_car, count_motor, inference_ms, objects = \
+                detect_vehicles_detailed(frame)
+            last_count_car = count_car
+            last_count_motor = count_motor
+            last_inference_ms = inference_ms
+            last_objects = objects
+        else:
+            annotated = redraw_detections(frame, last_objects)
+            count_car = last_count_car
+            count_motor = last_count_motor
+            inference_ms = last_inference_ms
 
         # 计算实际 FPS
         fps_counter += 1
@@ -214,24 +261,20 @@ def _sim_image_loop(images: list[Path]) -> None:
             fps_counter = 0
             fps_timer = time.time()
 
-        # 速度估算
         speed_car = estimate_speed(count_car)
         speed_motor = estimate_speed(count_motor)
 
-        # 叠加信息栏
         draw_overlay(annotated, count_car, count_motor, speed_car, speed_motor,
                      inference_ms, current_fps)
 
-        # 编码 JPEG 并更新全局状态
         success, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
         if not success:
             img_idx += 1
-            continue  # 跳过编码失败的帧
+            continue
         state.update_traffic(count_car, count_motor, speed_car, speed_motor,
                              inference_ms, current_fps)
         state.update_frame(jpeg.tobytes())
 
-        # 每张图片停留约 2 秒，可被停止信号中断
         if state.stop_event.wait(timeout=2.0):
             break
 

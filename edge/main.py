@@ -196,6 +196,18 @@ def parse_args() -> argparse.Namespace:
         help="HTTP 服务端口 (默认读取 $PORT 或 8000)",
     )
     p.add_argument(
+        "--imgsz", type=int, default=None,
+        help="YOLO 输入分辨率 (默认读取 $IMGSZ 或 320)",
+    )
+    p.add_argument(
+        "--frame-skip", type=int, default=None,
+        help="每N帧推理一次，1=每帧都推理 (默认读取 $FRAME_SKIP 或 2)",
+    )
+    p.add_argument(
+        "--quantize", choices=["int8", "fp16", "none"], default=None,
+        help="量化模式: int8, fp16, none (默认读取 $QUANTIZE 或 none)",
+    )
+    p.add_argument(
         "--no-openvino", action="store_true", default=False,
         help="禁用 OpenVINO 加速，使用原始 PyTorch 推理",
     )
@@ -223,6 +235,12 @@ def apply_args(args: argparse.Namespace) -> int:
         config.USE_OPENVINO = False
     if args.no_browser:
         config.NO_BROWSER = True
+    if args.imgsz is not None:
+        config.IMGSZ = args.imgsz
+    if args.frame_skip is not None:
+        config.FRAME_SKIP = args.frame_skip
+    if args.quantize is not None:
+        config.QUANTIZE = args.quantize
 
     port = args.port or config.HTTP_PORT
 
