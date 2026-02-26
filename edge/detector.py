@@ -36,14 +36,17 @@ def reset_model() -> None:
 
 
 def _get_openvino_path() -> Path:
-    """获取 OpenVINO IR 模型目录路径，根据量化模式添加后缀区分"""
+    """Return the OpenVINO IR model directory path.
+
+    Must match the naming convention used by ultralytics export:
+      - INT8 (int8=True):  {stem}_int8_openvino_model/
+      - FP16 (half=True):  {stem}_openvino_model/   (half does not change dir name)
+      - Default:           {stem}_openvino_model/
+    """
     model_path = config.get_model_path()
-    suffix = ""
-    if config.QUANTIZE == "fp16":
-        suffix = "_fp16"
-    elif config.QUANTIZE == "int8":
-        suffix = "_int8"
-    return model_path.parent / f"{model_path.stem}_openvino{suffix}_model"
+    # Only INT8 quantization adds a prefix before '_openvino'; FP16 does not.
+    prefix = "_int8" if config.QUANTIZE == "int8" else ""
+    return model_path.parent / f"{model_path.stem}{prefix}_openvino_model"
 
 
 def _load_model() -> YOLO:
