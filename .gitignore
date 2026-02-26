@@ -43,3 +43,5 @@ backend/*.class
 edge/__pycache__/
 edge/tmp/
 edge/models/*_openvino_model/
+.venv/
+docs/

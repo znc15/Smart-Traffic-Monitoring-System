@@ -38,15 +38,19 @@ def reset_model() -> None:
 def _get_openvino_path() -> Path:
     """Return the OpenVINO IR model directory path.
 
-    Must match the naming convention used by ultralytics export:
-      - INT8 (int8=True):  {stem}_int8_openvino_model/
-      - FP16 (half=True):  {stem}_openvino_model/   (half does not change dir name)
-      - Default:           {stem}_openvino_model/
+    The directory name encodes both quantization mode and input size so that
+    exports with different settings do not collide.  Format:
+      {stem}[_int8]_{imgsz}_openvino_model/
+
+    Examples:
+      yolov8n_320_openvino_model/
+      yolov8n_int8_320_openvino_model/
+      yolov8n_640_openvino_model/
     """
     model_path = config.get_model_path()
-    # Only INT8 quantization adds a prefix before '_openvino'; FP16 does not.
-    prefix = "_int8" if config.QUANTIZE == "int8" else ""
-    return model_path.parent / f"{model_path.stem}{prefix}_openvino_model"
+    # Only INT8 quantization adds a prefix before the size tag; FP16 does not.
+    quant_tag = "_int8" if config.QUANTIZE == "int8" else ""
+    return model_path.parent / f"{model_path.stem}{quant_tag}_{config.IMGSZ}_openvino_model"
 
 
 def _load_model() -> YOLO:
@@ -73,13 +77,17 @@ def _load_model() -> YOLO:
             if not ov_dir.exists():
                 print(f"[INFO] 首次运行，导出 OpenVINO 模型: {model_path} → {ov_dir}")
                 pt_model = YOLO(str(model_path))
-                export_kwargs: dict = {"format": "openvino"}
+                export_kwargs: dict = {
+                    "format": "openvino",
+                    "imgsz": config.IMGSZ,
+                }
                 if config.QUANTIZE == "fp16":
                     export_kwargs["half"] = True
                     print("[INFO] 启用 FP16 半精度量化导出")
                 elif config.QUANTIZE == "int8":
                     export_kwargs["int8"] = True
                     print("[INFO] 启用 INT8 量化导出")
+                print(f"[INFO] 导出参数: imgsz={config.IMGSZ}, quantize={config.QUANTIZE}")
                 pt_model.export(**export_kwargs)
                 print(f"[INFO] OpenVINO 导出完成: {ov_dir}")
 

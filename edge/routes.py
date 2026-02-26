@@ -362,9 +362,11 @@ def get_models() -> JSONResponse:
 @router.put("/api/config", response_model=None)
 def update_config(body: ConfigUpdateRequest) -> JSONResponse:
     """更新运行配置（仅更新传入的字段，未传入的保持不变），并触发检测循环热重启"""
-    # 记录旧模型名和 OpenVINO 开关，用于判断模型是否变更
+    # Snapshot current values before mutation, used to detect what changed
     old_model = config.MODEL_NAME
     old_openvino = config.USE_OPENVINO
+    old_imgsz = config.IMGSZ
+    old_quantize = config.QUANTIZE
 
     # 逐字段检查并更新 config 模块变量
     if body.mode is not None:
@@ -405,17 +407,19 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
     if body.jpeg_quality is not None:
         config.JPEG_QUALITY = body.jpeg_quality
 
-    old_quantize = config.QUANTIZE
     if body.quantize is not None:
         config.QUANTIZE = body.quantize
 
     # Determine whether a full restart is needed.
-    # frame_skip, imgsz, jpeg_quality are read dynamically in the loop — no restart required.
-    # Only mode, model, openvino, and quantize changes need a restart.
+    # frame_skip, jpeg_quality are read dynamically in the loop — no restart required.
+    # model, openvino, quantize, and imgsz (when OpenVINO is active) need a restart
+    # because OpenVINO IR models have a fixed input size baked in at export time.
+    imgsz_changed = body.imgsz is not None and body.imgsz != old_imgsz
     model_changed = (
         config.MODEL_NAME != old_model
         or config.USE_OPENVINO != old_openvino
         or (body.quantize is not None and config.QUANTIZE != old_quantize)
+        or (imgsz_changed and config.USE_OPENVINO)
     )
     needs_restart = model_changed or body.mode is not None
 
