@@ -15,8 +15,8 @@ from pathlib import Path
 root = Path(os.environ["ROOT_DIR"])
 
 targets = [
-    root / "frontend-vue" / "node_modules",
-    root / "frontend-vue" / "dist",
+    root / "frontend" / "node_modules",
+    root / "frontend" / "dist",
     root / "backend" / "target",
     root / ".venv",
     root / ".pytest_cache",

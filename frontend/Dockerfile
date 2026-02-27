@@ -8,7 +8,7 @@ FROM ${NODE_BASE_IMAGE} AS builder
 RUN npm config set registry https://registry.npmmirror.com \
     && npm install -g pnpm@${PNPM_VERSION}
 
-WORKDIR /frontend-vue
+WORKDIR /frontend
 
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
@@ -17,7 +17,7 @@ COPY . .
 RUN pnpm build
 
 FROM ${NGINX_BASE_IMAGE}
-COPY --from=builder /frontend-vue/dist /usr/share/nginx/html
+COPY --from=builder /frontend/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80

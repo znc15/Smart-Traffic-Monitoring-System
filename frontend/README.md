@@ -1,4 +1,4 @@
-# frontend-vue
+# frontend
 
 Vue3 + TypeScript + ECharts 前端（系统唯一入口）。
 
@@ -12,7 +12,7 @@ Vue3 + TypeScript + ECharts 前端（系统唯一入口）。
 ## 本地运行
 
 ```bash
-cd frontend-vue
+cd frontend
 pnpm install
 pnpm dev --port 5174
 ```
@@ -20,7 +20,7 @@ pnpm dev --port 5174
 ## 构建
 
 ```bash
-cd frontend-vue
+cd frontend
 pnpm build
 ```
 

@@ -91,6 +91,6 @@ cat backup_YYYY-MM-DD.sql | docker exec -i database psql -U postgres -d transpor
 
 ## 7. 回滚
 
-- 前端回滚：回退到上一版 `gateway` 与 `frontend-vue` 镜像 tag
+- 前端回滚：回退到上一版 `gateway` 与 `frontend` 镜像 tag
 - 数据库回滚：执行 `./scripts/db/switch_primary.sh postgres`
 - 应用回滚：回退镜像 tag 后 `docker compose up -d`

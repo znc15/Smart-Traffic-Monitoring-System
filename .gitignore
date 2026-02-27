@@ -18,15 +18,12 @@ flow.js
 .env.*
 !.env.example
 
-# === Frontend (Vite + React) ===
+# === Frontend (Vite + Vue) ===
 frontend/node_modules/
 frontend/dist/
 frontend/*.local
-frontend-vue/node_modules/
-frontend-vue/dist/
-frontend-vue/*.local
-frontend-vue/*.tsbuildinfo
-frontend-vue/src/*.js
+frontend/*.tsbuildinfo
+frontend/src/*.js
 .pnpm-store/
 
 # === Backend (Java + Maven) ===

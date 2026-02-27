@@ -1,6 +1,6 @@
 # Docker Compose 部署教程
 
-本教程用于单机完整部署：`gateway + frontend-vue + backend + postgres + mysql + redis`。
+本教程用于单机完整部署：`gateway + frontend + backend + postgres + mysql + redis`。
 
 ## 1. 构建并启动
 
@@ -16,7 +16,7 @@ docker compose ps
 
 期望：
 
-- `gateway`、`frontend-vue`、`backend`、`database`、`mysql`、`redis` 全部 `healthy`。
+- `gateway`、`frontend`、`backend`、`database`、`mysql`、`redis` 全部 `healthy`。
 
 ## 3. 路由验证
 

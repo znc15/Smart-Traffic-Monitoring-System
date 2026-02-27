@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-- 前端仅保留 `frontend-vue`，`/react` 已下线（返回 `404`）
+- 前端仅保留 `frontend`，`/react` 已下线（返回 `404`）
 - 仓库不再存放原始截图、CSV、XLSX 证据文件
 - 默认支持 PostgreSQL 主库，MySQL/Redis 保留灰度能力
 
@@ -40,7 +40,7 @@ docker compose down
 
 ## 项目结构
 
-- `frontend-vue`：Vue3 管理端与可视化
+- `frontend`：Vue3 管理端与可视化
 - `backend`：认证、管理、预测、MaaS、报表导出
 - `edge`：检测、追踪、车道统计、事件识别、上报
 - `gateway`：统一入口网关（`5173`）
@@ -56,4 +56,4 @@ docker compose down
 
 - 后端：`backend/README.md`
 - 边缘端：`edge/README.md`
-- 前端：`frontend-vue/README.md`
+- 前端：`frontend/README.md`

@@ -47,7 +47,7 @@ curl http://localhost:8000/api/v1/site-settings
 ## 4. 启动 Vue 前端
 
 ```bash
-cd frontend-vue
+cd frontend
 pnpm install
 pnpm dev --port 5174
 ```
