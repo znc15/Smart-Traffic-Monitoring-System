@@ -1,7 +1,8 @@
 package com.smarttraffic.backend.model;
 
 import jakarta.persistence.*;
-import org.hibernate.annotations.ColumnTransformer;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -46,8 +47,8 @@ public class TrafficSampleEntity {
     @Column(name = "congestion_index", nullable = false)
     private Double congestionIndex = 0.0;
 
-    @Column(name = "lane_stats_json", columnDefinition = "jsonb")
-    @ColumnTransformer(write = "?::jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "lane_stats_json")
     private String laneStatsJson;
 
     @Column(name = "source", nullable = false, length = 32)

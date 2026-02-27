@@ -44,6 +44,13 @@ QUANTIZE = os.environ.get("QUANTIZE", "none").lower()       # 量化模式: "int
 if QUANTIZE not in ("int8", "fp16", "none"):
     QUANTIZE = "none"
 
+# 跟踪后端配置
+TRACKER_BACKEND = os.environ.get("TRACKER_BACKEND", "bytetrack").lower()
+if TRACKER_BACKEND not in ("bytetrack", "simple"):
+    TRACKER_BACKEND = "simple"
+TRACKER_STRICT = os.environ.get("TRACKER_STRICT", "false").lower() in ("1", "true", "yes")
+TRACKER_CFG = os.environ.get("TRACKER_CFG", "bytetrack.yaml")
+
 # JPEG encoding quality for live frames (overridden by resource_manager in low/ultra_low mode)
 JPEG_QUALITY = int(os.environ.get("JPEG_QUALITY", "80"))
 

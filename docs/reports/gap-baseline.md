@@ -2,6 +2,9 @@
 
 更新时间：2026-02-26
 
+> 说明：本文档是整改启动时的历史基线快照，不代表当前最终状态。  
+> 当前完成态请以 `docs/reports/closure-validation-2026-02-27.md` 为准。
+
 ## 1. 构建与运行
 
 - 前端 Docker 构建问题：已统一使用 `npm install -g pnpm`，规避 Corepack 签名波动。

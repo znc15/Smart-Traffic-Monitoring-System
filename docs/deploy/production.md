@@ -1,50 +1,91 @@
 # 生产部署教程（Production）
 
-## 1. 架构建议
+## 1. 目标架构
 
-- Nginx/Traefik 作为外层网关（TLS 终止 + 反向代理）
-- `frontend` 静态资源服务
-- `backend` 仅内网暴露给网关
-- `postgres` 仅内网访问
-- 边缘节点通过专线或 VPN 上报 `telemetry`
+推荐拓扑：
 
-## 2. 安全基线
+1. 外层 Nginx/Traefik（TLS 终止、WAF、限流）
+2. 内层 `gateway`（`/` -> Vue，`/react/` -> React 回滚）
+3. `backend`（仅内网暴露）
+4. `postgres` 主库（默认）
+5. `mysql` 镜像库（灰度阶段）
+6. `redis` 缓存
 
-1. 使用强 `JWT_SECRET`。
-2. 生产环境禁用 `APP_WS_ALLOW_QUERY_TOKEN`。
-3. 收敛 `APP_CORS_ALLOWED_ORIGINS` 到明确域名。
-4. 更换 `APP_MAAS_DEFAULT_API_KEY`，并定期轮换。
-5. 开启容器日志采集与审计。
+## 2. 生产前准备
 
-## 3. 上线步骤
+- 设置强 `JWT_SECRET`（至少 32 位随机串）
+- 设置精确 `APP_CORS_ALLOWED_ORIGINS`
+- 关闭 `APP_WS_ALLOW_QUERY_TOKEN`（除非兼容旧客户端）
+- 配置 `APP_MAAS_DEFAULT_API_KEY` 并定期轮换
 
-1. 预发布环境完成回归。
-2. 执行 `docker compose up --build -d`。
-3. 验证健康检查与关键接口。
-4. 开启监控与告警。
+## 3. 部署步骤
 
-## 4. 监控指标
+### 3.1 拉取代码与镜像构建
 
-- 后端：接口错误率、P95/P99、JVM/线程、DB 连接池
-- 边缘：FPS、inference_ms、CPU/内存、上报成功率
-- 数据：样本写入量、预测任务成功率、MaaS 调用量
+```bash
+git pull
+docker compose build
+```
 
-## 5. 备份与恢复
+### 3.2 启动
 
-### 备份
+```bash
+docker compose up -d
+```
+
+### 3.3 验收
+
+```bash
+docker compose ps
+curl -I http://127.0.0.1:5173/
+curl -I http://127.0.0.1:8000/api/v1/site-settings
+```
+
+## 4. 数据库灰度策略
+
+- 阶段 A：`postgres` 主库，`mysql` 镜像双写，观察 24h
+- 阶段 B：切 `mysql` 主库，`postgres` 镜像双写，观察 24h
+- 阶段 C：稳定后关闭镜像写
+
+执行命令：
+
+```bash
+./scripts/db/switch_primary.sh postgres
+./scripts/db/switch_primary.sh mysql
+```
+
+一致性检查：
+
+```bash
+bash scripts/check_mirror_consistency.sh
+```
+
+## 5. 监控与告警
+
+至少采集：
+
+- 后端：接口错误率、P95/P99、JVM、连接池
+- Edge：FPS、inference_ms、CPU/内存、上报成功率
+- DB：主从延迟（如有）、慢查询、连接数
+- Redis：命中率、内存使用、连接数
+
+## 6. 备份与恢复
+
+### PostgreSQL 备份
 
 ```bash
 docker exec database pg_dump -U postgres transportation_system > backup_$(date +%F).sql
 ```
 
-### 恢复
+### PostgreSQL 恢复
 
 ```bash
 cat backup_YYYY-MM-DD.sql | docker exec -i database psql -U postgres -d transportation_system
 ```
 
-## 6. 回滚策略
+## 7. 回滚
 
-- 每个里程碑独立发布版本号。
-- 回滚按镜像 tag + DB 备份点执行。
-- 新增接口默认灰度发布，保留旧接口一个迭代。
+- 前端回滚：切换到 `http://<host>/react/`
+- 数据库回滚：执行 `./scripts/db/switch_primary.sh postgres`
+- 应用回滚：回退镜像 tag 后 `docker compose up -d`
+

@@ -20,10 +20,19 @@ public class TrafficPredictionService {
 
     private final TrafficSampleRepository sampleRepository;
     private final TrafficPredictionRepository predictionRepository;
+    private final MirrorWriteService mirrorWriteService;
+    private final RedisCacheService redisCacheService;
 
-    public TrafficPredictionService(TrafficSampleRepository sampleRepository, TrafficPredictionRepository predictionRepository) {
+    public TrafficPredictionService(
+            TrafficSampleRepository sampleRepository,
+            TrafficPredictionRepository predictionRepository,
+            MirrorWriteService mirrorWriteService,
+            RedisCacheService redisCacheService
+    ) {
         this.sampleRepository = sampleRepository;
         this.predictionRepository = predictionRepository;
+        this.mirrorWriteService = mirrorWriteService;
+        this.redisCacheService = redisCacheService;
     }
 
     @Transactional
@@ -69,7 +78,11 @@ public class TrafficPredictionService {
         }
 
         predictionRepository.saveAll(predictionEntities);
-        return new PredictionResponse(roadName, now, DEFAULT_ALGORITHM, points);
+        predictionEntities.forEach(mirrorWriteService::mirrorPrediction);
+
+        PredictionResponse response = new PredictionResponse(roadName, now, DEFAULT_ALGORITHM, points);
+        redisCacheService.put("traffic:pred:" + roadName + ":" + horizon, response);
+        return response;
     }
 
     private static double calculateBaseFlow(List<TrafficSampleEntity> history) {

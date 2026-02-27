@@ -15,6 +15,12 @@ echo "[gate] frontend build"
   pnpm build
 )
 
+echo "[gate] frontend-vue build"
+(
+  cd "$ROOT_DIR/frontend-vue"
+  pnpm build
+)
+
 echo "[gate] backend test"
 (
   cd "$ROOT_DIR/backend"

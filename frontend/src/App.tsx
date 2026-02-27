@@ -39,10 +39,15 @@ import { authConfig, endpoints } from "@/config";
 import { normalizeSiteSettings } from "@/utils/normalize";
 import "./App.css";
 import { TrafficProvider } from "@/hooks/useTrafficStore";
+
+const APP_BASE_URL = import.meta.env.BASE_URL || "/";
+const ROUTER_BASENAME = APP_BASE_URL === "/" ? undefined : APP_BASE_URL.replace(/\/$/, "");
+const HOME_HREF = `${APP_BASE_URL.replace(/\/$/, "")}/home`;
+
 export default function App() {
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-      <BrowserRouter>
+      <BrowserRouter basename={ROUTER_BASENAME}>
         <AppContent />
       </BrowserRouter>
     </ThemeProvider>
@@ -133,7 +138,7 @@ function AppContent() {
       <div className="w-full flex flex-wrap items-center justify-between px-2 sm:px-4 py-1.5 bg-background/80 dark:bg-background/70 shadow-sm border-b border-border/60 backdrop-blur-xl backdrop-saturate-150 sticky top-0 z-50 transition-colors">
         <div className="flex items-center min-w-0 gap-2">
           <a
-            href="/home"
+            href={HOME_HREF}
             className="flex items-center flex-shrink-0"
             title="首页"
           >

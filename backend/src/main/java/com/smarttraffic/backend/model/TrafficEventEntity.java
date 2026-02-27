@@ -1,7 +1,8 @@
 package com.smarttraffic.backend.model;
 
 import jakarta.persistence.*;
-import org.hibernate.annotations.ColumnTransformer;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -31,8 +32,8 @@ public class TrafficEventEntity {
     @Column(name = "end_at")
     private LocalDateTime endAt;
 
-    @Column(name = "payload_json", columnDefinition = "jsonb")
-    @ColumnTransformer(write = "?::jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "payload_json")
     private String payloadJson;
 
     @Column(name = "created_at", nullable = false)

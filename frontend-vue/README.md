@@ -1,12 +1,24 @@
-# frontend-vue（迁移并行版本）
+# frontend-vue
 
-该目录用于执行“React -> Vue + ECharts”并行迁移，当前作为备用前端与现有 `frontend` 并存一个迭代周期。
+Vue3 + TypeScript + ECharts 前端，当前为系统默认入口。
 
-## 功能覆盖（当前）
+## 访问入口
 
-- Vue3 + TypeScript + Vite 基础工程
-- 页面骨架：登录、首页监控、分析报表、管理员
-- ECharts 示例图（流量趋势 + 车型占比）
+- 默认入口：`http://localhost:5173/`
+- React 回滚入口：`http://localhost:5173/react/`
+
+## 功能范围
+
+- 登录
+- 首页监控（路段状态 + 视频预览）
+- 分析页（图表 + 报表查询 + JSON/XLSX 下载）
+- 管理员页（用户、摄像头、站点设置、系统监控）
+
+## 契约约束
+
+- 读取优先 `snake_case`
+- 兼容读取 `camelCase`（保留一个迭代）
+- 提交按后端当前契约写入
 
 ## 本地运行
 
@@ -16,25 +28,10 @@ pnpm install
 pnpm dev --port 5174
 ```
 
-默认访问：`http://localhost:5174`
-
-## 生产构建
+## 构建
 
 ```bash
 cd frontend-vue
 pnpm build
-pnpm preview --port 4174
 ```
 
-构建产物目录：`frontend-vue/dist`
-
-## 与 React 前端并行切换建议
-
-1. 保持 `frontend` 作为默认入口，`frontend-vue` 用于灰度验证。
-2. 通过网关/Nginx 路由开关切换主入口（例如 `/` -> React，`/vue` -> Vue）。
-3. 若灰度阶段出现问题，可立即回切到 React，不影响后端接口契约。
-
-## 契约约束
-
-- 接口字段以 `snake_case` 为标准。
-- 迁移期允许读兼容（`camelCase + snake_case`），写入统一按后端契约提交。

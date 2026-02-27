@@ -155,7 +155,49 @@ def detect_vehicles_detailed(
     t0 = time.time()
     results = model(frame, conf=config.CONF_THRESHOLD, imgsz=config.IMGSZ, verbose=False)
     inference_ms = (time.time() - t0) * 1000
+    annotated, count_car, count_motor, objects = _build_detection_response(
+        frame,
+        results,
+        use_track_id=False,
+    )
+    return annotated, count_car, count_motor, inference_ms, objects
 
+
+def detect_vehicles_with_bytetrack_detailed(
+    frame: np.ndarray,
+) -> tuple[np.ndarray, int, int, float, list[dict]]:
+    """
+    使用 Ultralytics 内置 ByteTrack 跟踪（persist=True）并输出 track_id。
+    返回: (标注后的帧, 汽车数, 摩托车数, 推理耗时ms, 目标列表)
+            目标列表: [{"class": "...", "confidence": float, "bbox": [x1,y1,x2,y2], "track_id": int}]
+    """
+    model = _load_model()
+
+    t0 = time.time()
+    results = model.track(
+        frame,
+        conf=config.CONF_THRESHOLD,
+        imgsz=config.IMGSZ,
+        tracker=config.TRACKER_CFG,
+        persist=True,
+        verbose=False,
+    )
+    inference_ms = (time.time() - t0) * 1000
+    annotated, count_car, count_motor, objects = _build_detection_response(
+        frame,
+        results,
+        use_track_id=True,
+        strict_track=config.TRACKER_STRICT,
+    )
+    return annotated, count_car, count_motor, inference_ms, objects
+
+
+def _build_detection_response(
+    frame: np.ndarray,
+    results,
+    use_track_id: bool,
+    strict_track: bool = False,
+) -> tuple[np.ndarray, int, int, list[dict]]:
     count_car = 0
     count_motor = 0
     objects_list: list[dict] = []
@@ -165,7 +207,15 @@ def detect_vehicles_detailed(
         boxes = r.boxes
         if boxes is None:
             continue
-        for box in boxes:
+
+        track_ids = None
+        if use_track_id and getattr(boxes, "id", None) is not None:
+            try:
+                track_ids = boxes.id.int().cpu().tolist()
+            except Exception:
+                track_ids = None
+
+        for i, box in enumerate(boxes):
             cls_id = int(box.cls[0])
             conf = float(box.conf[0])
             x1, y1, x2, y2 = map(int, box.xyxy[0])
@@ -187,17 +237,31 @@ def detect_vehicles_detailed(
             else:
                 continue
 
+            track_id = None
+            if use_track_id:
+                if track_ids is not None and i < len(track_ids):
+                    track_id = int(track_ids[i])
+                elif strict_track:
+                    raise RuntimeError("ByteTrack 未返回 track_id，且 TRACKER_STRICT=true")
+                else:
+                    # 非严格模式下使用可复现的降级 track_id（避免接口字段缺失）
+                    track_id = -(i + 1)
+
             cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
-            cv2.putText(annotated, label, (x1, y1 - 6),
+            label_suffix = f" #{track_id}" if use_track_id and track_id is not None else ""
+            cv2.putText(annotated, f"{label}{label_suffix}", (x1, y1 - 6),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
 
-            objects_list.append({
+            item = {
                 "class": cls_name,
                 "confidence": round(conf, 4),
                 "bbox": [x1, y1, x2, y2],
-            })
+            }
+            if use_track_id and track_id is not None:
+                item["track_id"] = track_id
+            objects_list.append(item)
 
-    return annotated, count_car, count_motor, inference_ms, objects_list
+    return annotated, count_car, count_motor, objects_list
 
 
 def redraw_detections(frame: np.ndarray, objects_list: list[dict]) -> np.ndarray:

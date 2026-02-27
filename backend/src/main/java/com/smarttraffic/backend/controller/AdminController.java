@@ -12,6 +12,7 @@ import com.smarttraffic.backend.config.TrafficProperties;
 import com.smarttraffic.backend.service.CameraPollerService;
 import com.smarttraffic.backend.service.SystemMetricsService;
 import com.smarttraffic.backend.service.TrafficService;
+import com.smarttraffic.backend.service.analytics.RedisCacheService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,16 +29,19 @@ public class AdminController {
     private final TrafficService trafficService;
     private final TrafficProperties trafficProperties;
     private final CameraPollerService cameraPollerService;
+    private final RedisCacheService redisCacheService;
 
     public AdminController(SystemMetricsService systemMetricsService, CameraRepository cameraRepository,
                            UserRepository userRepository, TrafficService trafficService,
-                           TrafficProperties trafficProperties, CameraPollerService cameraPollerService) {
+                           TrafficProperties trafficProperties, CameraPollerService cameraPollerService,
+                           RedisCacheService redisCacheService) {
         this.systemMetricsService = systemMetricsService;
         this.cameraRepository = cameraRepository;
         this.userRepository = userRepository;
         this.trafficService = trafficService;
         this.trafficProperties = trafficProperties;
         this.cameraPollerService = cameraPollerService;
+        this.redisCacheService = redisCacheService;
     }
 
     @GetMapping("/resources")
@@ -74,6 +78,7 @@ public class AdminController {
         camera.setId(null);
         CameraEntity saved = cameraRepository.save(camera);
         trafficService.reloadCameras(trafficProperties);
+        invalidateTrafficCaches();
         return saved;
     }
 
@@ -101,6 +106,7 @@ public class AdminController {
         }
         CameraEntity saved = cameraRepository.save(cam);
         trafficService.reloadCameras(trafficProperties);
+        invalidateTrafficCaches();
         return saved;
     }
 
@@ -112,6 +118,7 @@ public class AdminController {
         }
         cameraRepository.deleteById(id);
         trafficService.reloadCameras(trafficProperties);
+        invalidateTrafficCaches();
         return Map.of("detail", "Deleted");
     }
 
@@ -191,5 +198,11 @@ public class AdminController {
             }
         }
         return null;
+    }
+
+    private void invalidateTrafficCaches() {
+        redisCacheService.evict("traffic:roads");
+        redisCacheService.evictByPrefix("traffic:maas:");
+        redisCacheService.evictByPrefix("traffic:info:");
     }
 }

@@ -17,6 +17,40 @@ services:
       retries: 10
     networks:
       - mynet
+  mysql:
+    image: mysql:8.4
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: transportation_system_mysql
+      MYSQL_USER: traffic
+      MYSQL_PASSWORD: traffic
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysqldata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks:
+      - mynet
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6380:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - mynet
   backend:
     build:
       context: ./backend
@@ -30,16 +64,35 @@ services:
     ports:
       - "8000:8000"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://database:5432/transportation_system
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: odoo
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://database:5432/transportation_system}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-odoo}
+      SPRING_FLYWAY_LOCATIONS: ${SPRING_FLYWAY_LOCATIONS:-classpath:db/migration}
       JWT_SECRET: change-this-dev-secret-change-this-dev-secret
       ACCESS_TOKEN_EXPIRE_DAYS: 7
       BASE_URL_API: http://localhost:8000
       APP_MAAS_DEFAULT_CLIENT_NAME: default-dev-client
       APP_MAAS_DEFAULT_API_KEY: dev-maas-key-change-me
+      APP_DB_PRIMARY: ${APP_DB_PRIMARY:-postgres}
+      APP_DB_MIRROR_WRITE: ${APP_DB_MIRROR_WRITE:-false}
+      APP_DB_MIRROR_MYSQL_ENABLED: ${APP_DB_MIRROR_MYSQL_ENABLED:-false}
+      APP_DB_MIRROR_POSTGRES_ENABLED: ${APP_DB_MIRROR_POSTGRES_ENABLED:-false}
+      APP_DB_MIRROR_MYSQL_URL: ${APP_DB_MIRROR_MYSQL_URL:-jdbc:mysql://mysql:3306/transportation_system_mysql?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC}
+      APP_DB_MIRROR_MYSQL_USERNAME: ${APP_DB_MIRROR_MYSQL_USERNAME:-traffic}
+      APP_DB_MIRROR_MYSQL_PASSWORD: ${APP_DB_MIRROR_MYSQL_PASSWORD:-traffic}
+      APP_DB_MIRROR_POSTGRES_URL: ${APP_DB_MIRROR_POSTGRES_URL:-jdbc:postgresql://database:5432/transportation_system}
+      APP_DB_MIRROR_POSTGRES_USERNAME: ${APP_DB_MIRROR_POSTGRES_USERNAME:-postgres}
+      APP_DB_MIRROR_POSTGRES_PASSWORD: ${APP_DB_MIRROR_POSTGRES_PASSWORD:-odoo}
+      APP_REDIS_CACHE_ENABLED: ${APP_REDIS_CACHE_ENABLED:-true}
+      APP_CACHE_TTL_SECONDS: ${APP_CACHE_TTL_SECONDS:-10}
+      SPRING_REDIS_HOST: ${SPRING_REDIS_HOST:-redis}
+      SPRING_REDIS_PORT: ${SPRING_REDIS_PORT:-6379}
     depends_on:
       database:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "ps -ef | grep -q '[j]ava -jar app.jar'"]
@@ -49,18 +102,58 @@ services:
     networks:
       - mynet
 
-  frontend:
+  frontend-react:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
         NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-docker.m.daocloud.io/library/node:20.19.0-alpine}
         NGINX_BASE_IMAGE: ${NGINX_BASE_IMAGE:-docker.m.daocloud.io/library/nginx:1.27-alpine}
-    container_name: frontend
+        VITE_BASE_PATH: /react/
+    container_name: frontend-react
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "ps -ef | grep -q '[n]ginx: master process'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+    networks:
+      - mynet
+
+  frontend-vue:
+    build:
+      context: ./frontend-vue
+      dockerfile: Dockerfile
+      args:
+        NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-docker.m.daocloud.io/library/node:20.19.0-alpine}
+        NGINX_BASE_IMAGE: ${NGINX_BASE_IMAGE:-docker.m.daocloud.io/library/nginx:1.27-alpine}
+    container_name: frontend-vue
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "ps -ef | grep -q '[n]ginx: master process'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+    networks:
+      - mynet
+
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+      args:
+        NGINX_BASE_IMAGE: ${NGINX_BASE_IMAGE:-docker.m.daocloud.io/library/nginx:1.27-alpine}
+    container_name: gateway
     ports:
       - "5173:80"
     depends_on:
-      backend:
+      frontend-vue:
+        condition: service_healthy
+      frontend-react:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "ps -ef | grep -q '[n]ginx: master process'"]
@@ -75,6 +168,8 @@ networks:
 
 volumes:
   pgdata:
+  mysqldata:
+  redisdata:
 
 
 # docker compose up --build

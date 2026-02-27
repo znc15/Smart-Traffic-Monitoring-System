@@ -23,17 +23,23 @@ public class TelemetryIngestionService {
     private final TrafficEventRepository trafficEventRepository;
     private final TrafficService trafficService;
     private final ObjectMapper objectMapper;
+    private final MirrorWriteService mirrorWriteService;
+    private final RedisCacheService redisCacheService;
 
     public TelemetryIngestionService(
             TrafficSampleRepository trafficSampleRepository,
             TrafficEventRepository trafficEventRepository,
             TrafficService trafficService,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            MirrorWriteService mirrorWriteService,
+            RedisCacheService redisCacheService
     ) {
         this.trafficSampleRepository = trafficSampleRepository;
         this.trafficEventRepository = trafficEventRepository;
         this.trafficService = trafficService;
         this.objectMapper = objectMapper;
+        this.mirrorWriteService = mirrorWriteService;
+        this.redisCacheService = redisCacheService;
     }
 
     @Transactional
@@ -67,6 +73,7 @@ public class TelemetryIngestionService {
         sample.setLaneStatsJson(toJson(request.getLaneStats(), "[]"));
         sample.setSource("edge");
         trafficSampleRepository.save(sample);
+        mirrorWriteService.mirrorTrafficSample(sample);
 
         List<EdgeTelemetryRequest.EventPayload> events = request.getEvents() == null ? List.of() : request.getEvents();
         for (EdgeTelemetryRequest.EventPayload item : events) {
@@ -79,6 +86,7 @@ public class TelemetryIngestionService {
             event.setEndAt(item.getEndAt());
             event.setPayloadJson(toJson(item, "{}"));
             trafficEventRepository.save(event);
+            mirrorWriteService.mirrorTrafficEvent(event);
         }
 
         Map<String, Object> snapshot = new LinkedHashMap<>();
@@ -92,7 +100,14 @@ public class TelemetryIngestionService {
         snapshot.put("congestion_index", congestionIndex);
         snapshot.put("lane_stats", request.getLaneStats());
         snapshot.put("events", events);
-        trafficService.updateFromRemote(request.getRoadName().trim(), snapshot, null);
+        String normalizedRoadName = request.getRoadName().trim();
+        trafficService.updateFromRemote(normalizedRoadName, snapshot, null);
+
+        // 主动失效热点缓存，避免短时间读到旧值
+        redisCacheService.evict("traffic:roads");
+        redisCacheService.evict("traffic:info:" + normalizedRoadName);
+        redisCacheService.evictByPrefix("traffic:pred:" + normalizedRoadName + ":");
+        redisCacheService.evictByPrefix("traffic:maas:");
     }
 
     private static int positive(Integer value) {

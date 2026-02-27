@@ -1,27 +1,14 @@
-# Backend（Spring Boot 云端服务）
+# Backend Service (Spring Boot)
 
-`backend` 提供认证、管理、交通聚合、预测与 MaaS 对外接口。
+后端负责认证、管理、交通汇聚、预测、MaaS 对外接口、报表导出，以及 MySQL/PostgreSQL 双写灰度能力。
 
-## 功能模块
+## 运行前提
 
-- 用户认证与权限（JWT + Cookie）
-- 管理端接口（用户/摄像头/系统监控）
-- 边缘主动上报接收：`POST /api/v1/edge/telemetry`
-- 交通预测：`GET /api/v1/traffic/predictions`
-- MaaS 查询（API Key）：`GET /api/v1/maas/congestion`
-
-## 环境变量
-
-核心配置（可参考 `.env.example`）：
-
-- `SPRING_DATASOURCE_URL`
-- `SPRING_DATASOURCE_USERNAME`
-- `SPRING_DATASOURCE_PASSWORD`
-- `JWT_SECRET`
-- `APP_CORS_ALLOWED_ORIGINS`
-- `APP_WS_ALLOW_QUERY_TOKEN`
-- `APP_MAAS_DEFAULT_CLIENT_NAME`
-- `APP_MAAS_DEFAULT_API_KEY`
+- Java 17+
+- Maven 3.9+
+- PostgreSQL（主库默认）
+- MySQL（灰度镜像/切主）
+- Redis（热点缓存）
 
 ## 本地运行
 
@@ -37,44 +24,110 @@ cd backend
 mvn -B test
 ```
 
-## 数据迁移（Flyway）
+## 关键接口
 
-迁移文件位于 `src/main/resources/db/migration/`：
+### 认证
 
-- `V1__init.sql`
-- `V2__traffic_samples.sql`
-- `V3__traffic_events.sql`
-- `V4__traffic_predictions.sql`
-- `V5__camera_geo_and_api_clients.sql`
-- `V6__reporting_views.sql`
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `GET /api/v1/auth/me`
 
-## 关键接口示例
+### 交通与预测
 
-### 1) 边缘上报
+- `POST /api/v1/edge/telemetry`
+- `GET /api/v1/traffic/predictions`
 
-```bash
-curl -X POST http://localhost:8000/api/v1/edge/telemetry \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "node_id":"edge-01",
-    "road_name":"陈兴道路",
-    "count_car":10,
-    "count_motor":5,
-    "count_person":2,
-    "avg_speed_car":30.5,
-    "avg_speed_motor":25.0
-  }'
-```
+### MaaS
 
-### 2) 预测
+- `GET /api/v1/maas/congestion`（需 `X-API-Key`）
+
+### 报表导出
+
+- `GET /api/v1/reports/traffic/export?granularity=...&format=json|xlsx`
+
+## 报表导出示例
 
 ```bash
-curl "http://localhost:8000/api/v1/traffic/predictions?road_name=陈兴道路&horizon_minutes=60"
+# JSON
+curl -H "Authorization: Bearer <token>" \
+  "http://localhost:8000/api/v1/reports/traffic/export?granularity=hourly&format=json"
+
+# XLSX
+curl -L -H "Authorization: Bearer <token>" \
+  "http://localhost:8000/api/v1/reports/traffic/export?granularity=hourly&format=xlsx" \
+  -o traffic_report.xlsx
 ```
 
-### 3) MaaS
+## 配置项（重点）
+
+### 安全与鉴权
+
+- `APP_ENV`
+- `JWT_SECRET`
+- `APP_CORS_ALLOWED_ORIGINS`
+- `APP_WS_ALLOW_QUERY_TOKEN`
+- `INIT_ADMIN`
+- `INIT_ADMIN_USERNAME`
+- `INIT_ADMIN_EMAIL`
+- `INIT_ADMIN_PASSWORD`
+
+### 主库与灰度
+
+- `SPRING_DATASOURCE_URL`
+- `SPRING_DATASOURCE_USERNAME`
+- `SPRING_DATASOURCE_PASSWORD`
+- `SPRING_FLYWAY_LOCATIONS`
+- `APP_DB_PRIMARY`（`postgres|mysql`）
+- `APP_DB_MIRROR_WRITE`（`true|false`）
+- `APP_DB_MIRROR_MYSQL_ENABLED`
+- `APP_DB_MIRROR_MYSQL_URL`
+- `APP_DB_MIRROR_MYSQL_USERNAME`
+- `APP_DB_MIRROR_MYSQL_PASSWORD`
+- `APP_DB_MIRROR_POSTGRES_ENABLED`
+- `APP_DB_MIRROR_POSTGRES_URL`
+- `APP_DB_MIRROR_POSTGRES_USERNAME`
+- `APP_DB_MIRROR_POSTGRES_PASSWORD`
+
+### Redis 缓存
+
+- `SPRING_REDIS_HOST`
+- `SPRING_REDIS_PORT`
+- `APP_REDIS_CACHE_ENABLED`
+- `APP_CACHE_TTL_SECONDS`
+
+## Flyway 迁移目录
+
+- PostgreSQL：`src/main/resources/db/migration/`
+- MySQL：`src/main/resources/db/migration-mysql/`
+
+## 主库切换与一致性校验
+
+项目根目录执行：
 
 ```bash
-curl -H 'X-API-Key: dev-maas-key-change-me' \
-  "http://localhost:8000/api/v1/maas/congestion?min_lat=0&max_lat=90&min_lng=0&max_lng=180"
+# PostgreSQL 主库 + MySQL 镜像双写
+./scripts/db/switch_primary.sh postgres
+
+# MySQL 主库 + PostgreSQL 镜像双写
+./scripts/db/switch_primary.sh mysql
+
+# 一致性校验（双写表）
+bash scripts/check_mirror_consistency.sh
 ```
+
+说明：镜像库迁移失败仅记录警告，不阻塞主服务启动；主库迁移失败会阻塞启动。
+
+## 常见问题
+
+1. `Unsupported Database: PostgreSQL 16.x`
+
+- 确认 `pom.xml` 已包含 `flyway-database-postgresql`。
+
+2. MySQL 迁移失败后无法再次启动
+
+- 运行切换脚本前，脚本会自动清理 MySQL `flyway_schema_history` 中 `success=0` 记录。
+
+3. 返回 `Internal server error` 难定位
+
+- `ApiExceptionHandler` 已输出 fallback 异常日志，先看 `docker compose logs backend`。
+

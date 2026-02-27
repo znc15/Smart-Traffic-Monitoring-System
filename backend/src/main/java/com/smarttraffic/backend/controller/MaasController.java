@@ -2,6 +2,7 @@ package com.smarttraffic.backend.controller;
 
 import com.smarttraffic.backend.dto.maas.MaasCongestionResponse;
 import com.smarttraffic.backend.exception.AppException;
+import com.smarttraffic.backend.service.analytics.RedisCacheService;
 import com.smarttraffic.backend.service.analytics.MaasService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,9 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class MaasController {
 
     private final MaasService maasService;
+    private final RedisCacheService redisCacheService;
 
-    public MaasController(MaasService maasService) {
+    public MaasController(MaasService maasService, RedisCacheService redisCacheService) {
         this.maasService = maasService;
+        this.redisCacheService = redisCacheService;
     }
 
     @GetMapping("/congestion")
@@ -29,6 +32,12 @@ public class MaasController {
         if (minLat > maxLat || minLng > maxLng) {
             throw new AppException(HttpStatus.BAD_REQUEST, "invalid bbox range");
         }
-        return maasService.queryCongestion(minLat, maxLat, minLng, maxLng);
+        String cacheKey = String.format("traffic:maas:%s:%s:%s:%s", minLat, maxLat, minLng, maxLng);
+        return redisCacheService.get(cacheKey, MaasCongestionResponse.class)
+                .orElseGet(() -> {
+                    MaasCongestionResponse response = maasService.queryCongestion(minLat, maxLat, minLng, maxLng);
+                    redisCacheService.put(cacheKey, response);
+                    return response;
+                });
     }
 }

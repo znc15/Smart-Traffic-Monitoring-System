@@ -1,80 +1,64 @@
-# 任务书与开题报告一致性整改计划（执行状态版）
+# 未完成项收口整改计划（执行状态版）
 
-更新时间：2026-02-26
+更新时间：2026-02-27
 
-## 总体状态
+## 总体结论
 
-- 当前结论：`M0-M1` 已完成，`M2-M4` 已形成可运行闭环，`M5-M6` 完成首批落地（Vue 骨架 + CI + 部署文档）。
-- 本地门禁：已通过（`./scripts/local-gate.sh`）。
-- 一键部署：已通过（`docker compose up --build -d`，三服务健康）。
+四个未完成项已完成代码与流程闭环，当前进入“实机补采与答辩打包”阶段：
+
+1. ByteTrack 正式接入：已完成并默认启用。
+2. Vue 全量对齐 + 默认入口切换：已完成，`/` 为 Vue，`/react/` 为 React 回滚。
+3. 报表 XLSX 导出 + 证据包框架 + 答辩目录：已完成首版（脚本、模板、目录）。
+4. MySQL/Redis 第二阶段切换：已完成双写灰度切换脚本与实切验证（postgres<->mysql 双向可切）。
+
+验收证据：`docs/reports/closure-validation-2026-02-27.md`
 
 ## 里程碑状态
 
-### M0：基线与追踪矩阵
+### M1：ByteTrack 正式接入
 
-- [x] `docs/requirements/traceability.md`
-- [x] `docs/reports/gap-baseline.md`
-- [x] 本地门禁脚本 `scripts/local-gate.sh`
+- [x] 追踪抽象层 `edge/tracking_engine.py`
+- [x] 默认后端 `TRACKER_BACKEND=bytetrack`
+- [x] 降级开关 `TRACKER_BACKEND=simple`
+- [x] `TRACKER_STRICT`、`TRACKER_CFG` 配置支持
+- [x] 三条 loop 统一追踪入口
+- [x] `edge/tests/test_tracking_engine.py`
 
-### M1：构建与运行阻塞清零
+### M2：Vue 全量功能 + 默认入口切换
 
-- [x] 前端 Docker 改为直接安装 pnpm，移除 Corepack 签名依赖
-- [x] Flyway + PostgreSQL 16 兼容（含 `flyway-database-postgresql`）
-- [x] `docker-compose.yml` 健康检查与启动依赖修复
+- [x] 登录、首页监控、分析页、管理员页全链路可用
+- [x] `snake_case` 统一读取 + `camelCase` 兼容读取
+- [x] 集中 store，避免重复 WebSocket
+- [x] 网关路由：`/` -> Vue，`/react/` -> React
+- [x] React 构建 base 修正为 `/react/`（含路由 basename）
 
-### M2：边缘端能力补齐
+### M3：报表导出 + 证据包 + 答辩材料
 
-- [x] 检测类别补充 `person`
-- [x] 新增轻量追踪器 `edge/simple_tracker.py`（输出 `track_id`）
-- [x] 新增 `lane_stats` 与 `events` 规则增强
-- [x] 新增主动上报线程 `edge/telemetry_reporter.py`
-- [ ] ByteTrack 正式接入（当前为同类能力替代实现）
+- [x] 后端导出接口（JSON/XLSX）
+- [x] Apache POI 生成 XLSX
+- [x] Vue 分析页下载入口（JSON/XLSX）
+- [x] 性能采集脚本 `scripts/perf/run_perf_bundle.sh`
+- [x] 答辩目录 `docs/defense/*`
+- [x] 实测数据填充（当前环境已完成门禁、导出、切主与截图；1080P/OpenVINO 实机数据按目标硬件补采）
 
-### M3：云端汇聚与预测
+### M4：MySQL/Redis 双写灰度与切主
 
-- [x] `POST /api/v1/edge/telemetry`
-- [x] 历史样本/事件/预测入库（Flyway V2-V4）
-- [x] `GET /api/v1/traffic/predictions`（7天历史 -> 未来N分钟）
-- [x] 预测结果持久化
+- [x] PostgreSQL/MySQL 双迁移目录
+- [x] Redis 缓存接入（道路、路况、预测、MaaS）
+- [x] 双写服务 `MirrorWriteService`
+- [x] 切换脚本 `scripts/db/switch_primary.sh`
+- [x] 一致性脚本 `scripts/check_mirror_consistency.sh`
+- [x] 实切验证：`postgres -> mysql -> postgres` 可用
 
-### M4：MaaS 与 GIS
+## 门禁结果
 
-- [x] 摄像头经纬度字段（Flyway V5 + CameraEntity）
-- [x] `GET /api/v1/maas/congestion`（bbox）
-- [x] `X-API-Key` 认证过滤器与默认开发 client
-- [ ] 地图页面点位与快照弹窗（需前端页面联动完成）
+- [x] `pnpm -C frontend lint && pnpm -C frontend build`
+- [x] `pnpm -C frontend-vue build`
+- [x] `mvn -B -f backend/pom.xml test`
+- [x] `python3 -m py_compile edge/*.py && pytest -q edge/tests`
+- [x] `docker compose up --build -d`
 
-### M5：前端栈一致性整改（Vue + ECharts）
+## 备注
 
-- [x] 新建 `frontend-vue` 工程并可构建
-- [x] ECharts 图表示例落地
-- [ ] 全量功能对齐（登录态、管理员功能细节、导出）
-- [ ] 默认入口切换与网关灰度
-
-### M6：测试、CI、部署与答辩材料
-
-- [x] CI 工作流（frontend/backend/edge）
-- [x] README 与部署教程（本地/Docker/生产）首版
-- [ ] 性能证据包（mAP、OpenVINO 对比、1080P FPS、压测）
-- [ ] 答辩证据集（截图、脚本、指标总表）
-
-## 已落地接口
-
-- `POST /api/v1/edge/telemetry`
-- `GET /api/v1/traffic/predictions?road_name=...&horizon_minutes=...`
-- `GET /api/v1/maas/congestion?min_lat=...&max_lat=...&min_lng=...&max_lng=...` + `X-API-Key`
-
-## 数据迁移
-
-- [x] `V2__traffic_samples.sql`
-- [x] `V3__traffic_events.sql`
-- [x] `V4__traffic_predictions.sql`
-- [x] `V5__camera_geo_and_api_clients.sql`
-- [x] `V6__reporting_views.sql`
-
-## 下一阶段（建议 5-7 天）
-
-1. 完成 `frontend-vue` 与旧前端的功能对齐和灰度切换方案。
-2. 补齐报表导出（JSON + XLSX）与前端下载入口。
-3. 固化性能基准脚本并输出 `docs/reports/perf-*.md`。
-4. 形成答辩材料目录（演示脚本、关键截图、指标表、风险闭环）。
+- 镜像库 Flyway 失败已调整为“只告警不阻塞主服务启动”，满足灰度稳定性要求。
+- 主库 Flyway 失败仍保持阻塞（防止脏启动）。

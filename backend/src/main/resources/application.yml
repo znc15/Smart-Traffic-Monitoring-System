@@ -16,7 +16,13 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
-    locations: classpath:db/migration
+    locations: ${SPRING_FLYWAY_LOCATIONS:classpath:db/migration}
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+      repositories:
+        enabled: false
   jackson:
     property-naming-strategy: SNAKE_CASE
     serialization:
@@ -42,3 +48,19 @@ app:
     default-api-key: ${APP_MAAS_DEFAULT_API_KEY:dev-maas-key-change-me}
   traffic:
     roads: ${TRAFFIC_ROADS:陈兴道路,陈富路,阮惠路,黎利路,阮廌路}
+  db:
+    primary: ${APP_DB_PRIMARY:postgres}
+    mirror-write: ${APP_DB_MIRROR_WRITE:false}
+    redis-cache-enabled: ${APP_REDIS_CACHE_ENABLED:true}
+    cache-ttl-seconds: ${APP_CACHE_TTL_SECONDS:10}
+    mirror:
+      mysql:
+        enabled: ${APP_DB_MIRROR_MYSQL_ENABLED:false}
+        url: ${APP_DB_MIRROR_MYSQL_URL:}
+        username: ${APP_DB_MIRROR_MYSQL_USERNAME:}
+        password: ${APP_DB_MIRROR_MYSQL_PASSWORD:}
+      postgres:
+        enabled: ${APP_DB_MIRROR_POSTGRES_ENABLED:false}
+        url: ${APP_DB_MIRROR_POSTGRES_URL:}
+        username: ${APP_DB_MIRROR_POSTGRES_USERNAME:}
+        password: ${APP_DB_MIRROR_POSTGRES_PASSWORD:}

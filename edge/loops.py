@@ -12,10 +12,10 @@ import numpy as np
 
 import config
 from state import state
-from detector import detect_vehicles_detailed, redraw_detections, estimate_speed
+from detector import estimate_speed
 from overlay import draw_overlay
-from simple_tracker import SimpleTracker
 from traffic_enrichment import build_events, build_lane_stats, count_person
+from tracking_engine import TrackingEngine
 
 
 # ---------------------------------------------------------------------------
@@ -44,7 +44,7 @@ def camera_loop() -> None:
     last_count_motor = 0
     last_inference_ms = 0.0
     last_objects: list[dict] = []
-    tracker = SimpleTracker()
+    tracking_engine = TrackingEngine()
 
     try:
         while not state.should_stop():
@@ -63,20 +63,19 @@ def camera_loop() -> None:
 
             if frame_count % config.FRAME_SKIP == 0 or (not last_objects and frame_count == 1):
                 # 执行推理
-                annotated, count_car, count_motor, inference_ms, objects = \
-                    detect_vehicles_detailed(frame)
-                tracked_objects = tracker.update(objects)
-                last_count_car = count_car
-                last_count_motor = count_motor
-                last_inference_ms = inference_ms
-                last_objects = tracked_objects
+                result = tracking_engine.detect(frame)
+                annotated = result.annotated
+                last_count_car = result.count_car
+                last_count_motor = result.count_motor
+                last_inference_ms = result.inference_ms
+                last_objects = result.tracked_objects
             else:
                 # 跳过推理，复用上次检测结果在新帧上重绘
-                annotated = redraw_detections(frame, last_objects)
-                count_car = last_count_car
-                count_motor = last_count_motor
-                inference_ms = last_inference_ms
+                annotated = tracking_engine.redraw(frame, last_objects)
 
+            count_car = last_count_car
+            count_motor = last_count_motor
+            inference_ms = last_inference_ms
             # 计算 FPS
             fps_counter += 1
             elapsed = time.time() - fps_timer
@@ -171,7 +170,7 @@ def _sim_video_loop(videos: list[Path]) -> None:
         last_count_motor = 0
         last_inference_ms = 0.0
         last_objects: list[dict] = []
-        tracker = SimpleTracker()
+        tracking_engine = TrackingEngine()
 
         try:
             while not state.should_stop():
@@ -183,19 +182,18 @@ def _sim_video_loop(videos: list[Path]) -> None:
                 frame_count += 1
 
                 if frame_count % config.FRAME_SKIP == 0 or (not last_objects and frame_count == 1):
-                    annotated, count_car, count_motor, inference_ms, objects = \
-                        detect_vehicles_detailed(frame)
-                    tracked_objects = tracker.update(objects)
-                    last_count_car = count_car
-                    last_count_motor = count_motor
-                    last_inference_ms = inference_ms
-                    last_objects = tracked_objects
+                    result = tracking_engine.detect(frame)
+                    annotated = result.annotated
+                    last_count_car = result.count_car
+                    last_count_motor = result.count_motor
+                    last_inference_ms = result.inference_ms
+                    last_objects = result.tracked_objects
                 else:
-                    annotated = redraw_detections(frame, last_objects)
-                    count_car = last_count_car
-                    count_motor = last_count_motor
-                    inference_ms = last_inference_ms
+                    annotated = tracking_engine.redraw(frame, last_objects)
 
+                count_car = last_count_car
+                count_motor = last_count_motor
+                inference_ms = last_inference_ms
                 # 计算实际 FPS
                 fps_counter += 1
                 elapsed = time.time() - fps_timer
@@ -248,7 +246,7 @@ def _sim_image_loop(images: list[Path]) -> None:
     last_count_motor = 0
     last_inference_ms = 0.0
     last_objects: list[dict] = []
-    tracker = SimpleTracker()
+    tracking_engine = TrackingEngine()
 
     while not state.should_stop():
         img_path = images[img_idx % len(images)]
@@ -262,19 +260,18 @@ def _sim_image_loop(images: list[Path]) -> None:
         frame_count += 1
 
         if frame_count % config.FRAME_SKIP == 0 or (not last_objects and frame_count == 1):
-            annotated, count_car, count_motor, inference_ms, objects = \
-                detect_vehicles_detailed(frame)
-            tracked_objects = tracker.update(objects)
-            last_count_car = count_car
-            last_count_motor = count_motor
-            last_inference_ms = inference_ms
-            last_objects = tracked_objects
+            result = tracking_engine.detect(frame)
+            annotated = result.annotated
+            last_count_car = result.count_car
+            last_count_motor = result.count_motor
+            last_inference_ms = result.inference_ms
+            last_objects = result.tracked_objects
         else:
-            annotated = redraw_detections(frame, last_objects)
-            count_car = last_count_car
-            count_motor = last_count_motor
-            inference_ms = last_inference_ms
+            annotated = tracking_engine.redraw(frame, last_objects)
 
+        count_car = last_count_car
+        count_motor = last_count_motor
+        inference_ms = last_inference_ms
         # 计算实际 FPS
         fps_counter += 1
         elapsed = time.time() - fps_timer

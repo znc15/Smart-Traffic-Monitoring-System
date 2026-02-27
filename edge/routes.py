@@ -70,6 +70,9 @@ class ConfigUpdateRequest(BaseModel):
     imgsz: Optional[int] = Field(None, ge=160, le=1280, description="YOLO 输入分辨率 (160-1280)")
     quantize: Optional[str] = Field(None, pattern=r"^(int8|fp16|none)$", description="量化模式: int8, fp16, none")
     jpeg_quality: Optional[int] = Field(None, ge=30, le=100, description="JPEG 编码质量 (30-100)")
+    tracker_backend: Optional[str] = Field(None, pattern=r"^(bytetrack|simple)$", description="跟踪后端: bytetrack 或 simple")
+    tracker_strict: Optional[bool] = Field(None, description="ByteTrack 严格模式，失败时是否禁止回退")
+    tracker_cfg: Optional[str] = Field(None, max_length=128, description="Ultralytics tracker 配置文件名")
 
     @field_validator('imgsz')
     @classmethod
@@ -104,6 +107,9 @@ def _current_config() -> dict:
         "imgsz": config.IMGSZ,
         "quantize": config.QUANTIZE,
         "jpeg_quality": config.JPEG_QUALITY,
+        "tracker_backend": config.TRACKER_BACKEND,
+        "tracker_strict": config.TRACKER_STRICT,
+        "tracker_cfg": config.TRACKER_CFG,
     }
 
 # ---------------------------------------------------------------------------
@@ -371,6 +377,9 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
     old_quantize = config.QUANTIZE
     old_mode = config.MODE
     old_road_name = config.ROAD_NAME
+    old_tracker_backend = config.TRACKER_BACKEND
+    old_tracker_strict = config.TRACKER_STRICT
+    old_tracker_cfg = config.TRACKER_CFG
 
     # 逐字段检查并更新 config 模块变量
     if body.mode is not None:
@@ -416,6 +425,12 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
 
     if body.quantize is not None:
         config.QUANTIZE = body.quantize
+    if body.tracker_backend is not None:
+        config.TRACKER_BACKEND = body.tracker_backend
+    if body.tracker_strict is not None:
+        config.TRACKER_STRICT = body.tracker_strict
+    if body.tracker_cfg is not None:
+        config.TRACKER_CFG = body.tracker_cfg.strip() or "bytetrack.yaml"
 
     # Determine whether a full restart is needed.
     # frame_skip, jpeg_quality are read dynamically in the loop — no restart required.
@@ -427,6 +442,9 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
         or config.USE_OPENVINO != old_openvino
         or (body.quantize is not None and config.QUANTIZE != old_quantize)
         or (imgsz_changed and config.USE_OPENVINO)
+        or config.TRACKER_BACKEND != old_tracker_backend
+        or config.TRACKER_STRICT != old_tracker_strict
+        or config.TRACKER_CFG != old_tracker_cfg
     )
     needs_restart = model_changed or body.mode is not None
 
@@ -436,13 +454,16 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
             state.restart_callback(model_changed=model_changed)
             restarted = True
             logger.info(
-                "检测循环热重启完成: mode=%s->%s, model_changed=%s, openvino=%s, quantize=%s, imgsz=%s",
+                "检测循环热重启完成: mode=%s->%s, model_changed=%s, openvino=%s, quantize=%s, imgsz=%s, tracker=%s, strict=%s, tracker_cfg=%s",
                 old_mode,
                 config.MODE,
                 model_changed,
                 config.USE_OPENVINO,
                 config.QUANTIZE,
                 config.IMGSZ,
+                config.TRACKER_BACKEND,
+                config.TRACKER_STRICT,
+                config.TRACKER_CFG,
             )
         except Exception as e:
             logger.error(f"重启检测循环失败: {e}")

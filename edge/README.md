@@ -1,305 +1,95 @@
-# Edge Node（智能交通边缘检测节点）
+# Edge Node
 
-`edge` 是独立部署的边缘检测服务，负责：
+边缘节点负责实时检测、追踪、统计、事件识别和视频输出。
 
-- 实时车辆检测（YOLOv8）
-- 输出交通统计与实时帧
-- 运行时热更新配置（模型/模式/路段名等）
-- 提供图片与视频上传检测接口
+## 能力
 
-默认支持 OpenVINO 加速与资源分级自适应（低配机器自动降级参数）。
+- YOLOv8 检测（机动车/非机动车/行人）
+- ByteTrack 追踪（默认）
+- `SimpleTracker` 降级链路
+- OpenVINO 推理加速
+- 热更新配置（模型/路段/追踪后端）
+- 主动上报到后端 `/api/v1/edge/telemetry`
 
-## 目录结构
-
-```text
-edge/
-├── main.py
-├── routes.py
-├── detector.py
-├── loops.py
-├── state.py
-├── config.py
-├── resource_manager.py
-├── validators.py
-├── camera_discovery.py
-├── static/
-├── samples/
-├── tests/
-└── requirements.txt
-```
-
-## 运行要求
-
-- Python 3.10+
-- 可选摄像头或 RTSP/HTTP 视频流
-- 首次运行会下载/导出模型，需联网
-
-## 启动方式
-
-### 1. 本地
+## 安装
 
 ```bash
 cd edge
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python main.py
-```
-
-常用启动参数：
-
-```bash
-# 摄像头模式（交互选择）
-python main.py --mode camera
-
-# 指定本地摄像头
-python main.py --mode camera --url 0
-
-# 指定 RTSP
-python main.py --mode camera --url rtsp://192.168.1.10:554/stream
-
-# 指定端口/路段
-python main.py --mode camera --port 9000 --road "长安街-East"
-
-# 无浏览器环境
-python main.py --no-browser
-```
-
-### 2. Docker
-
-```bash
-cd edge
-docker build -t edge-node .
-
-docker run -p 9000:8000 \
-  -e MODE=camera \
-  -e CAMERA_URL=rtsp://192.168.1.10:554/stream \
-  -e ROAD_NAME="长安街-East" \
-  -e NO_BROWSER=true \
-  edge-node
-```
-
-## 生产部署教程（Edge 节点）
-
-本节给出边缘节点在 Linux 设备上的常驻部署方案（`systemd`）。
-
-### 第 1 步：安装系统依赖
-
-```bash
-sudo apt update
-sudo apt install -y python3 python3-venv python3-pip ffmpeg
-```
-
-`ffmpeg` 仅用于 `/api/video`，不影响 `/api/stream` 与核心检测流程。
-
-### 第 2 步：准备运行目录与虚拟环境
-
-```bash
-cd /opt
-sudo git clone <your-repo-url> smart-traffic
-cd smart-traffic/edge
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 第 3 步：先手工启动一次验证
+## 启动
 
 ```bash
-source .venv/bin/activate
-MODE=camera \
-CAMERA_URL=0 \
-ROAD_NAME="长安街-East" \
-PORT=9000 \
-NO_BROWSER=true \
-python main.py
+python main.py --mode sim --port 9000 --no-browser
 ```
 
-另开终端验收：
+摄像头模式示例：
 
 ```bash
-curl http://127.0.0.1:9000/health
-curl http://127.0.0.1:9000/api/traffic
+python main.py --mode camera --url 0 --road "陈兴道路" --port 9000 --no-browser
 ```
 
-### 第 4 步：注册 systemd 服务
+## ByteTrack 配置
 
-创建 `/etc/systemd/system/edge-node.service`：
+默认使用 ByteTrack：
 
-```ini
-[Unit]
-Description=Smart Traffic Edge Node
-After=network.target
+- `TRACKER_BACKEND=bytetrack`
+- `TRACKER_STRICT=false`
+- `TRACKER_CFG=bytetrack.yaml`
 
-[Service]
-Type=simple
-User=ubuntu
-WorkingDirectory=/opt/smart-traffic/edge
-Environment=MODE=camera
-Environment=CAMERA_URL=0
-Environment=ROAD_NAME=长安街-East
-Environment=PORT=9000
-Environment=NO_BROWSER=true
-Environment=OPENVINO=true
-ExecStart=/opt/smart-traffic/edge/.venv/bin/python /opt/smart-traffic/edge/main.py
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-加载并启动：
+可降级为 simple：
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable edge-node
-sudo systemctl start edge-node
-sudo systemctl status edge-node
+TRACKER_BACKEND=simple python main.py --mode camera --url 0
 ```
 
-查看日志：
+严格模式（ByteTrack 失败直接报错，不回退）：
 
 ```bash
-sudo journalctl -u edge-node -f
+TRACKER_BACKEND=bytetrack TRACKER_STRICT=true python main.py --mode camera --url 0
 ```
 
-### 第 5 步：接入中心后端
+## 关键环境变量
 
-在后端管理端新增摄像头：
-
-- `stream_url`: `http://<edge-ip>:9000`
-- `road_name`: 与本节点 `ROAD_NAME` 保持一致
-
-如需多个路段，建议“一路段一个 edge 进程/容器”。
-
-### 第 6 步：升级流程
-
-```bash
-cd /opt/smart-traffic
-git pull
-cd edge
-source .venv/bin/activate
-pip install -r requirements.txt
-sudo systemctl restart edge-node
-```
-
-## 配置优先级
-
-`CLI 参数 > 环境变量 > 默认值`
-
-常用环境变量：
-
-- `MODE`：`sim` 或 `camera`
-- `CAMERA_URL`：设备号 / URL / `/dev/*`
+- `MODE`：`sim|camera`
+- `CAMERA_URL`
 - `ROAD_NAME`
-- `MODEL`：例如 `yolov8n.pt`
+- `MODEL`
 - `CONF`
-- `PORT`
 - `OPENVINO`
+- `PORT`
 - `NO_BROWSER`
-- `FRAME_SKIP`
-- `IMGSZ`
-- `QUANTIZE`：`int8 | fp16 | none`
-- `JPEG_QUALITY`
-- `MAX_MJPEG_CLIENTS`
-- `EDGE_NODE_ID`：边缘节点标识（主动上报使用）
-- `BACKEND_TELEMETRY_URL`：主动上报地址（如 `http://backend:8000/api/v1/edge/telemetry`）
-- `TELEMETRY_INTERVAL_SEC`：主动上报周期（秒）
+- `TRACKER_BACKEND`
+- `TRACKER_STRICT`
+- `TRACKER_CFG`
+- `EDGE_NODE_ID`
+- `BACKEND_TELEMETRY_URL`
+- `TELEMETRY_INTERVAL_SEC`
 
-## API 一览
+## API
 
-### 交通与健康
-
-- `GET /api/traffic`：交通数据 + `edge_metrics`
-- `GET /api/frame`：最新 JPEG 帧
-- `GET /api/metrics`：性能指标
-- `GET /health`：健康检查
-- `GET /api/resource-mode`：当前资源等级与生效参数
-
-### 实时视频
-
-- `GET /api/stream`：MJPEG 流
-- `GET /api/video`：WebM 视频流（依赖 FFmpeg）
-
-### 配置与模型
-
+- `GET /health`
+- `GET /api/traffic`
+- `GET /api/frame`
+- `GET /api/stream`
+- `GET /api/metrics`
 - `GET /api/config`
 - `PUT /api/config`
 - `GET /api/models`
 
-`/api/models` 返回 `has_openvino`，同时兼容新旧 OpenVINO 缓存目录命名。
+`/api/config` 已支持 tracker 相关字段热更新：
 
-### 摄像头工具接口
-
-- `GET /api/cameras`：扫描本地设备
-- `POST /api/cameras/probe`：探测视频源连通性
-- `GET /api/cameras/preview?source=...`：抓帧+检测预览
-
-探测地址校验规则：
-
-- 允许：设备号、`/dev/*`、`rtsp(s)://`、`http(s)://`
-- 拒绝：其他格式
-
-### 上传检测
-
-- `POST /api/detect/image`
-- `POST /api/detect/video`
-- `GET /api/detect/video/result/{result_id}`
-
-## `/api/config` 热更新说明
-
-可更新字段（按需提交）：
-
-- `mode`
-- `camera_source`
-- `model`
-- `confidence`
-- `road_name`
-- `use_openvino`
-- `frame_skip`
-- `imgsz`
-- `quantize`
-- `jpeg_quality`
-
-重启策略：
-
-- `frame_skip`、`jpeg_quality`：动态生效，通常不重启
-- `mode`、`model`、`use_openvino`、`quantize`、`imgsz`（OpenVINO 模式）会触发热重启
-
-## 与后端对接
-
-在后端管理页「摄像头管理」配置：
-
-- `stream_url`：填边缘节点基地址，例如 `http://192.168.1.20:9000`
-- `road_name`：与前端展示路段一致
-
-后端会轮询：
-
-- `GET /api/traffic`
-- `GET /api/frame`
-
-如需改为“边缘主动上报为主”，配置以下环境变量后重启：
-
-```bash
-export EDGE_NODE_ID=edge-01
-export BACKEND_TELEMETRY_URL=http://<backend-host>:8000/api/v1/edge/telemetry
-export TELEMETRY_INTERVAL_SEC=3
-```
-
-主动上报 payload 会包含：
-
-- `count_car`, `count_motor`, `count_person`
-- `lane_stats`（车道级计数）
-- `events`（规则型异常事件）
-- `tracked_objects`（含 `track_id`）
+- `tracker_backend`
+- `tracker_strict`
+- `tracker_cfg`
 
 ## 测试
 
 ```bash
-cd edge
-python -m py_compile *.py
-pytest -q tests
+python3 -m py_compile edge/*.py
+pytest -q edge/tests
 ```
 
-当前测试覆盖 `validators.py` 关键行为（视频源校验、OpenVINO 缓存识别）。

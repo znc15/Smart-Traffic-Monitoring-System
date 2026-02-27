@@ -28,6 +28,7 @@ from detector import reset_model
 from camera_discovery import interactive_select
 from resource_manager import init_resource_manager
 from telemetry_reporter import start_reporter_thread
+from tracking_engine import print_tracker_runtime_info
 
 # ---------------------------------------------------------------------------
 # 模块级变量：当前检测循环线程引用，供 restart_loop 访问
@@ -129,6 +130,7 @@ async def lifespan(application: FastAPI):
     # Detect hardware and apply resource-level presets before starting loops
     level = init_resource_manager()
     print(f"[INFO] Resource level: {level}")
+    print_tracker_runtime_info()
 
     if config.MODE == "camera":
         print(f"[INFO] 摄像头模式，视频源: {config.camera_source}，模型: {config.MODEL_NAME}")
@@ -218,6 +220,18 @@ def parse_args() -> argparse.Namespace:
         help="量化模式: int8, fp16, none (默认读取 $QUANTIZE 或 none)",
     )
     p.add_argument(
+        "--tracker-backend", choices=["bytetrack", "simple"], default=None,
+        help="跟踪后端: bytetrack 或 simple (默认读取 $TRACKER_BACKEND 或 bytetrack)",
+    )
+    p.add_argument(
+        "--tracker-strict", action="store_true", default=False,
+        help="开启严格模式：ByteTrack 出错时不自动回退 simple",
+    )
+    p.add_argument(
+        "--tracker-cfg", default=None,
+        help="Ultralytics tracker 配置文件名 (默认读取 $TRACKER_CFG 或 bytetrack.yaml)",
+    )
+    p.add_argument(
         "--no-openvino", action="store_true", default=False,
         help="禁用 OpenVINO 加速，使用原始 PyTorch 推理",
     )
@@ -251,6 +265,12 @@ def apply_args(args: argparse.Namespace) -> int:
         config.FRAME_SKIP = args.frame_skip
     if args.quantize is not None:
         config.QUANTIZE = args.quantize
+    if args.tracker_backend is not None:
+        config.TRACKER_BACKEND = args.tracker_backend
+    if args.tracker_strict:
+        config.TRACKER_STRICT = True
+    if args.tracker_cfg is not None:
+        config.TRACKER_CFG = args.tracker_cfg
 
     port = args.port or config.HTTP_PORT
 

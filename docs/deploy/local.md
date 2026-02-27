@@ -1,34 +1,40 @@
 # 本地部署教程（Local）
 
-## 前置依赖
+本教程目标：从零启动后，能够访问页面并完成一次接口调用验证。
 
-- Node.js 20.19+
+## 1. 前置依赖
+
+- Node.js 20+
 - pnpm 9+
 - Java 17+
 - Maven 3.9+
 - Python 3.10+
-- PostgreSQL 16（或使用 Docker）
+- Docker + Docker Compose
 
-## 1. 启动数据库
+## 2. 启动基础依赖（数据库与缓存）
 
-推荐：
+项目根目录执行：
 
 ```bash
-docker run -d --name traffic-db \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=odoo \
-  -e POSTGRES_DB=transportation_system \
-  -p 5433:5432 postgres:16
+docker compose up -d database mysql redis
 ```
 
-## 2. 启动后端
+验证：
+
+```bash
+docker compose ps database mysql redis
+```
+
+期望状态：3 个服务均为 `healthy`。
+
+## 3. 启动后端
 
 ```bash
 cd backend
-export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/transportation_system
-export SPRING_DATASOURCE_USERNAME=postgres
-export SPRING_DATASOURCE_PASSWORD=odoo
-export JWT_SECRET=change-this-dev-secret-change-this-dev-secret
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/transportation_system \
+SPRING_DATASOURCE_USERNAME=postgres \
+SPRING_DATASOURCE_PASSWORD=odoo \
+JWT_SECRET=change-this-dev-secret-change-this-dev-secret \
 mvn -B spring-boot:run
 ```
 
@@ -38,34 +44,39 @@ mvn -B spring-boot:run
 curl http://localhost:8000/api/v1/site-settings
 ```
 
-## 3. 启动前端
+## 4. 启动 Vue 前端（默认前端）
+
+```bash
+cd frontend-vue
+pnpm install
+pnpm dev --port 5174
+```
+
+浏览器访问：`http://localhost:5174`
+
+## 5. 启动 React 前端（回滚验证，可选）
 
 ```bash
 cd frontend
 pnpm install
-pnpm dev
+pnpm dev --port 5173
 ```
 
-访问：`http://localhost:5173`
-
-## 4. 启动边缘端
+## 6. 启动 Edge（可选）
 
 ```bash
 cd edge
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 python main.py --mode sim --port 9000 --no-browser
 ```
 
-可选启用主动上报：
+## 7. 本地门禁
 
-```bash
-export BACKEND_TELEMETRY_URL=http://localhost:8000/api/v1/edge/telemetry
-export EDGE_NODE_ID=edge-local-01
-python main.py --mode sim --port 9000 --no-browser
-```
-
-## 5. 一键门禁
+项目根目录执行：
 
 ```bash
 ./scripts/local-gate.sh
 ```
+
