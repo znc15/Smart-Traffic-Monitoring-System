@@ -8,7 +8,10 @@ import java.util.List;
 
 @ConfigurationProperties(prefix = "app.security")
 public class SecurityProperties {
-    private String corsAllowedOrigins = "http://localhost:5173";
+    private static final String DEFAULT_CORS_ALLOWED_ORIGINS =
+            "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174";
+
+    private String corsAllowedOrigins = DEFAULT_CORS_ALLOWED_ORIGINS;
     private boolean wsAllowQueryToken = true;
 
     public String getCorsAllowedOrigins() {
@@ -29,7 +32,10 @@ public class SecurityProperties {
 
     public List<String> corsAllowedOriginsAsList() {
         if (!StringUtils.hasText(corsAllowedOrigins)) {
-            return List.of("http://localhost:5173");
+            return Arrays.stream(DEFAULT_CORS_ALLOWED_ORIGINS.split(","))
+                    .map(String::trim)
+                    .filter(StringUtils::hasText)
+                    .toList();
         }
         return Arrays.stream(corsAllowedOrigins.split(","))
                 .map(String::trim)
@@ -37,4 +43,3 @@ public class SecurityProperties {
                 .toList();
     }
 }
-
