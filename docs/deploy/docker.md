@@ -1,6 +1,6 @@
 # Docker Compose 部署教程
 
-本教程用于单机完整部署：`gateway + frontend-vue + frontend-react + backend + postgres + mysql + redis`。
+本教程用于单机完整部署：`gateway + frontend-vue + backend + postgres + mysql + redis`。
 
 ## 1. 构建并启动
 
@@ -16,7 +16,7 @@ docker compose ps
 
 期望：
 
-- `gateway`、`frontend-vue`、`frontend-react`、`backend`、`database`、`mysql`、`redis` 全部 `healthy`。
+- `gateway`、`frontend-vue`、`backend`、`database`、`mysql`、`redis` 全部 `healthy`。
 
 ## 3. 路由验证
 
@@ -25,10 +25,10 @@ curl -I http://localhost:5173/
 curl -I http://localhost:5173/react/
 ```
 
-页面验证：
+预期：
 
-- `http://localhost:5173/` 为 Vue
-- `http://localhost:5173/react/` 为 React
+- `http://localhost:5173/` 返回 200
+- `http://localhost:5173/react/` 返回 404
 
 ## 4. 接口验证
 
@@ -55,17 +55,12 @@ curl "http://localhost:8000/api/v1/traffic/predictions?road_name=陈兴道路&ho
 
 ```bash
 bash scripts/check_mirror_consistency.sh
-```
-
-按灰度窗口做增量校验（推荐）：
-
-```bash
 bash scripts/check_mirror_consistency.sh --since 2026-02-27T03:00:00
 ```
 
 ## 6. 回滚
 
-若切换后异常，可快速回到 PostgreSQL 主库：
+数据库回滚：
 
 ```bash
 ./scripts/db/switch_primary.sh postgres

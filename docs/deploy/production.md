@@ -5,7 +5,7 @@
 推荐拓扑：
 
 1. 外层 Nginx/Traefik（TLS 终止、WAF、限流）
-2. 内层 `gateway`（`/` -> Vue，`/react/` -> React 回滚）
+2. 内层 `gateway`（`/` -> Vue 单栈）
 3. `backend`（仅内网暴露）
 4. `postgres` 主库（默认）
 5. `mysql` 镜像库（灰度阶段）
@@ -38,8 +38,14 @@ docker compose up -d
 ```bash
 docker compose ps
 curl -I http://127.0.0.1:5173/
+curl -I http://127.0.0.1:5173/react/
 curl -I http://127.0.0.1:8000/api/v1/site-settings
 ```
+
+验收预期：
+
+- `/` 返回 `200`
+- `/react/` 返回 `404`
 
 ## 4. 数据库灰度策略
 
@@ -66,7 +72,7 @@ bash scripts/check_mirror_consistency.sh
 
 - 后端：接口错误率、P95/P99、JVM、连接池
 - Edge：FPS、inference_ms、CPU/内存、上报成功率
-- DB：主从延迟（如有）、慢查询、连接数
+- DB：慢查询、连接数
 - Redis：命中率、内存使用、连接数
 
 ## 6. 备份与恢复
@@ -85,7 +91,6 @@ cat backup_YYYY-MM-DD.sql | docker exec -i database psql -U postgres -d transpor
 
 ## 7. 回滚
 
-- 前端回滚：切换到 `http://<host>/react/`
+- 前端回滚：回退到上一版 `gateway` 与 `frontend-vue` 镜像 tag
 - 数据库回滚：执行 `./scripts/db/switch_primary.sh postgres`
 - 应用回滚：回退镜像 tag 后 `docker compose up -d`
-

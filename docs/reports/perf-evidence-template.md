@@ -18,7 +18,7 @@
 - 样本数：
 - P95 响应时间：
 
-## 4. 原始数据与脚本
+## 4. 产出要求
 - 脚本：`scripts/perf/run_perf_bundle.sh`
-- 原始 CSV：`docs/reports/raw/`
 - 汇总报告：`docs/reports/perf-summary-*.md`
+- 原始数据：外部归档（不入仓）

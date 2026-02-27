@@ -1,11 +1,10 @@
 # frontend-vue
 
-Vue3 + TypeScript + ECharts 前端，当前为系统默认入口。
+Vue3 + TypeScript + ECharts 前端，当前为系统唯一入口。
 
 ## 访问入口
 
 - 默认入口：`http://localhost:5173/`
-- React 回滚入口：`http://localhost:5173/react/`
 
 ## 功能范围
 
@@ -34,4 +33,3 @@ pnpm dev --port 5174
 cd frontend-vue
 pnpm build
 ```
-

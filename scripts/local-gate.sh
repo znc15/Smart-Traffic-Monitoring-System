@@ -3,18 +3,6 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-echo "[gate] frontend lint"
-(
-  cd "$ROOT_DIR/frontend"
-  pnpm lint
-)
-
-echo "[gate] frontend build"
-(
-  cd "$ROOT_DIR/frontend"
-  pnpm build
-)
-
 echo "[gate] frontend-vue build"
 (
   cd "$ROOT_DIR/frontend-vue"
