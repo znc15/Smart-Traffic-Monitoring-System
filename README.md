@@ -1,85 +1,59 @@
 # Smart Traffic Monitoring System
 
-智能交通监控系统，当前采用 Vue 单栈前端。
+智能交通监控系统（Vue 单栈 + Spring Boot + Edge 推理）。
 
-## 当前入口
+## 当前状态
 
-- `http://localhost:5173/`：Vue 控制台
-- `http://localhost:8000/`：后端 API
-- `localhost:5433`：PostgreSQL
-- `localhost:3307`：MySQL
-- `localhost:6380`：Redis
+- 前端仅保留 `frontend-vue`，`/react` 已下线（返回 `404`）
+- 仓库不再存放原始截图、CSV、XLSX 证据文件
+- 默认支持 PostgreSQL 主库，MySQL/Redis 保留灰度能力
 
-## 架构概览
-
-- `edge`：YOLOv8 + OpenVINO + ByteTrack（默认）实时检测与追踪
-- `backend`：Spring Boot（鉴权、管理、预测、MaaS、报表导出、双写灰度）
-- `frontend-vue`：Vue3 + ECharts，唯一前端入口
-- `gateway`：Nginx 路由层，统一 `5173` 端口
-
-## 一键启动
+## 快速开始
 
 ```bash
 docker compose up --build -d
-```
-
-检查状态：
-
-```bash
 docker compose ps
 ```
 
-期望：`backend`、`frontend-vue`、`gateway`、`database`、`mysql`、`redis` 均为 `healthy`。
-
-## 本地门禁
+联调检查：
 
 ```bash
+curl -I http://localhost:5173/
+curl -I http://localhost:5173/react/
+curl -I http://localhost:8000/api/v1/site-settings
+```
+
+预期：`/` 为 `200`，`/react/` 为 `404`。
+
+## 常用命令
+
+```bash
+# 本地门禁（构建 + 测试 + 联调）
 ./scripts/local-gate.sh
+
+# 清理依赖与构建缓存
+./scripts/clean-project.sh
+
+# 停止服务
+docker compose down
 ```
 
-顺序：
+## 项目结构
 
-1. `frontend-vue`：`pnpm build`
-2. `backend`：`mvn -B test`
-3. `edge`：`python3 -m py_compile edge/*.py && pytest -q edge/tests`
-4. `docker compose up --build -d`
+- `frontend-vue`：Vue3 管理端与可视化
+- `backend`：认证、管理、预测、MaaS、报表导出
+- `edge`：检测、追踪、车道统计、事件识别、上报
+- `gateway`：统一入口网关（`5173`）
+- `docs`：部署、需求追踪、答辩模板文档
 
-## 报表导出接口
-
-```text
-GET /api/v1/reports/traffic/export
-  ?granularity=hourly|daily|weekly|monthly
-  &road_name=<optional>
-  &start_at=<ISO8601 optional>
-  &end_at=<ISO8601 optional>
-  &format=json|xlsx
-```
-
-认证：`Authorization: Bearer <token>` 或登录 Cookie。
-
-## MySQL/Redis 双写灰度切换
-
-```bash
-./scripts/db/switch_primary.sh postgres
-./scripts/db/switch_primary.sh mysql
-```
-
-一致性校验：
-
-```bash
-bash scripts/check_mirror_consistency.sh
-bash scripts/check_mirror_consistency.sh --all
-bash scripts/check_mirror_consistency.sh --since 2026-02-27T03:00:00
-```
-
-## 详细部署教程
+## 部署文档
 
 - 本地部署：`docs/deploy/local.md`
 - Docker 部署：`docs/deploy/docker.md`
 - 生产部署：`docs/deploy/production.md`
 
-## 子模块 README
+## 模块文档
 
 - 后端：`backend/README.md`
 - 边缘端：`edge/README.md`
-- Vue 前端：`frontend-vue/README.md`
+- 前端：`frontend-vue/README.md`
