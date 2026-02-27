@@ -1,45 +1,106 @@
 <template>
   <section class="dashboard">
-    <div v-if="announcement" class="announcement">{{ announcement }}</div>
+    <!-- 顶部公告栏 -->
+    <n-alert v-if="announcement" type="info" closable>
+      {{ announcement }}
+    </n-alert>
 
-    <div class="content">
-      <div class="video-panel">
-        <h3>实时画面</h3>
-        <div class="video-box">
-          <img v-if="selectedRoad" :src="frameUrl(selectedRoad)" :alt="selectedRoad" />
-          <div v-else class="empty">暂无路段</div>
-        </div>
-        <p v-if="selectedRoad" class="sub">当前路段：{{ selectedRoad }}</p>
-      </div>
+    <!-- 加载骨架屏 -->
+    <template v-if="!state.initialized">
+      <n-grid :cols="24" :x-gap="16" :y-gap="16" responsive="screen" item-responsive>
+        <n-grid-item span="24 m:16">
+          <n-card title="实时监控" size="small">
+            <n-skeleton height="360px" />
+            <n-skeleton text style="margin-top: 12px; width: 40%" />
+          </n-card>
+        </n-grid-item>
+        <n-grid-item span="24 m:8">
+          <n-card title="道路状态" size="small">
+            <n-skeleton text :repeat="8" />
+          </n-card>
+        </n-grid-item>
+      </n-grid>
+    </template>
 
-      <div class="list-panel">
-        <h3>交通状态</h3>
-        <div v-if="!state.roads.length" class="empty">暂无道路数据</div>
-        <button
-          v-for="road in state.roads"
-          :key="road"
-          class="road-item"
-          :class="{ active: road === selectedRoad }"
-          @click="selectedRoad = road"
-        >
-          <div class="top">
-            <strong>{{ road }}</strong>
-            <span class="tag" :class="statusClass(state.trafficData[road]?.density_status)">
-              {{ statusLabel(state.trafficData[road]?.density_status) }}
-            </span>
+    <!-- 主体内容 -->
+    <n-grid v-else :cols="24" :x-gap="16" :y-gap="16" responsive="screen" item-responsive>
+      <!-- 左侧：视频流区域 -->
+      <n-grid-item span="24 m:16">
+        <n-card title="实时监控" size="small" :segmented="{ content: true }">
+          <div class="video-box">
+            <img
+              v-if="selectedRoad"
+              :src="frameUrl(selectedRoad)"
+              :alt="selectedRoad"
+            />
+            <n-empty v-else description="暂无路段" class="video-empty" />
           </div>
-          <div class="meta">
-            <span>汽车 {{ state.trafficData[road]?.count_car ?? 0 }}</span>
-            <span>非机动车 {{ state.trafficData[road]?.count_motor ?? 0 }}</span>
-            <span>行人 {{ state.trafficData[road]?.count_person ?? 0 }}</span>
+          <n-text v-if="selectedRoad" depth="3" style="margin-top: 10px; display: block">
+            当前路段：{{ selectedRoad }}
+          </n-text>
+        </n-card>
+      </n-grid-item>
+
+      <!-- 右侧：道路状态列表 -->
+      <n-grid-item span="24 m:8">
+        <n-card title="道路状态" size="small" :segmented="{ content: true }">
+          <n-empty v-if="!state.roads.length" description="暂无道路数据" />
+          <div v-else class="road-list">
+            <n-card
+              v-for="road in state.roads"
+              :key="road"
+              size="small"
+              hoverable
+              class="road-item"
+              :class="{ 'road-item--active': road === selectedRoad }"
+              @click="selectedRoad = road"
+            >
+              <div class="road-header">
+                <n-text strong>{{ road }}</n-text>
+                <n-tag
+                  :type="tagType(state.trafficData[road]?.density_status)"
+                  size="small"
+                  round
+                >
+                  {{ statusLabel(state.trafficData[road]?.density_status) }}
+                </n-tag>
+              </div>
+              <div class="road-stats">
+                <n-statistic label="汽车" tabular-nums>
+                  <n-number-animation
+                    :from="0"
+                    :to="state.trafficData[road]?.count_car ?? 0"
+                    :duration="600"
+                  />
+                </n-statistic>
+                <n-statistic label="非机动车" tabular-nums>
+                  <n-number-animation
+                    :from="0"
+                    :to="state.trafficData[road]?.count_motor ?? 0"
+                    :duration="600"
+                  />
+                </n-statistic>
+                <n-statistic label="行人" tabular-nums>
+                  <n-number-animation
+                    :from="0"
+                    :to="state.trafficData[road]?.count_person ?? 0"
+                    :duration="600"
+                  />
+                </n-statistic>
+              </div>
+              <div class="road-speed">
+                <n-text depth="3">
+                  车速 {{ state.trafficData[road]?.speed_car ?? 0 }} km/h
+                </n-text>
+                <n-text depth="3">
+                  摩托 {{ state.trafficData[road]?.speed_motor ?? 0 }} km/h
+                </n-text>
+              </div>
+            </n-card>
           </div>
-          <div class="meta">
-            <span>车速 {{ state.trafficData[road]?.speed_car ?? 0 }} km/h</span>
-            <span>摩托 {{ state.trafficData[road]?.speed_motor ?? 0 }} km/h</span>
-          </div>
-        </button>
-      </div>
-    </div>
+        </n-card>
+      </n-grid-item>
+    </n-grid>
   </section>
 </template>
 
@@ -65,11 +126,11 @@ const statusLabel = (status?: string) => {
   return '未知'
 }
 
-const statusClass = (status?: string) => {
-  if (status === 'congested') return 'danger'
-  if (status === 'busy') return 'warn'
-  if (status === 'clear') return 'ok'
-  return 'normal'
+const tagType = (status?: string): 'error' | 'warning' | 'success' | 'default' => {
+  if (status === 'congested') return 'error'
+  if (status === 'busy') return 'warning'
+  if (status === 'clear') return 'success'
+  return 'default'
 }
 
 onMounted(async () => {
@@ -101,35 +162,12 @@ onUnmounted(() => {
 <style scoped>
 .dashboard {
   display: grid;
-  gap: 14px;
-}
-
-.announcement {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  color: #1d4ed8;
-  border-radius: 10px;
-  padding: 10px 12px;
-}
-
-.content {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: 2fr 1fr;
-}
-
-.video-panel,
-.list-panel {
-  border-radius: 12px;
-  background: #fff;
-  padding: 14px;
-  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.08);
+  gap: 16px;
 }
 
 .video-box {
-  margin-top: 8px;
   aspect-ratio: 16 / 9;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #111827;
   overflow: hidden;
 }
@@ -140,76 +178,54 @@ onUnmounted(() => {
   object-fit: cover;
 }
 
-.sub {
-  margin-top: 8px;
-  color: #64748b;
+.video-empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.road-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .road-item {
-  width: 100%;
-  margin-top: 10px;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  background: #fff;
-  padding: 10px;
-  text-align: left;
   cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.road-item.active {
-  border-color: #0ea5e9;
-  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+.road-item--active {
+  border-color: #2080f0;
+  box-shadow: 0 0 0 2px rgba(32, 128, 240, 0.15);
 }
 
-.top {
+.road-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: 8px;
 }
 
-.tag {
-  font-size: 12px;
-  padding: 3px 8px;
-  border-radius: 999px;
-}
-
-.tag.ok {
-  background: #dcfce7;
-  color: #15803d;
-}
-
-.tag.warn {
-  background: #fef3c7;
-  color: #b45309;
-}
-
-.tag.danger {
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
-.tag.normal {
-  background: #e2e8f0;
-  color: #475569;
-}
-
-.meta {
-  margin-top: 6px;
-  color: #334155;
+.road-stats {
   display: flex;
-  gap: 10px;
+  gap: 16px;
   flex-wrap: wrap;
+}
+
+.road-stats :deep(.n-statistic .n-statistic-value) {
+  font-size: 20px;
+}
+
+.road-stats :deep(.n-statistic .n-statistic__label) {
+  font-size: 12px;
+}
+
+.road-speed {
+  margin-top: 8px;
+  display: flex;
+  gap: 16px;
   font-size: 13px;
-}
-
-.empty {
-  color: #64748b;
-  padding: 14px 0;
-}
-
-@media (max-width: 960px) {
-  .content {
-    grid-template-columns: 1fr;
-  }
 }
 </style>
