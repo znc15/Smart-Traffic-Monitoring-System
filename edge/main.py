@@ -27,11 +27,13 @@ from state import state
 from detector import reset_model
 from camera_discovery import interactive_select
 from resource_manager import init_resource_manager
+from telemetry_reporter import start_reporter_thread
 
 # ---------------------------------------------------------------------------
 # 模块级变量：当前检测循环线程引用，供 restart_loop 访问
 # ---------------------------------------------------------------------------
 _loop_thread: threading.Thread | None = None
+_reporter_thread: threading.Thread | None = None
 # 重启锁，防止并发重启导致竞态
 _restart_lock = threading.Lock()
 
@@ -119,7 +121,7 @@ def _open_browser(port: int, timeout: float = 10.0) -> None:
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     """启动后台检测线程，并注册重启回调"""
-    global _loop_thread
+    global _loop_thread, _reporter_thread
 
     # 预初始化 psutil CPU 采样（首次调用返回 0，需要预热）
     psutil.cpu_percent(interval=None)
@@ -135,6 +137,7 @@ async def lifespan(application: FastAPI):
         print(f"[INFO] 模拟模式，路段: {config.ROAD_NAME}")
         _loop_thread = threading.Thread(target=sim_loop, daemon=True)
     _loop_thread.start()
+    _reporter_thread = start_reporter_thread()
 
     # 注册重启回调到 state，供 routes.py 调用（避免循环导入）
     state.restart_callback = restart_loop
@@ -153,6 +156,8 @@ async def lifespan(application: FastAPI):
     state.stop()
     if _loop_thread is not None and _loop_thread.is_alive():
         _loop_thread.join(timeout=5.0)
+    if _reporter_thread is not None and _reporter_thread.is_alive():
+        _reporter_thread.join(timeout=2.0)
     print("[INFO] 应用关闭，检测循环已停止")
 
 

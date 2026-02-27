@@ -22,6 +22,11 @@ flow.js
 frontend/node_modules/
 frontend/dist/
 frontend/*.local
+frontend-vue/node_modules/
+frontend-vue/dist/
+frontend-vue/*.local
+frontend-vue/*.tsbuildinfo
+frontend-vue/src/*.js
 .pnpm-store/
 
 # === Backend (Java + Maven) ===
@@ -45,6 +50,5 @@ edge/__pycache__/
 edge/tmp/
 edge/models/*_openvino_model/
 .venv/
-docs/
 .pytest_cache/
 __pycache__/

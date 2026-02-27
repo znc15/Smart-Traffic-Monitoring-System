@@ -19,8 +19,12 @@ class EdgeState:
         self.frame_jpeg: bytes = b""
         self.count_car: int = 0
         self.count_motor: int = 0
+        self.count_person: int = 0
         self.speed_car: float = 0.0
         self.speed_motor: float = 0.0
+        self.lane_stats: list[dict] = []
+        self.events: list[dict] = []
+        self.tracked_objects: list[dict] = []
         self.inference_ms: float = 0.0
         self.fps: float = 0.0
         self.start_time: float = time.time()
@@ -45,12 +49,20 @@ class EdgeState:
 
     def update_traffic(self, count_car: int, count_motor: int,
                        speed_car: float, speed_motor: float,
-                       inference_ms: float, fps: float):
+                       inference_ms: float, fps: float,
+                       count_person: int = 0,
+                       lane_stats: list[dict] | None = None,
+                       events: list[dict] | None = None,
+                       tracked_objects: list[dict] | None = None):
         with self._lock:
             self.count_car = count_car
             self.count_motor = count_motor
+            self.count_person = count_person
             self.speed_car = speed_car
             self.speed_motor = speed_motor
+            self.lane_stats = lane_stats if lane_stats is not None else []
+            self.events = events if events is not None else []
+            self.tracked_objects = tracked_objects if tracked_objects is not None else []
             self.inference_ms = inference_ms
             self.fps = fps
 
@@ -63,8 +75,12 @@ class EdgeState:
             return {
                 "count_car": self.count_car,
                 "count_motor": self.count_motor,
+                "count_person": self.count_person,
                 "speed_car": self.speed_car,
                 "speed_motor": self.speed_motor,
+                "lane_stats": self.lane_stats,
+                "events": self.events,
+                "tracked_objects": self.tracked_objects,
             }
 
     def clear_frame(self) -> None:

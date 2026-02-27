@@ -203,6 +203,9 @@ sudo systemctl restart edge-node
 - `QUANTIZE`：`int8 | fp16 | none`
 - `JPEG_QUALITY`
 - `MAX_MJPEG_CLIENTS`
+- `EDGE_NODE_ID`：边缘节点标识（主动上报使用）
+- `BACKEND_TELEMETRY_URL`：主动上报地址（如 `http://backend:8000/api/v1/edge/telemetry`）
+- `TELEMETRY_INTERVAL_SEC`：主动上报周期（秒）
 
 ## API 一览
 
@@ -275,6 +278,21 @@ sudo systemctl restart edge-node
 
 - `GET /api/traffic`
 - `GET /api/frame`
+
+如需改为“边缘主动上报为主”，配置以下环境变量后重启：
+
+```bash
+export EDGE_NODE_ID=edge-01
+export BACKEND_TELEMETRY_URL=http://<backend-host>:8000/api/v1/edge/telemetry
+export TELEMETRY_INTERVAL_SEC=3
+```
+
+主动上报 payload 会包含：
+
+- `count_car`, `count_motor`, `count_person`
+- `lane_stats`（车道级计数）
+- `events`（规则型异常事件）
+- `tracked_objects`（含 `track_id`）
 
 ## 测试
 

@@ -37,5 +37,8 @@ app:
     password: ${INIT_ADMIN_PASSWORD:}
   network:
     base-url-api: ${BASE_URL_API:http://localhost:8000}
+  maas:
+    default-client-name: ${APP_MAAS_DEFAULT_CLIENT_NAME:default-dev-client}
+    default-api-key: ${APP_MAAS_DEFAULT_API_KEY:dev-maas-key-change-me}
   traffic:
     roads: ${TRAFFIC_ROADS:陈兴道路,陈富路,阮惠路,黎利路,阮廌路}

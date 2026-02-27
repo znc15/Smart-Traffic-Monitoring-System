@@ -53,9 +53,15 @@ MAX_MJPEG_CLIENTS = int(os.environ.get("MAX_MJPEG_CLIENTS", "5"))
 # Uvicorn worker count (keep at 1 for low-spec industrial PCs)
 UVICORN_WORKERS = int(os.environ.get("UVICORN_WORKERS", "1"))
 
+# 主动上报到云端后端（可选）
+EDGE_NODE_ID = os.environ.get("EDGE_NODE_ID", "edge-01")
+BACKEND_TELEMETRY_URL = os.environ.get("BACKEND_TELEMETRY_URL", "").strip()
+TELEMETRY_INTERVAL_SEC = float(os.environ.get("TELEMETRY_INTERVAL_SEC", "3"))
+
 # COCO 类别映射
 CAR_CLASSES = {2, 5, 7}       # car, bus, truck → 归为"汽车"
 MOTOR_CLASSES = {1, 3}        # bicycle, motorcycle → 归为"摩托/非机动车"
+PERSON_CLASSES = {0}          # person
 
 
 def get_model_path() -> Path:

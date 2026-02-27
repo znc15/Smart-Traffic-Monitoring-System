@@ -1,8 +1,10 @@
 package com.smarttraffic.backend.config;
 
 import com.smarttraffic.backend.model.CameraEntity;
+import com.smarttraffic.backend.model.ApiClientEntity;
 import com.smarttraffic.backend.model.SiteSettingsEntity;
 import com.smarttraffic.backend.model.UserEntity;
+import com.smarttraffic.backend.repository.ApiClientRepository;
 import com.smarttraffic.backend.repository.CameraRepository;
 import com.smarttraffic.backend.repository.SiteSettingsRepository;
 import com.smarttraffic.backend.repository.UserRepository;
@@ -24,16 +26,21 @@ public class SiteSettingsInitializer implements CommandLineRunner {
     private final CameraRepository cameraRepository;
     private final TrafficProperties trafficProperties;
     private final InitAdminProperties initAdminProperties;
+    private final ApiClientRepository apiClientRepository;
+    private final MaasProperties maasProperties;
 
     public SiteSettingsInitializer(SiteSettingsRepository repo, UserRepository userRepository,
                                    PasswordEncoder passwordEncoder, CameraRepository cameraRepository,
-                                   TrafficProperties trafficProperties, InitAdminProperties initAdminProperties) {
+                                   TrafficProperties trafficProperties, InitAdminProperties initAdminProperties,
+                                   ApiClientRepository apiClientRepository, MaasProperties maasProperties) {
         this.repo = repo;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.cameraRepository = cameraRepository;
         this.trafficProperties = trafficProperties;
         this.initAdminProperties = initAdminProperties;
+        this.apiClientRepository = apiClientRepository;
+        this.maasProperties = maasProperties;
     }
 
     @Override
@@ -57,6 +64,8 @@ public class SiteSettingsInitializer implements CommandLineRunner {
             }
             log.info("已从配置初始化 {} 个摄像头", trafficProperties.roadsAsList().size());
         }
+
+        ensureDefaultApiClient();
     }
 
     private void createInitialAdmin() {
@@ -99,5 +108,20 @@ public class SiteSettingsInitializer implements CommandLineRunner {
             else hasSpecial = true;
         }
         return hasUpper && hasLower && hasDigit && hasSpecial;
+    }
+
+    private void ensureDefaultApiClient() {
+        if (apiClientRepository.count() > 0) {
+            return;
+        }
+        ApiClientEntity entity = new ApiClientEntity();
+        entity.setName(safeTrim(maasProperties.getDefaultClientName()).isEmpty()
+                ? "default-dev-client"
+                : safeTrim(maasProperties.getDefaultClientName()));
+        String key = safeTrim(maasProperties.getDefaultApiKey());
+        entity.setApiKey(key.isEmpty() ? "dev-maas-key-change-me" : key);
+        entity.setEnabled(true);
+        apiClientRepository.save(entity);
+        log.info("已初始化默认 MaaS API 客户端: {}", entity.getName());
     }
 }

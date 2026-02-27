@@ -10,6 +10,11 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d transportation_system"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks:
       - mynet
   backend:
@@ -31,8 +36,16 @@ services:
       JWT_SECRET: change-this-dev-secret-change-this-dev-secret
       ACCESS_TOKEN_EXPIRE_DAYS: 7
       BASE_URL_API: http://localhost:8000
+      APP_MAAS_DEFAULT_CLIENT_NAME: default-dev-client
+      APP_MAAS_DEFAULT_API_KEY: dev-maas-key-change-me
     depends_on:
-      - database
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "ps -ef | grep -q '[j]ava -jar app.jar'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
     networks:
       - mynet
 
@@ -41,13 +54,19 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-docker.m.daocloud.io/library/node:20.17.0-alpine}
+        NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-docker.m.daocloud.io/library/node:20.19.0-alpine}
         NGINX_BASE_IMAGE: ${NGINX_BASE_IMAGE:-docker.m.daocloud.io/library/nginx:1.27-alpine}
     container_name: frontend
     ports:
       - "5173:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "ps -ef | grep -q '[n]ginx: master process'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
     networks:
       - mynet
 

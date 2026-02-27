@@ -93,6 +93,12 @@ public class AdminController {
             Object roadName = body.getOrDefault("road_name", body.get("roadName"));
             cam.setRoadName(roadName != null ? String.valueOf(roadName) : null);
         }
+        if (body.containsKey("latitude")) {
+            cam.setLatitude(parseDouble(body.get("latitude")));
+        }
+        if (body.containsKey("longitude")) {
+            cam.setLongitude(parseDouble(body.get("longitude")));
+        }
         CameraEntity saved = cameraRepository.save(cam);
         trafficService.reloadCameras(trafficProperties);
         return saved;
@@ -159,6 +165,27 @@ public class AdminController {
         if (raw instanceof String text) {
             try {
                 return Integer.parseInt(text.trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private Double parseDouble(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        if (raw instanceof Number number) {
+            return number.doubleValue();
+        }
+        if (raw instanceof String text) {
+            String normalized = text.trim();
+            if (normalized.isEmpty()) {
+                return null;
+            }
+            try {
+                return Double.parseDouble(normalized);
             } catch (NumberFormatException ignored) {
                 return null;
             }

@@ -1,6 +1,7 @@
 package com.smarttraffic.backend.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smarttraffic.backend.security.ApiKeyAuthenticationFilter;
 import com.smarttraffic.backend.security.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
@@ -26,11 +27,18 @@ import java.util.Map;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
     private final ObjectMapper objectMapper;
     private final SecurityProperties securityProperties;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, ObjectMapper objectMapper, SecurityProperties securityProperties) {
+    public SecurityConfig(
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
+            ObjectMapper objectMapper,
+            SecurityProperties securityProperties
+    ) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.apiKeyAuthenticationFilter = apiKeyAuthenticationFilter;
         this.objectMapper = objectMapper;
         this.securityProperties = securityProperties;
     }
@@ -44,7 +52,9 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/edge/telemetry").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/roads_name", "/api/v1/info/**", "/api/v1/frames_no_auth/**", "/api/v1/site-settings").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/traffic/predictions", "/api/v1/maas/**").permitAll()
                         .requestMatchers("/api/v1/ws/**", "/api/v1/admin/ws/**").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
@@ -58,7 +68,8 @@ public class SecurityConfig {
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                             objectMapper.writeValue(response.getWriter(), Map.of("detail", "Forbidden"));
                         }))
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(apiKeyAuthenticationFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }

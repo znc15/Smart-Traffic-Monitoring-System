@@ -20,9 +20,20 @@ Smart-Traffic-Monitoring-System
 ├── backend/                  # Spring Boot 后端
 ├── edge/                     # 边缘节点
 ├── frontend/                 # React 前端
+├── docs/                     # 需求矩阵、部署文档、报告
+├── scripts/                  # 本地门禁脚本
 ├── docker-compose.yml
 └── README.md
 ```
+
+关键文档入口：
+
+- `docs/requirements/traceability.md`
+- `docs/reports/gap-baseline.md`
+- `docs/deploy/local.md`
+- `docs/deploy/docker.md`
+- `docs/deploy/production.md`
+- `backend/README.md`
 
 ## 快速启动（Docker）
 
@@ -285,9 +296,7 @@ python main.py --port 9000
 按以下顺序执行：
 
 ```bash
-cd frontend && pnpm lint && pnpm build
-cd ../backend && mvn test
-cd ../edge && python3 -m py_compile *.py
+./scripts/local-gate.sh
 ```
 
 ## CI

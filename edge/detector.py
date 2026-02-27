@@ -19,6 +19,7 @@ import config
 # ---------------------------------------------------------------------------
 _COLOR_CAR = (255, 120, 40)     # blue-orange for cars
 _COLOR_MOTOR = (40, 220, 120)   # green for motorcycles
+_COLOR_PERSON = (120, 180, 255)  # light blue for person
 
 # ---------------------------------------------------------------------------
 # 模型加载（懒加载单例，支持 OpenVINO，线程安全）
@@ -147,7 +148,7 @@ def detect_vehicles_detailed(
     使用 YOLOv8 检测车辆（详细模式）
     与 detect_vehicles 相同的检测逻辑，但额外返回每个目标的详细信息
     返回: (标注后的帧, 汽车数, 摩托车数, 推理耗时ms, 目标列表)
-    目标列表: [{"class": "car"/"motor", "confidence": float, "bbox": [x1,y1,x2,y2]}]
+            目标列表: [{"class": "car"/"motor"/"person", "confidence": float, "bbox": [x1,y1,x2,y2]}]
     """
     model = _load_model()
 
@@ -179,6 +180,10 @@ def detect_vehicles_detailed(
                 color = _COLOR_MOTOR
                 label = f"Motor {conf:.0%}"
                 cls_name = "motor"
+            elif cls_id in config.PERSON_CLASSES:
+                color = _COLOR_PERSON
+                label = f"Person {conf:.0%}"
+                cls_name = "person"
             else:
                 continue
 
@@ -207,9 +212,12 @@ def redraw_detections(frame: np.ndarray, objects_list: list[dict]) -> np.ndarray
         if obj["class"] == "car":
             color = _COLOR_CAR
             label = f"Car {conf:.0%}"
-        else:
+        elif obj["class"] == "motor":
             color = _COLOR_MOTOR
             label = f"Motor {conf:.0%}"
+        else:
+            color = _COLOR_PERSON
+            label = f"Person {conf:.0%}"
         cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
         cv2.putText(annotated, label, (x1, y1 - 6),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)

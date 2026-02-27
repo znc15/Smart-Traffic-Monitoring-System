@@ -14,6 +14,8 @@ import config
 from state import state
 from detector import detect_vehicles_detailed, redraw_detections, estimate_speed
 from overlay import draw_overlay
+from simple_tracker import SimpleTracker
+from traffic_enrichment import build_events, build_lane_stats, count_person
 
 
 # ---------------------------------------------------------------------------
@@ -42,6 +44,7 @@ def camera_loop() -> None:
     last_count_motor = 0
     last_inference_ms = 0.0
     last_objects: list[dict] = []
+    tracker = SimpleTracker()
 
     try:
         while not state.should_stop():
@@ -62,10 +65,11 @@ def camera_loop() -> None:
                 # 执行推理
                 annotated, count_car, count_motor, inference_ms, objects = \
                     detect_vehicles_detailed(frame)
+                tracked_objects = tracker.update(objects)
                 last_count_car = count_car
                 last_count_motor = count_motor
                 last_inference_ms = inference_ms
-                last_objects = objects
+                last_objects = tracked_objects
             else:
                 # 跳过推理，复用上次检测结果在新帧上重绘
                 annotated = redraw_detections(frame, last_objects)
@@ -84,6 +88,9 @@ def camera_loop() -> None:
             # 速度估算
             speed_car = estimate_speed(count_car)
             speed_motor = estimate_speed(count_motor)
+            count_person_now = count_person(last_objects)
+            lane_stats = build_lane_stats(last_objects, frame.shape[1])
+            events = build_events(count_car + count_motor, speed_car, speed_motor)
 
             # 在帧上叠加信息栏
             draw_overlay(annotated, count_car, count_motor, speed_car, speed_motor,
@@ -95,7 +102,11 @@ def camera_loop() -> None:
                 continue
 
             state.update_traffic(count_car, count_motor, speed_car, speed_motor,
-                                 inference_ms, current_fps)
+                                 inference_ms, current_fps,
+                                 count_person=count_person_now,
+                                 lane_stats=lane_stats,
+                                 events=events,
+                                 tracked_objects=last_objects)
             state.update_frame(jpeg.tobytes())
     finally:
         # 循环退出时释放 VideoCapture 资源
@@ -160,6 +171,7 @@ def _sim_video_loop(videos: list[Path]) -> None:
         last_count_motor = 0
         last_inference_ms = 0.0
         last_objects: list[dict] = []
+        tracker = SimpleTracker()
 
         try:
             while not state.should_stop():
@@ -173,10 +185,11 @@ def _sim_video_loop(videos: list[Path]) -> None:
                 if frame_count % config.FRAME_SKIP == 0 or (not last_objects and frame_count == 1):
                     annotated, count_car, count_motor, inference_ms, objects = \
                         detect_vehicles_detailed(frame)
+                    tracked_objects = tracker.update(objects)
                     last_count_car = count_car
                     last_count_motor = count_motor
                     last_inference_ms = inference_ms
-                    last_objects = objects
+                    last_objects = tracked_objects
                 else:
                     annotated = redraw_detections(frame, last_objects)
                     count_car = last_count_car
@@ -193,6 +206,9 @@ def _sim_video_loop(videos: list[Path]) -> None:
 
                 speed_car = estimate_speed(count_car)
                 speed_motor = estimate_speed(count_motor)
+                count_person_now = count_person(last_objects)
+                lane_stats = build_lane_stats(last_objects, frame.shape[1])
+                events = build_events(count_car + count_motor, speed_car, speed_motor)
 
                 draw_overlay(annotated, count_car, count_motor, speed_car, speed_motor,
                              inference_ms, current_fps)
@@ -201,7 +217,11 @@ def _sim_video_loop(videos: list[Path]) -> None:
                 if not success:
                     continue
                 state.update_traffic(count_car, count_motor, speed_car, speed_motor,
-                                     inference_ms, current_fps)
+                                     inference_ms, current_fps,
+                                     count_person=count_person_now,
+                                     lane_stats=lane_stats,
+                                     events=events,
+                                     tracked_objects=last_objects)
                 state.update_frame(jpeg.tobytes())
 
                 processing_time = time.time() - frame_start
@@ -228,6 +248,7 @@ def _sim_image_loop(images: list[Path]) -> None:
     last_count_motor = 0
     last_inference_ms = 0.0
     last_objects: list[dict] = []
+    tracker = SimpleTracker()
 
     while not state.should_stop():
         img_path = images[img_idx % len(images)]
@@ -243,10 +264,11 @@ def _sim_image_loop(images: list[Path]) -> None:
         if frame_count % config.FRAME_SKIP == 0 or (not last_objects and frame_count == 1):
             annotated, count_car, count_motor, inference_ms, objects = \
                 detect_vehicles_detailed(frame)
+            tracked_objects = tracker.update(objects)
             last_count_car = count_car
             last_count_motor = count_motor
             last_inference_ms = inference_ms
-            last_objects = objects
+            last_objects = tracked_objects
         else:
             annotated = redraw_detections(frame, last_objects)
             count_car = last_count_car
@@ -263,6 +285,9 @@ def _sim_image_loop(images: list[Path]) -> None:
 
         speed_car = estimate_speed(count_car)
         speed_motor = estimate_speed(count_motor)
+        count_person_now = count_person(last_objects)
+        lane_stats = build_lane_stats(last_objects, frame.shape[1])
+        events = build_events(count_car + count_motor, speed_car, speed_motor)
 
         draw_overlay(annotated, count_car, count_motor, speed_car, speed_motor,
                      inference_ms, current_fps)
@@ -272,7 +297,11 @@ def _sim_image_loop(images: list[Path]) -> None:
             img_idx += 1
             continue
         state.update_traffic(count_car, count_motor, speed_car, speed_motor,
-                             inference_ms, current_fps)
+                             inference_ms, current_fps,
+                             count_person=count_person_now,
+                             lane_stats=lane_stats,
+                             events=events,
+                             tracked_objects=last_objects)
         state.update_frame(jpeg.tobytes())
 
         if state.stop_event.wait(timeout=2.0):
