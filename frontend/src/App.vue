@@ -1,18 +1,24 @@
 <template>
-  <div class="layout">
-    <header v-if="showHeader" class="topbar">
-      <div class="brand">{{ siteName }}</div>
-      <nav class="links">
-        <RouterLink to="/dashboard">首页监控</RouterLink>
-        <RouterLink to="/analytics">分析报表</RouterLink>
-        <RouterLink to="/admin">管理员</RouterLink>
-      </nav>
-      <button class="logout" @click="logout">退出</button>
-    </header>
-    <main :class="showHeader ? 'with-header' : ''">
-      <RouterView />
-    </main>
-  </div>
+  <n-config-provider :theme-overrides="themeOverrides">
+    <n-message-provider>
+      <n-dialog-provider>
+        <div class="layout">
+          <header v-if="showHeader" class="topbar">
+            <div class="brand">{{ siteName }}</div>
+            <nav class="links">
+              <RouterLink to="/dashboard">首页监控</RouterLink>
+              <RouterLink to="/analytics">分析报表</RouterLink>
+              <RouterLink to="/admin">管理员</RouterLink>
+            </nav>
+            <button class="logout" @click="logout">退出</button>
+          </header>
+          <main :class="showHeader ? 'with-header' : ''">
+            <RouterView />
+          </main>
+        </div>
+      </n-dialog-provider>
+    </n-message-provider>
+  </n-config-provider>
 </template>
 
 <script setup lang="ts">
@@ -21,6 +27,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { clearToken, endpoints } from './lib/api'
 import { normalizeSiteSettings } from './lib/normalize'
 import { closeTrafficStore } from './store/traffic'
+import { themeOverrides } from './theme'
 
 const route = useRoute()
 const router = useRouter()
