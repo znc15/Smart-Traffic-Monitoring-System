@@ -1,61 +1,123 @@
 <template>
   <section class="login-wrap">
-    <div class="card">
-      <h2>登录系统</h2>
-      <p class="hint">使用管理员或用户邮箱登录</p>
-      <form @submit.prevent="onSubmit">
-        <label>
-          邮箱
-          <input v-model="username" type="text" placeholder="admin@example.com" />
-        </label>
-        <label>
-          密码
-          <input v-model="password" type="password" placeholder="请输入密码" />
-        </label>
-        <button :disabled="submitting" type="submit">
-          {{ submitting ? '登录中...' : '登录' }}
-        </button>
-      </form>
-      <p v-if="errorText" class="error">{{ errorText }}</p>
+    <div class="login-card-container">
+      <n-card class="login-card" :bordered="false">
+        <div class="logo-section">
+          <div class="logo-icon">
+            <n-icon size="40" color="#2080f0">
+              <SpeedometerOutline />
+            </n-icon>
+          </div>
+          <h1 class="system-title">智慧交通监控系统</h1>
+          <p class="system-subtitle">Smart Traffic Monitoring</p>
+        </div>
+
+        <n-form
+          ref="formRef"
+          :model="formModel"
+          :rules="rules"
+          label-placement="left"
+          :show-label="false"
+          size="large"
+        >
+          <n-form-item path="username">
+            <n-input
+              v-model:value="formModel.username"
+              placeholder="请输入邮箱"
+              @keydown.enter="handleSubmit"
+            >
+              <template #prefix>
+                <n-icon :component="PersonOutline" />
+              </template>
+            </n-input>
+          </n-form-item>
+
+          <n-form-item path="password">
+            <n-input
+              v-model:value="formModel.password"
+              type="password"
+              show-password-on="click"
+              placeholder="请输入密码"
+              @keydown.enter="handleSubmit"
+            >
+              <template #prefix>
+                <n-icon :component="LockClosedOutline" />
+              </template>
+            </n-input>
+          </n-form-item>
+
+          <n-button
+            type="primary"
+            block
+            strong
+            :loading="submitting"
+            :disabled="submitting"
+            @click="handleSubmit"
+          >
+            {{ submitting ? '登录中...' : '登 录' }}
+          </n-button>
+        </n-form>
+      </n-card>
+
+      <p class="copyright">
+        &copy; {{ new Date().getFullYear() }} Smart Traffic Monitoring System
+      </p>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
+import { useMessage, type FormInst, type FormRules } from 'naive-ui'
+import { SpeedometerOutline, PersonOutline, LockClosedOutline } from '@vicons/ionicons5'
 import { endpoints, setToken } from '../lib/api'
 
 const router = useRouter()
-const username = ref('')
-const password = ref('')
+const message = useMessage()
+const formRef = ref<FormInst | null>(null)
 const submitting = ref(false)
-const errorText = ref('')
 
-const onSubmit = async () => {
-  if (!username.value || !password.value) {
-    errorText.value = '请输入邮箱和密码'
+const formModel = reactive({
+  username: '',
+  password: '',
+})
+
+const rules: FormRules = {
+  username: [
+    { required: true, message: '请输入邮箱', trigger: ['input', 'blur'] },
+    { type: 'email', message: '请输入有效的邮箱地址', trigger: ['blur'] },
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: ['input', 'blur'] },
+    { min: 6, message: '密码至少 6 位', trigger: ['blur'] },
+  ],
+}
+
+const handleSubmit = async () => {
+  try {
+    await formRef.value?.validate()
+  } catch {
     return
   }
 
   submitting.value = true
-  errorText.value = ''
 
   try {
     const body = new URLSearchParams()
-    body.set('username', username.value)
-    body.set('password', password.value)
+    body.set('username', formModel.username)
+    body.set('password', formModel.password)
 
     const res = await fetch(endpoints.login, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
-      credentials: 'include'
+      credentials: 'include',
     })
 
     if (!res.ok) {
       const err = await res.json().catch(() => null)
-      errorText.value = err?.detail || '登录失败'
+      message.error(err?.detail || '登录失败')
       return
     }
 
@@ -65,7 +127,7 @@ const onSubmit = async () => {
     }
     await router.replace('/dashboard')
   } catch {
-    errorText.value = '网络异常，请稍后再试'
+    message.error('网络异常，请稍后再试')
   } finally {
     submitting.value = false
   }
@@ -74,62 +136,70 @@ const onSubmit = async () => {
 
 <style scoped>
 .login-wrap {
-  min-height: calc(100vh - 40px);
+  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: linear-gradient(135deg, #e8f4fd 0%, #f0f7ff 50%, #e1ecf7 100%);
+  padding: 20px;
 }
 
-.card {
-  width: min(420px, 92vw);
-  border-radius: 14px;
-  background: #ffffff;
-  padding: 24px;
-  box-shadow: 0 10px 32px rgba(2, 6, 23, 0.12);
+.login-card-container {
+  animation: fadeInUp 0.6s ease-out both;
 }
 
-.hint {
-  color: #64748b;
-  margin-top: -4px;
-  margin-bottom: 14px;
+.login-card {
+  width: min(400px, 92vw);
+  border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
 }
 
-form {
-  display: grid;
-  gap: 12px;
+.logo-section {
+  text-align: center;
+  margin-bottom: 32px;
 }
 
-label {
-  display: grid;
-  gap: 6px;
-  font-size: 14px;
+.logo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #eef4ff 0%, #dbeafe 100%);
+  margin-bottom: 16px;
 }
 
-input {
-  height: 40px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 0 10px;
+.system-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 4px 0;
+  letter-spacing: 1px;
 }
 
-button {
-  margin-top: 4px;
-  height: 40px;
-  border: 0;
-  border-radius: 8px;
-  background: #0ea5e9;
-  color: #fff;
-  cursor: pointer;
+.system-subtitle {
+  font-size: 13px;
+  color: #9ca3af;
+  margin: 0;
+  letter-spacing: 0.5px;
 }
 
-button:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
+.copyright {
+  text-align: center;
+  font-size: 12px;
+  color: #b0bec5;
+  margin-top: 24px;
 }
 
-.error {
-  margin-top: 12px;
-  color: #dc2626;
-  font-size: 14px;
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>
