@@ -106,10 +106,12 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
+import { useMessage } from 'naive-ui'
 import { endpoints } from '../lib/api'
 import { normalizeSiteSettings } from '../lib/normalize'
 import { initializeTrafficStore, useTrafficStoreState } from '../store/traffic'
 
+const message = useMessage()
 const state = useTrafficStoreState()
 const selectedRoad = ref<string | null>(null)
 const announcement = ref('')
@@ -144,7 +146,7 @@ onMounted(async () => {
       announcement.value = normalizeSiteSettings(payload).announcement
     }
   } catch {
-    // ignore
+    message.warning('获取站点公告失败')
   }
 
   timer = window.setInterval(() => {

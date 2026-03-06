@@ -79,6 +79,7 @@ import { computed, h, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   NCard, NSpace, NSelect, NDatePicker, NButton, NButtonGroup,
   NIcon, NGrid, NGridItem, NDataTable,
+  useMessage,
   type DataTableColumns, type PaginationProps
 } from 'naive-ui'
 import * as echarts from 'echarts'
@@ -86,6 +87,7 @@ import { SearchOutline, DownloadOutline } from '@vicons/ionicons5'
 import { authFetch, endpoints } from '../lib/api'
 import { initializeTrafficStore, useTrafficStoreState } from '../store/traffic'
 
+const message = useMessage()
 const state = useTrafficStoreState()
 const lineRef = ref<HTMLElement | null>(null)
 const pieRef = ref<HTMLElement | null>(null)
@@ -201,11 +203,15 @@ const loadReport = async () => {
   try {
     const res = await authFetch(buildQuery('json'), { method: 'GET' })
     if (!res.ok) {
+      message.error('查询报表失败')
       rows.value = []
       return
     }
     const payload = await res.json()
     rows.value = Array.isArray(payload?.rows) ? payload.rows : []
+  } catch (e) {
+    message.error(e instanceof DOMException && e.name === 'AbortError' ? '请求超时' : '查询报表出错')
+    rows.value = []
   } finally {
     tableLoading.value = false
   }
@@ -213,35 +219,46 @@ const loadReport = async () => {
 
 // 导出 JSON
 const downloadJson = async () => {
-  await loadReport()
-  const blob = new Blob(
-    [JSON.stringify(rows.value, null, 2)],
-    { type: 'application/json;charset=utf-8' }
-  )
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `traffic_report_${granularity.value}.json`
-  a.click()
-  URL.revokeObjectURL(url)
+  try {
+    await loadReport()
+    const blob = new Blob(
+      [JSON.stringify(rows.value, null, 2)],
+      { type: 'application/json;charset=utf-8' }
+    )
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `traffic_report_${granularity.value}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    message.error('导出 JSON 失败')
+  }
 }
 
 // 导出 XLSX
 const downloadXlsx = async () => {
-  const res = await authFetch(buildQuery('xlsx'), {
-    method: 'GET',
-    headers: {
-      Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  try {
+    const res = await authFetch(buildQuery('xlsx'), {
+      method: 'GET',
+      headers: {
+        Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      }
+    })
+    if (!res.ok) {
+      message.error('导出 XLSX 失败')
+      return
     }
-  })
-  if (!res.ok) return
-  const blob = await res.blob()
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `traffic_report_${granularity.value}.xlsx`
-  a.click()
-  URL.revokeObjectURL(url)
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `traffic_report_${granularity.value}.xlsx`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    message.error('导出 XLSX 出错')
+  }
 }
 
 // ECharts 商务配色

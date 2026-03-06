@@ -101,29 +101,33 @@ onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
 })
 
-// Fetch current user info
 async function fetchUserInfo() {
   try {
     const res = await authFetch(endpoints.me)
-    if (!res.ok) return
+    if (!res.ok) {
+      if (res.status !== 401) console.warn('获取用户信息失败', res.status)
+      return
+    }
     const data = await res.json()
     username.value = data.username || '用户'
-  } catch {
-    // ignore
+  } catch (e) {
+    console.warn('获取用户信息出错', e)
   }
 }
 
-// Fetch site settings
 async function fetchSiteSettings() {
   try {
     const res = await fetch(endpoints.siteSettings)
-    if (!res.ok) return
+    if (!res.ok) {
+      console.warn('获取站点设置失败', res.status)
+      return
+    }
     const body = await res.json()
     const settings = normalizeSiteSettings(body)
     siteName.value = settings.site_name || '智慧交通监控'
     footerText.value = settings.footer_text
-  } catch {
-    // ignore
+  } catch (e) {
+    console.warn('获取站点设置出错', e)
   }
 }
 

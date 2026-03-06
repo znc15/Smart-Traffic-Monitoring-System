@@ -33,7 +33,11 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY)
 }
 
-export async function authFetch(url: string, init: RequestInit = {}) {
+export async function authFetch(
+  url: string,
+  init: RequestInit = {},
+  timeoutMs = 30_000,
+) {
   const token = getToken()
   const headers = new Headers(init.headers || {})
   if (!headers.has('Content-Type') && !(init.body instanceof FormData)) {
@@ -43,11 +47,29 @@ export async function authFetch(url: string, init: RequestInit = {}) {
     headers.set('Authorization', `Bearer ${token}`)
   }
 
-  return fetch(url, {
-    ...init,
-    headers,
-    credentials: 'include'
-  })
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  if (init.signal) {
+    init.signal.addEventListener('abort', () => controller.abort())
+  }
+
+  try {
+    const res = await fetch(url, {
+      ...init,
+      headers,
+      credentials: 'include',
+      signal: controller.signal,
+    })
+
+    if (res.status === 401) {
+      clearToken()
+      window.location.href = '/login'
+    }
+
+    return res
+  } finally {
+    clearTimeout(timeoutId)
+  }
 }
 
 export function getWsUrl(pathOrUrl: string): string {

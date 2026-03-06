@@ -269,7 +269,10 @@ const fetchUsers = async () => {
   usersLoading.value = true
   try {
     const res = await authFetch(endpoints.adminUsers)
-    if (!res.ok) return
+    if (!res.ok) {
+      message.error('获取用户列表失败')
+      return
+    }
     const data = await res.json()
     users.value = Array.isArray(data) ? data.map(normalizeAdminUser) : []
   } finally {
@@ -281,7 +284,10 @@ const fetchCameras = async () => {
   camerasLoading.value = true
   try {
     const res = await authFetch(endpoints.adminCameras)
-    if (!res.ok) return
+    if (!res.ok) {
+      message.error('获取摄像头列表失败')
+      return
+    }
     const data = await res.json()
     cameras.value = Array.isArray(data) ? data.map(normalizeCamera) : []
   } finally {
@@ -310,18 +316,26 @@ const fetchMonitor = async () => {
 
 // --- User actions ---
 const changeRole = async (u: AdminUser, newRole: number) => {
-  await authFetch(`${endpoints.adminUsers}/${u.id}/role`, {
-    method: 'PUT',
-    body: JSON.stringify({ role_id: newRole }),
-  })
-  await fetchUsers()
-  message.success('角色已更新')
+  try {
+    await authFetch(`${endpoints.adminUsers}/${u.id}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role_id: newRole }),
+    })
+    await fetchUsers()
+    message.success('角色已更新')
+  } catch {
+    message.error('更新角色失败，请重试')
+  }
 }
 
 const toggleStatus = async (u: AdminUser) => {
-  await authFetch(`${endpoints.adminUsers}/${u.id}/status`, { method: 'PUT' })
-  await fetchUsers()
-  message.success('状态已更新')
+  try {
+    await authFetch(`${endpoints.adminUsers}/${u.id}/status`, { method: 'PUT' })
+    await fetchUsers()
+    message.success('状态已更新')
+  } catch {
+    message.error('更新状态失败，请重试')
+  }
 }
 
 // --- Camera actions ---
@@ -382,24 +396,32 @@ const handleCameraSubmit = async () => {
 }
 
 const toggleCamera = async (camera: CameraItem) => {
-  await authFetch(`${endpoints.adminCameras}/${camera.id}`, {
-    method: 'PUT',
-    body: JSON.stringify({
-      name: camera.name,
-      road_name: camera.road_name,
-      location: camera.location,
-      stream_url: camera.stream_url,
-      enabled: !camera.enabled,
-    }),
-  })
-  await fetchCameras()
-  message.success(camera.enabled ? '已禁用' : '已启用')
+  try {
+    await authFetch(`${endpoints.adminCameras}/${camera.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: camera.name,
+        road_name: camera.road_name,
+        location: camera.location,
+        stream_url: camera.stream_url,
+        enabled: !camera.enabled,
+      }),
+    })
+    await fetchCameras()
+    message.success(camera.enabled ? '已禁用' : '已启用')
+  } catch {
+    message.error('切换摄像头状态失败，请重试')
+  }
 }
 
 const deleteCamera = async (id: number) => {
-  await authFetch(`${endpoints.adminCameras}/${id}`, { method: 'DELETE' })
-  await fetchCameras()
-  message.success('摄像头已删除')
+  try {
+    await authFetch(`${endpoints.adminCameras}/${id}`, { method: 'DELETE' })
+    await fetchCameras()
+    message.success('摄像头已删除')
+  } catch {
+    message.error('删除摄像头失败，请重试')
+  }
 }
 
 const saveSettings = async () => {
