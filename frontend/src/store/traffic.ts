@@ -13,6 +13,8 @@ type State = {
 }
 
 const MAX_HISTORY = 120
+const MAX_RECONNECT = 10
+
 const state = reactive<State>({
   roads: [],
   trafficData: {},
@@ -22,6 +24,8 @@ const state = reactive<State>({
 })
 
 const sockets: Record<string, WebSocket> = {}
+const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const reconnectCounts = new Map<string, number>()
 
 function pushHistory() {
   const point: HistoricalPoint = {
@@ -41,14 +45,25 @@ function connectRoad(road: string) {
 
   ws.onopen = () => {
     state.connections[road] = true
+    reconnectCounts.set(road, 0)
   }
 
   ws.onclose = () => {
     state.connections[road] = false
     if (!state.initialized) return
-    setTimeout(() => {
+
+    const attempts = reconnectCounts.get(road) ?? 0
+    if (attempts >= MAX_RECONNECT) {
+      delete state.connections[road]
+      return
+    }
+    reconnectCounts.set(road, attempts + 1)
+
+    const timer = setTimeout(() => {
+      reconnectTimers.delete(road)
       if (state.initialized && state.roads.includes(road)) connectRoad(road)
     }, 1500)
+    reconnectTimers.set(road, timer)
   }
 
   ws.onerror = () => {
@@ -85,6 +100,11 @@ export async function initializeTrafficStore() {
 
 export function closeTrafficStore() {
   state.initialized = false
+
+  for (const timer of reconnectTimers.values()) clearTimeout(timer)
+  reconnectTimers.clear()
+  reconnectCounts.clear()
+
   Object.values(sockets).forEach((ws) => {
     try {
       ws.close()
@@ -93,7 +113,11 @@ export function closeTrafficStore() {
     }
   })
   for (const k of Object.keys(sockets)) delete sockets[k]
+
+  state.roads = []
+  state.trafficData = {}
   state.connections = {}
+  state.historicalData = []
 }
 
 export function useTrafficStoreState() {
