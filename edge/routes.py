@@ -264,6 +264,7 @@ async def _video_generator() -> AsyncGenerator[bytes, None]:
     )
 
     stop = threading.Event()
+    writer_thread = None
 
     def _writer():
         """写入线程：持续将帧写入 FFmpeg stdin"""
@@ -287,10 +288,10 @@ async def _video_generator() -> AsyncGenerator[bytes, None]:
                 break
             stop.wait(0.05)  # ~20fps
 
-    writer_thread = threading.Thread(target=_writer, daemon=True)
-    writer_thread.start()
-
     try:
+        writer_thread = threading.Thread(target=_writer, daemon=True)
+        writer_thread.start()
+
         # 读取 FFmpeg 输出并 yield
         loop = asyncio.get_running_loop()
         while True:
@@ -313,6 +314,8 @@ async def _video_generator() -> AsyncGenerator[bytes, None]:
             proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             proc.kill()
+        if writer_thread is not None:
+            writer_thread.join(timeout=5)
 
 
 @router.get("/api/video", response_model=None)
@@ -430,7 +433,7 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
     if body.tracker_strict is not None:
         config.TRACKER_STRICT = body.tracker_strict
     if body.tracker_cfg is not None:
-        config.TRACKER_CFG = body.tracker_cfg.strip() or "bytetrack.yaml"
+        config.TRACKER_CFG = (body.tracker_cfg.strip() if body.tracker_cfg else "") or "bytetrack.yaml"
 
     # Determine whether a full restart is needed.
     # frame_skip, jpeg_quality are read dynamically in the loop — no restart required.
@@ -541,6 +544,11 @@ def _capture_and_detect(source: str) -> dict | None:
 @router.get("/api/cameras/preview", response_model=None)
 async def preview_camera(source: str = Query(..., description="摄像头源（设备索引或 URL）")) -> Response:
     """抓取一帧并运行检测，用于测试摄像头是否正常"""
+    try:
+        source = validate_probe_source(source)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"detail": str(e)})
+
     loop = asyncio.get_running_loop()
     try:
         result = await asyncio.wait_for(
