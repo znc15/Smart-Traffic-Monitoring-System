@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -39,6 +40,7 @@ public class TrafficReportExportService {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    @Transactional(readOnly = true)
     public TrafficReportResponse queryReport(
             String granularity,
             String roadName,
@@ -97,6 +99,7 @@ public class TrafficReportExportService {
         );
     }
 
+    @Transactional(readOnly = true)
     public byte[] exportXlsx(
             String granularity,
             String roadName,

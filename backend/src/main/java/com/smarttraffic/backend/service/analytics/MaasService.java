@@ -8,10 +8,16 @@ import com.smarttraffic.backend.repository.CameraRepository;
 import com.smarttraffic.backend.repository.TrafficSampleRepository;
 import com.smarttraffic.backend.service.TrafficService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class MaasService {
@@ -30,6 +36,7 @@ public class MaasService {
         this.trafficService = trafficService;
     }
 
+    @Transactional(readOnly = true)
     public MaasCongestionResponse queryCongestion(double minLat, double maxLat, double minLng, double maxLng) {
         List<CameraEntity> cameras = cameraRepository.findInBoundingBox(
                 minLat,
@@ -38,18 +45,26 @@ public class MaasService {
                 maxLng
         );
 
+        List<CameraEntity> validCameras = cameras.stream()
+                .filter(c -> c.getLatitude() != null && c.getLongitude() != null)
+                .toList();
+
+        Set<String> roadNames = new LinkedHashSet<>();
+        for (CameraEntity camera : validCameras) {
+            roadNames.add(firstNonBlank(camera.getRoadName(), camera.getName()));
+        }
+
+        Map<String, TrafficSampleEntity> latestByRoad = roadNames.isEmpty()
+                ? Map.of()
+                : trafficSampleRepository.findLatestByRoadNames(roadNames).stream()
+                        .collect(Collectors.toMap(TrafficSampleEntity::getRoadName, Function.identity(), (a, b) -> a));
+
         List<MaasCongestionItemResponse> data = new ArrayList<>();
         LocalDateTime updatedAt = LocalDateTime.now();
 
-        for (CameraEntity camera : cameras) {
-            if (camera.getLatitude() == null || camera.getLongitude() == null) {
-                continue;
-            }
-
+        for (CameraEntity camera : validCameras) {
             String roadName = firstNonBlank(camera.getRoadName(), camera.getName());
-            TrafficSampleEntity latest = trafficSampleRepository
-                    .findFirstByRoadNameOrderBySampleTimeDesc(roadName)
-                    .orElse(null);
+            TrafficSampleEntity latest = latestByRoad.get(roadName);
 
             double congestionIndex;
             String densityStatus;
