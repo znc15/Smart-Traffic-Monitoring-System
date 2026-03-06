@@ -2,6 +2,7 @@ package com.smarttraffic.backend.controller;
 
 import com.smarttraffic.backend.config.AppRuntimeProperties;
 import com.smarttraffic.backend.config.JwtProperties;
+import com.smarttraffic.backend.dto.auth.LoginRequest;
 import com.smarttraffic.backend.dto.auth.LoginResponse;
 import com.smarttraffic.backend.dto.auth.RegisterRequest;
 import com.smarttraffic.backend.dto.auth.RegisterResponse;
@@ -20,7 +21,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
@@ -47,12 +47,11 @@ public class AuthController {
 
     @PostMapping(value = "/login", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public ResponseEntity<LoginResponse> login(
-            @RequestParam("username") String username,
-            @RequestParam("password") String password,
+            @Valid LoginRequest loginRequest,
             HttpServletRequest request,
             HttpServletResponse response
     ) {
-        LoginResponse loginResponse = authService.login(username, password);
+        LoginResponse loginResponse = authService.login(loginRequest.getUsername(), loginRequest.getPassword());
         boolean secureCookie = !appRuntimeProperties.isDevelopment() || request.isSecure();
 
         ResponseCookie cookie = ResponseCookie.from("access_token", loginResponse.getAccessToken())

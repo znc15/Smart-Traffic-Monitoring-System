@@ -1,6 +1,7 @@
 package com.smarttraffic.backend.controller;
 
 import com.smarttraffic.backend.dto.admin.AdminUserResponse;
+import com.smarttraffic.backend.dto.admin.UpdateCameraRequest;
 import com.smarttraffic.backend.exception.AppException;
 import com.smarttraffic.backend.model.CameraEntity;
 import com.smarttraffic.backend.model.UserEntity;
@@ -13,10 +14,13 @@ import com.smarttraffic.backend.service.CameraPollerService;
 import com.smarttraffic.backend.service.SystemMetricsService;
 import com.smarttraffic.backend.service.TrafficService;
 import com.smarttraffic.backend.service.analytics.RedisCacheService;
+import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -67,13 +71,13 @@ public class AdminController {
     }
 
     @GetMapping("/cameras")
-    public List<CameraEntity> listCameras() {
+    public Page<CameraEntity> listCameras(@PageableDefault(size = 20) Pageable pageable) {
         requireAdmin();
-        return cameraRepository.findAll();
+        return cameraRepository.findAll(pageable);
     }
 
     @PostMapping("/cameras")
-    public CameraEntity createCamera(@RequestBody CameraEntity camera) {
+    public CameraEntity createCamera(@Valid @RequestBody CameraEntity camera) {
         requireAdmin();
         camera.setId(null);
         CameraEntity saved = cameraRepository.save(camera);
@@ -83,27 +87,17 @@ public class AdminController {
     }
 
     @PutMapping("/cameras/{id}")
-    public CameraEntity updateCamera(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+    public CameraEntity updateCamera(@PathVariable Long id, @Valid @RequestBody UpdateCameraRequest body) {
         requireAdmin();
         CameraEntity cam = cameraRepository.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Camera not found"));
-        if (body.containsKey("name")) cam.setName((String) body.get("name"));
-        if (body.containsKey("location")) cam.setLocation((String) body.get("location"));
-        if (body.containsKey("enabled")) cam.setEnabled((Boolean) body.get("enabled"));
-        if (body.containsKey("stream_url") || body.containsKey("streamUrl")) {
-            Object streamUrl = body.getOrDefault("stream_url", body.get("streamUrl"));
-            cam.setStreamUrl(streamUrl != null ? String.valueOf(streamUrl) : null);
-        }
-        if (body.containsKey("road_name") || body.containsKey("roadName")) {
-            Object roadName = body.getOrDefault("road_name", body.get("roadName"));
-            cam.setRoadName(roadName != null ? String.valueOf(roadName) : null);
-        }
-        if (body.containsKey("latitude")) {
-            cam.setLatitude(parseDouble(body.get("latitude")));
-        }
-        if (body.containsKey("longitude")) {
-            cam.setLongitude(parseDouble(body.get("longitude")));
-        }
+        if (body.hasField("name")) cam.setName(body.getName());
+        if (body.hasField("location")) cam.setLocation(body.getLocation());
+        if (body.hasField("enabled") && body.getEnabled() != null) cam.setEnabled(body.getEnabled());
+        if (body.hasField("streamUrl")) cam.setStreamUrl(body.getStreamUrl());
+        if (body.hasField("roadName")) cam.setRoadName(body.getRoadName());
+        if (body.hasField("latitude")) cam.setLatitude(body.getLatitude());
+        if (body.hasField("longitude")) cam.setLongitude(body.getLongitude());
         CameraEntity saved = cameraRepository.save(cam);
         trafficService.reloadCameras(trafficProperties);
         invalidateTrafficCaches();
@@ -123,11 +117,9 @@ public class AdminController {
     }
 
     @GetMapping("/users")
-    public List<AdminUserResponse> listUsers() {
+    public Page<AdminUserResponse> listUsers(@PageableDefault(size = 20) Pageable pageable) {
         requireAdmin();
-        return userRepository.findAll().stream()
-                .map(AdminUserResponse::fromEntity)
-                .toList();
+        return userRepository.findAll(pageable).map(AdminUserResponse::fromEntity);
     }
 
     @PutMapping("/users/{id}/role")
@@ -172,27 +164,6 @@ public class AdminController {
         if (raw instanceof String text) {
             try {
                 return Integer.parseInt(text.trim());
-            } catch (NumberFormatException ignored) {
-                return null;
-            }
-        }
-        return null;
-    }
-
-    private Double parseDouble(Object raw) {
-        if (raw == null) {
-            return null;
-        }
-        if (raw instanceof Number number) {
-            return number.doubleValue();
-        }
-        if (raw instanceof String text) {
-            String normalized = text.trim();
-            if (normalized.isEmpty()) {
-                return null;
-            }
-            try {
-                return Double.parseDouble(normalized);
             } catch (NumberFormatException ignored) {
                 return null;
             }
