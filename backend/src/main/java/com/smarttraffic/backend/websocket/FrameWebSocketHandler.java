@@ -1,7 +1,8 @@
 package com.smarttraffic.backend.websocket;
 
 import com.smarttraffic.backend.service.TrafficService;
-import jakarta.annotation.PreDestroy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
@@ -12,7 +13,6 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -20,16 +20,26 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class FrameWebSocketHandler extends BinaryWebSocketHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(FrameWebSocketHandler.class);
+
     private final TrafficService trafficService;
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+    private final ScheduledExecutorService scheduler;
+    private final WebSocketConnectionLimiter connectionLimiter;
     private final Map<String, ScheduledFuture<?>> tasks = new ConcurrentHashMap<>();
 
-    public FrameWebSocketHandler(TrafficService trafficService) {
+    public FrameWebSocketHandler(TrafficService trafficService,
+                                 ScheduledExecutorService webSocketScheduler,
+                                 WebSocketConnectionLimiter connectionLimiter) {
         this.trafficService = trafficService;
+        this.scheduler = webSocketScheduler;
+        this.connectionLimiter = connectionLimiter;
     }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
+        if (!connectionLimiter.tryAcquire(session)) {
+            return;
+        }
         String roadName = extractRoadName(session, "/api/v1/ws/frames/");
         ScheduledFuture<?> task = scheduler.scheduleAtFixedRate(() -> sendFrame(session, roadName), 0, 33, TimeUnit.MILLISECONDS);
         tasks.put(session.getId(), task);
@@ -37,7 +47,9 @@ public class FrameWebSocketHandler extends BinaryWebSocketHandler {
 
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
+        log.warn("Transport error on frame session {}: {}", session.getId(), exception.getMessage());
         cancel(session.getId());
+        connectionLimiter.release();
         if (session.isOpen()) {
             session.close(CloseStatus.SERVER_ERROR);
         }
@@ -46,11 +58,7 @@ public class FrameWebSocketHandler extends BinaryWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         cancel(session.getId());
-    }
-
-    @PreDestroy
-    public void shutdown() {
-        scheduler.shutdownNow();
+        connectionLimiter.release();
     }
 
     private void sendFrame(WebSocketSession session, String roadName) {
@@ -62,10 +70,12 @@ public class FrameWebSocketHandler extends BinaryWebSocketHandler {
             byte[] frame = trafficService.frame(roadName);
             session.sendMessage(new BinaryMessage(frame));
         } catch (Exception ex) {
+            log.error("Failed to send frame for session {}, road '{}': {}", session.getId(), roadName, ex.getMessage(), ex);
             cancel(session.getId());
             try {
                 session.close(CloseStatus.SERVER_ERROR);
-            } catch (Exception ignored) {
+            } catch (Exception closeEx) {
+                log.warn("Failed to close session {} after send error: {}", session.getId(), closeEx.getMessage());
             }
         }
     }
