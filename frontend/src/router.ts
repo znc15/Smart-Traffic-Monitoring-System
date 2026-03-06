@@ -1,9 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import LoginView from './views/LoginView.vue'
-import DashboardView from './views/DashboardView.vue'
-import AnalyticsView from './views/AnalyticsView.vue'
-import AdminView from './views/AdminView.vue'
 import { getToken } from './lib/api'
+
+const LoginView = () => import('./views/LoginView.vue')
+const DashboardView = () => import('./views/DashboardView.vue')
+const AnalyticsView = () => import('./views/AnalyticsView.vue')
+const AdminView = () => import('./views/AdminView.vue')
 
 const router = createRouter({
   history: createWebHistory(),

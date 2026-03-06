@@ -82,7 +82,13 @@ import {
   useMessage,
   type DataTableColumns, type PaginationProps
 } from 'naive-ui'
-import * as echarts from 'echarts'
+import { use } from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
+import { LineChart, PieChart } from 'echarts/charts'
+import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components'
+import * as echarts from 'echarts/core'
+
+use([CanvasRenderer, LineChart, PieChart, GridComponent, TooltipComponent, LegendComponent])
 import { SearchOutline, DownloadOutline } from '@vicons/ionicons5'
 import { authFetch, endpoints } from '../lib/api'
 import { initializeTrafficStore, useTrafficStoreState } from '../store/traffic'
