@@ -63,7 +63,7 @@ public class AdminMetricsWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         cancel(session.getId());
-        connectionLimiter.release();
+        connectionLimiter.release(session.getId());
     }
 
     private void sendMetrics(WebSocketSession session) {

@@ -7,6 +7,8 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
@@ -18,6 +20,7 @@ public class WebSocketConnectionLimiter {
     private static final CloseStatus POLICY_VIOLATION = new CloseStatus(1008, "Too many connections");
 
     private final AtomicInteger connectionCount = new AtomicInteger(0);
+    private final Set<String> acquiredSessions = ConcurrentHashMap.newKeySet();
 
     /**
      * Try to acquire a connection slot. Returns true if accepted, false if limit exceeded
@@ -36,15 +39,20 @@ public class WebSocketConnectionLimiter {
             }
             return false;
         }
+        acquiredSessions.add(session.getId());
         log.debug("WebSocket connection accepted: session={}, total={}", session.getId(), current);
         return true;
     }
 
-    public void release() {
-        int current = connectionCount.decrementAndGet();
-        if (current < 0) {
-            connectionCount.set(0);
-            log.warn("WebSocket connection count went negative, reset to 0");
+    /**
+     * Release a connection slot. Only decrements the counter if this session
+     * was previously acquired, preventing counter drift from rejected sessions
+     * whose close callback also triggers release.
+     */
+    public void release(String sessionId) {
+        if (acquiredSessions.remove(sessionId)) {
+            int current = connectionCount.decrementAndGet();
+            log.debug("WebSocket connection released: session={}, total={}", sessionId, current);
         }
     }
 

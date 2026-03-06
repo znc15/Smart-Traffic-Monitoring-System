@@ -57,7 +57,7 @@ public class FrameWebSocketHandler extends BinaryWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         cancel(session.getId());
-        connectionLimiter.release();
+        connectionLimiter.release(session.getId());
     }
 
     private void sendFrame(WebSocketSession session, String roadName) {
