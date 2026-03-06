@@ -10,21 +10,27 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final int MAX_REQUESTS = 10;
     private static final long WINDOW_MS = 60_000;
+    private static final long CLEANUP_INTERVAL_MS = 5 * 60_000;
     private static final String LOGIN_PATH = "/api/v1/auth/login";
 
     private final ConcurrentHashMap<String, ConcurrentLinkedDeque<Long>> requestLog = new ConcurrentHashMap<>();
+    private final AtomicLong lastCleanup = new AtomicLong(System.currentTimeMillis());
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+        cleanupIfNeeded();
         if ("POST".equalsIgnoreCase(request.getMethod()) && LOGIN_PATH.equals(request.getRequestURI())) {
             String clientIp = resolveClientIp(request);
             if (isRateLimited(clientIp)) {
@@ -51,6 +57,24 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         timestamps.addLast(now);
         return false;
+    }
+
+    private void cleanupIfNeeded() {
+        long now = System.currentTimeMillis();
+        long last = lastCleanup.get();
+        if (now - last > CLEANUP_INTERVAL_MS && lastCleanup.compareAndSet(last, now)) {
+            Iterator<Map.Entry<String, ConcurrentLinkedDeque<Long>>> it = requestLog.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<String, ConcurrentLinkedDeque<Long>> entry = it.next();
+                ConcurrentLinkedDeque<Long> deque = entry.getValue();
+                while (!deque.isEmpty() && now - deque.peekFirst() > WINDOW_MS) {
+                    deque.pollFirst();
+                }
+                if (deque.isEmpty()) {
+                    it.remove();
+                }
+            }
+        }
     }
 
     private String resolveClientIp(HttpServletRequest request) {

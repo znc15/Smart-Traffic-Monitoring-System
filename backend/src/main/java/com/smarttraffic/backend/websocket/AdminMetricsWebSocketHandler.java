@@ -55,7 +55,6 @@ public class AdminMetricsWebSocketHandler extends TextWebSocketHandler {
     public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
         log.warn("Transport error on metrics session {}: {}", session.getId(), exception.getMessage());
         cancel(session.getId());
-        connectionLimiter.release();
         if (session.isOpen()) {
             session.close(CloseStatus.SERVER_ERROR);
         }

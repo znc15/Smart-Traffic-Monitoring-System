@@ -274,7 +274,8 @@ const fetchUsers = async () => {
       return
     }
     const data = await res.json()
-    users.value = Array.isArray(data) ? data.map(normalizeAdminUser) : []
+    const arr = Array.isArray(data) ? data : (data?.content ?? [])
+    users.value = arr.map(normalizeAdminUser)
   } finally {
     usersLoading.value = false
   }
@@ -289,29 +290,38 @@ const fetchCameras = async () => {
       return
     }
     const data = await res.json()
-    cameras.value = Array.isArray(data) ? data.map(normalizeCamera) : []
+    const arr = Array.isArray(data) ? data : (data?.content ?? [])
+    cameras.value = arr.map(normalizeCamera)
   } finally {
     camerasLoading.value = false
   }
 }
 
 const fetchSettings = async () => {
-  const res = await authFetch(endpoints.siteSettings)
-  if (!res.ok) return
-  const data = normalizeSiteSettings(await res.json())
-  settings.site_name = data.site_name
-  settings.announcement = data.announcement
-  settings.logo_url = data.logo_url
-  settings.footer_text = data.footer_text
+  try {
+    const res = await authFetch(endpoints.siteSettings)
+    if (!res.ok) return
+    const data = normalizeSiteSettings(await res.json())
+    settings.site_name = data.site_name
+    settings.announcement = data.announcement
+    settings.logo_url = data.logo_url
+    settings.footer_text = data.footer_text
+  } catch {
+    message.error('获取站点设置失败')
+  }
 }
 
 const fetchMonitor = async () => {
-  const [r1, r2] = await Promise.all([
-    authFetch(endpoints.adminResources),
-    authFetch(endpoints.adminNodes),
-  ])
-  if (r1.ok) resources.value = await r1.json()
-  if (r2.ok) nodes.value = await r2.json()
+  try {
+    const [r1, r2] = await Promise.all([
+      authFetch(endpoints.adminResources),
+      authFetch(endpoints.adminNodes),
+    ])
+    if (r1.ok) resources.value = await r1.json()
+    if (r2.ok) nodes.value = await r2.json()
+  } catch {
+    message.error('获取监控数据失败')
+  }
 }
 
 // --- User actions ---

@@ -49,7 +49,6 @@ public class FrameWebSocketHandler extends BinaryWebSocketHandler {
     public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
         log.warn("Transport error on frame session {}: {}", session.getId(), exception.getMessage());
         cancel(session.getId());
-        connectionLimiter.release();
         if (session.isOpen()) {
             session.close(CloseStatus.SERVER_ERROR);
         }
