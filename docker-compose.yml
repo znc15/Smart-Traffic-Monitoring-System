@@ -4,10 +4,10 @@ services:
     container_name: database
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: odoo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-odoo}
       POSTGRES_DB: transportation_system
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -21,16 +21,16 @@ services:
     image: mysql:8.4
     container_name: mysql
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       MYSQL_DATABASE: transportation_system_mysql
       MYSQL_USER: traffic
-      MYSQL_PASSWORD: traffic
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traffic}
     ports:
-      - "3307:3306"
+      - "127.0.0.1:3307:3306"
     volumes:
       - mysqldata:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -proot"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD"]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -40,7 +40,7 @@ services:
     image: redis:7-alpine
     container_name: redis
     ports:
-      - "6380:6379"
+      - "127.0.0.1:6380:6379"
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redisdata:/data
@@ -66,23 +66,23 @@ services:
     environment:
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://database:5432/transportation_system}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
-      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-odoo}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-${POSTGRES_PASSWORD:-odoo}}
       SPRING_FLYWAY_LOCATIONS: ${SPRING_FLYWAY_LOCATIONS:-classpath:db/migration}
-      JWT_SECRET: change-this-dev-secret-change-this-dev-secret
+      JWT_SECRET: ${JWT_SECRET:-change-this-dev-secret-change-this-dev-secret}
       ACCESS_TOKEN_EXPIRE_DAYS: 7
       BASE_URL_API: http://localhost:8000
       APP_MAAS_DEFAULT_CLIENT_NAME: default-dev-client
-      APP_MAAS_DEFAULT_API_KEY: dev-maas-key-change-me
+      APP_MAAS_DEFAULT_API_KEY: ${MAAS_API_KEY:-dev-maas-key-change-me}
       APP_DB_PRIMARY: ${APP_DB_PRIMARY:-postgres}
       APP_DB_MIRROR_WRITE: ${APP_DB_MIRROR_WRITE:-false}
       APP_DB_MIRROR_MYSQL_ENABLED: ${APP_DB_MIRROR_MYSQL_ENABLED:-false}
       APP_DB_MIRROR_POSTGRES_ENABLED: ${APP_DB_MIRROR_POSTGRES_ENABLED:-false}
       APP_DB_MIRROR_MYSQL_URL: ${APP_DB_MIRROR_MYSQL_URL:-jdbc:mysql://mysql:3306/transportation_system_mysql?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC}
       APP_DB_MIRROR_MYSQL_USERNAME: ${APP_DB_MIRROR_MYSQL_USERNAME:-traffic}
-      APP_DB_MIRROR_MYSQL_PASSWORD: ${APP_DB_MIRROR_MYSQL_PASSWORD:-traffic}
+      APP_DB_MIRROR_MYSQL_PASSWORD: ${APP_DB_MIRROR_MYSQL_PASSWORD:-${MYSQL_PASSWORD:-traffic}}
       APP_DB_MIRROR_POSTGRES_URL: ${APP_DB_MIRROR_POSTGRES_URL:-jdbc:postgresql://database:5432/transportation_system}
       APP_DB_MIRROR_POSTGRES_USERNAME: ${APP_DB_MIRROR_POSTGRES_USERNAME:-postgres}
-      APP_DB_MIRROR_POSTGRES_PASSWORD: ${APP_DB_MIRROR_POSTGRES_PASSWORD:-odoo}
+      APP_DB_MIRROR_POSTGRES_PASSWORD: ${APP_DB_MIRROR_POSTGRES_PASSWORD:-${POSTGRES_PASSWORD:-odoo}}
       APP_REDIS_CACHE_ENABLED: ${APP_REDIS_CACHE_ENABLED:-true}
       APP_CACHE_TTL_SECONDS: ${APP_CACHE_TTL_SECONDS:-10}
       SPRING_REDIS_HOST: ${SPRING_REDIS_HOST:-redis}
@@ -95,7 +95,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "ps -ef | grep -q '[j]ava -jar app.jar'"]
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/api/v1/site-settings"]
       interval: 15s
       timeout: 5s
       retries: 20
