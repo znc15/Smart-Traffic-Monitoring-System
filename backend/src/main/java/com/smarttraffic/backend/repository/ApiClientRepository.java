@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface ApiClientRepository extends JpaRepository<ApiClientEntity, Long> {
     Optional<ApiClientEntity> findByApiKeyAndEnabledTrue(String apiKey);
+
+    boolean existsByName(String name);
 }
