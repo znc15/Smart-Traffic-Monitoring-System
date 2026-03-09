@@ -19,7 +19,8 @@ export const endpoints = {
   adminCameras: `${API_HTTP_BASE}/admin/cameras`,
   adminSiteSettings: `${API_HTTP_BASE}/admin/site-settings`,
   adminResources: `${API_HTTP_BASE}/admin/resources`,
-  adminNodes: `${API_HTTP_BASE}/admin/nodes`
+  adminNodes: `${API_HTTP_BASE}/admin/nodes`,
+  apiDocs: `${API_HTTP_BASE}/api-docs`,
 }
 
 export function getToken(): string | null {
