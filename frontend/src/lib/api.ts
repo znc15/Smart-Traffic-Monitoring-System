@@ -8,6 +8,7 @@ export const API_WS_BASE = `${WS_BASE_ROOT}/api/v1`
 
 export const endpoints = {
   login: `${API_HTTP_BASE}/auth/login`,
+  register: `${API_HTTP_BASE}/auth/register`,
   me: `${API_HTTP_BASE}/auth/me`,
   siteSettings: `${API_HTTP_BASE}/site-settings`,
   roads: `${API_HTTP_BASE}/roads_name`,

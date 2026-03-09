@@ -43,7 +43,7 @@
 
 | 路径 | 视图组件 | 说明 |
 |:-----|:---------|:-----|
-| `/login` | `LoginView.vue` | 用户登录页 |
+| `/login` | `LoginView.vue` | 用户登录 / 注册页 |
 | `/dashboard` | `DashboardView.vue` | 首页监控大屏 — 实时路况、车流统计、告警信息 |
 | `/analytics` | `AnalyticsView.vue` | 分析报表 — 历史趋势、多维度对比 |
 | `/admin` | `AdminView.vue` | 管理后台 — 用户管理、Edge 节点管理、系统配置 |
