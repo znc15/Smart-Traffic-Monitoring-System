@@ -20,6 +20,7 @@ export const endpoints = {
   adminSiteSettings: `${API_HTTP_BASE}/admin/site-settings`,
   adminResources: `${API_HTTP_BASE}/admin/resources`,
   adminNodes: `${API_HTTP_BASE}/admin/nodes`,
+  adminApiClients: `${API_HTTP_BASE}/admin/api-clients`,
   apiDocs: `${API_HTTP_BASE}/api-docs`,
 }
 

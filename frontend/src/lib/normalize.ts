@@ -93,3 +93,58 @@ export function normalizeSiteSettings(raw: unknown): SiteSettings {
     footer_text: String(pick(obj, 'footer_text', 'footerText', ''))
   }
 }
+
+export type ApiClient = {
+  id: number
+  name: string
+  api_key: string
+  description: string
+  allowed_endpoints: string[]
+  rate_limit: number
+  enabled: boolean
+  last_used_at: string | null
+  created_at: string
+}
+
+export function normalizeApiClient(raw: unknown): ApiClient {
+  const obj = (raw || {}) as Record<string, unknown>
+  const allowedRaw = pick(obj, 'allowed_endpoints', 'allowedEndpoints', [] as unknown)
+  return {
+    id: Number(obj.id || 0),
+    name: String(obj.name || ''),
+    api_key: String(pick(obj, 'api_key', 'apiKey', '')),
+    description: String(obj.description || ''),
+    allowed_endpoints: Array.isArray(allowedRaw) ? (allowedRaw as string[]) : [],
+    rate_limit: Number(pick(obj, 'rate_limit', 'rateLimit', 1000)),
+    enabled: Boolean(obj.enabled !== false),
+    last_used_at: pick(obj, 'last_used_at', 'lastUsedAt', null) as string | null,
+    created_at: String(pick(obj, 'created_at', 'createdAt', '')),
+  }
+}
+
+export type ApiClientUsage = {
+  total_calls: number
+  daily_stats: { date: string; count: number }[]
+  endpoint_stats: { endpoint: string; count: number }[]
+}
+
+export function normalizeApiClientUsage(raw: unknown): ApiClientUsage {
+  const obj = (raw || {}) as Record<string, unknown>
+  const dailyRaw = pick(obj, 'daily_stats', 'dailyStats', [] as unknown)
+  const endpointRaw = pick(obj, 'endpoint_stats', 'endpointStats', [] as unknown)
+  return {
+    total_calls: Number(pick(obj, 'total_calls', 'totalCalls', 0)),
+    daily_stats: Array.isArray(dailyRaw)
+      ? (dailyRaw as Record<string, unknown>[]).map((d) => ({
+          date: String(d.date || ''),
+          count: Number(d.count || 0),
+        }))
+      : [],
+    endpoint_stats: Array.isArray(endpointRaw)
+      ? (endpointRaw as Record<string, unknown>[]).map((e) => ({
+          endpoint: String(e.endpoint || ''),
+          count: Number(e.count || 0),
+        }))
+      : [],
+  }
+}
