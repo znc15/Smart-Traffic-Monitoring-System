@@ -11,6 +11,7 @@ import com.smarttraffic.backend.security.CurrentUser;
 import com.smarttraffic.backend.security.SecurityUtils;
 import com.smarttraffic.backend.config.TrafficProperties;
 import com.smarttraffic.backend.service.CameraPollerService;
+import com.smarttraffic.backend.service.RoadService;
 import com.smarttraffic.backend.service.SystemMetricsService;
 import com.smarttraffic.backend.service.TrafficService;
 import com.smarttraffic.backend.service.analytics.RedisCacheService;
@@ -34,11 +35,12 @@ public class AdminController {
     private final TrafficProperties trafficProperties;
     private final CameraPollerService cameraPollerService;
     private final RedisCacheService redisCacheService;
+    private final RoadService roadService;
 
     public AdminController(SystemMetricsService systemMetricsService, CameraRepository cameraRepository,
                            UserRepository userRepository, TrafficService trafficService,
                            TrafficProperties trafficProperties, CameraPollerService cameraPollerService,
-                           RedisCacheService redisCacheService) {
+                           RedisCacheService redisCacheService, RoadService roadService) {
         this.systemMetricsService = systemMetricsService;
         this.cameraRepository = cameraRepository;
         this.userRepository = userRepository;
@@ -46,6 +48,7 @@ public class AdminController {
         this.trafficProperties = trafficProperties;
         this.cameraPollerService = cameraPollerService;
         this.redisCacheService = redisCacheService;
+        this.roadService = roadService;
     }
 
     @GetMapping("/resources")
@@ -175,5 +178,7 @@ public class AdminController {
         redisCacheService.evict("traffic:roads");
         redisCacheService.evictByPrefix("traffic:maas:");
         redisCacheService.evictByPrefix("traffic:info:");
+        // 清除动态道路发现缓存，确保摄像头变更后道路列表实时更新
+        roadService.evictRoadCache();
     }
 }

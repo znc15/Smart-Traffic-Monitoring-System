@@ -14,6 +14,10 @@ public interface CameraRepository extends JpaRepository<CameraEntity, Long> {
     @Query("SELECT DISTINCT c.roadName FROM CameraEntity c WHERE c.roadName IS NOT NULL AND c.roadName <> ''")
     List<String> findDistinctRoadNames();
 
+    /** 从已启用的摄像头中查询不重复的道路名称 */
+    @Query("SELECT DISTINCT c.roadName FROM CameraEntity c WHERE c.enabled = true AND c.roadName IS NOT NULL AND c.roadName <> ''")
+    List<String> findDistinctRoadNameByEnabledTrue();
+
     @Query("""
             SELECT c
             FROM CameraEntity c
