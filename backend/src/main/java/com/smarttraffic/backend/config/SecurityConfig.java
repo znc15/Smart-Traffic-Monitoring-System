@@ -65,6 +65,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/edge/telemetry").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/api-docs").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/roads_name", "/api/v1/info/**", "/api/v1/frames_no_auth/**", "/api/v1/site-settings").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/traffic/predictions", "/api/v1/maas/**").permitAll()
                         .requestMatchers("/api/v1/ws/**", "/api/v1/admin/ws/**").permitAll()
