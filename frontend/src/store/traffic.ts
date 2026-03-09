@@ -98,6 +98,24 @@ export async function initializeTrafficStore() {
   state.initialized = true
 }
 
+export async function refreshRoads(): Promise<string[]> {
+  const res = await fetch(endpoints.roads, { credentials: 'include' })
+  if (!res.ok) {
+    return state.roads
+  }
+
+  const body = await res.json()
+  const freshRoads: string[] = Array.isArray(body?.road_names) ? body.road_names : []
+
+  const currentRoads = new Set(state.roads)
+  const newRoads = freshRoads.filter((road) => !currentRoads.has(road))
+
+  state.roads = freshRoads
+  newRoads.forEach((road) => connectRoad(road))
+
+  return freshRoads
+}
+
 export function closeTrafficStore() {
   state.initialized = false
 

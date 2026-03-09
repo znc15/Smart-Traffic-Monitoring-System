@@ -109,7 +109,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useMessage } from 'naive-ui'
 import { endpoints } from '../lib/api'
 import { normalizeSiteSettings } from '../lib/normalize'
-import { initializeTrafficStore, useTrafficStoreState } from '../store/traffic'
+import { initializeTrafficStore, refreshRoads, useTrafficStoreState } from '../store/traffic'
 
 const message = useMessage()
 const state = useTrafficStoreState()
@@ -135,9 +135,29 @@ const tagType = (status?: string): 'error' | 'warning' | 'success' | 'default' =
   return 'default'
 }
 
+async function doRefreshRoads() {
+  try {
+    const latestRoads = await refreshRoads()
+    if (selectedRoad.value === null || !latestRoads.includes(selectedRoad.value)) {
+      selectedRoad.value = latestRoads[0] || null
+    }
+  } catch {
+    message.warning('刷新道路列表失败')
+  }
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    doRefreshRoads()
+  }
+}
+
 onMounted(async () => {
   await initializeTrafficStore()
   selectedRoad.value = state.roads[0] || null
+
+  // Refresh road list to pick up any new cameras added since last load
+  await doRefreshRoads()
 
   try {
     const res = await fetch(endpoints.siteSettings)
@@ -149,12 +169,15 @@ onMounted(async () => {
     message.warning('获取站点公告失败')
   }
 
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+
   timer = window.setInterval(() => {
     frameTick.value += 1
   }, 1200)
 })
 
 onUnmounted(() => {
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
   if (timer) {
     window.clearInterval(timer)
   }
