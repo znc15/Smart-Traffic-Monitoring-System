@@ -1,5 +1,6 @@
 package com.smarttraffic.backend.websocket;
 
+import com.smarttraffic.backend.service.RoadService;
 import com.smarttraffic.backend.service.TrafficService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,24 +24,33 @@ public class FrameWebSocketHandler extends BinaryWebSocketHandler {
     private static final Logger log = LoggerFactory.getLogger(FrameWebSocketHandler.class);
 
     private final TrafficService trafficService;
+    private final RoadService roadService;
     private final ScheduledExecutorService scheduler;
     private final WebSocketConnectionLimiter connectionLimiter;
     private final Map<String, ScheduledFuture<?>> tasks = new ConcurrentHashMap<>();
 
     public FrameWebSocketHandler(TrafficService trafficService,
+                                 RoadService roadService,
                                  ScheduledExecutorService webSocketScheduler,
                                  WebSocketConnectionLimiter connectionLimiter) {
         this.trafficService = trafficService;
+        this.roadService = roadService;
         this.scheduler = webSocketScheduler;
         this.connectionLimiter = connectionLimiter;
     }
 
     @Override
-    public void afterConnectionEstablished(WebSocketSession session) {
+    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         if (!connectionLimiter.tryAcquire(session)) {
             return;
         }
         String roadName = extractRoadName(session, "/api/v1/ws/frames/");
+        if (!roadService.getActiveRoads().contains(roadName)) {
+            log.warn("Frame WebSocket rejected: unknown road '{}', session {}", roadName, session.getId());
+            connectionLimiter.release(session.getId());
+            session.close(CloseStatus.BAD_DATA);
+            return;
+        }
         ScheduledFuture<?> task = scheduler.scheduleAtFixedRate(() -> sendFrame(session, roadName), 0, 33, TimeUnit.MILLISECONDS);
         tasks.put(session.getId(), task);
     }

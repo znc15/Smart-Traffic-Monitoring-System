@@ -1,6 +1,7 @@
 package com.smarttraffic.backend.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smarttraffic.backend.service.RoadService;
 import com.smarttraffic.backend.service.TrafficService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,27 +25,36 @@ public class TrafficInfoWebSocketHandler extends TextWebSocketHandler {
     private static final Logger log = LoggerFactory.getLogger(TrafficInfoWebSocketHandler.class);
 
     private final TrafficService trafficService;
+    private final RoadService roadService;
     private final ObjectMapper objectMapper;
     private final ScheduledExecutorService scheduler;
     private final WebSocketConnectionLimiter connectionLimiter;
     private final Map<String, ScheduledFuture<?>> tasks = new ConcurrentHashMap<>();
 
     public TrafficInfoWebSocketHandler(TrafficService trafficService,
+                                       RoadService roadService,
                                        ObjectMapper objectMapper,
                                        ScheduledExecutorService webSocketScheduler,
                                        WebSocketConnectionLimiter connectionLimiter) {
         this.trafficService = trafficService;
+        this.roadService = roadService;
         this.objectMapper = objectMapper;
         this.scheduler = webSocketScheduler;
         this.connectionLimiter = connectionLimiter;
     }
 
     @Override
-    public void afterConnectionEstablished(WebSocketSession session) {
+    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         if (!connectionLimiter.tryAcquire(session)) {
             return;
         }
         String roadName = extractRoadName(session, "/api/v1/ws/info/");
+        if (!roadService.getActiveRoads().contains(roadName)) {
+            log.warn("Info WebSocket rejected: unknown road '{}', session {}", roadName, session.getId());
+            connectionLimiter.release(session.getId());
+            session.close(CloseStatus.BAD_DATA);
+            return;
+        }
         ScheduledFuture<?> task = scheduler.scheduleAtFixedRate(() -> sendInfo(session, roadName), 0, 200, TimeUnit.MILLISECONDS);
         tasks.put(session.getId(), task);
     }

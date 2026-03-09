@@ -4,6 +4,7 @@ import com.smarttraffic.backend.dto.traffic.RoadNamesResponse;
 import com.smarttraffic.backend.dto.traffic.PredictionResponse;
 import com.smarttraffic.backend.exception.AppException;
 import com.smarttraffic.backend.security.SecurityUtils;
+import com.smarttraffic.backend.service.RoadService;
 import com.smarttraffic.backend.service.TrafficService;
 import com.smarttraffic.backend.service.analytics.RedisCacheService;
 import com.smarttraffic.backend.service.analytics.TrafficPredictionService;
@@ -25,25 +26,23 @@ public class TrafficController {
     private final TrafficService trafficService;
     private final TrafficPredictionService trafficPredictionService;
     private final RedisCacheService redisCacheService;
+    private final RoadService roadService;
 
     public TrafficController(
             TrafficService trafficService,
             TrafficPredictionService trafficPredictionService,
-            RedisCacheService redisCacheService
+            RedisCacheService redisCacheService,
+            RoadService roadService
     ) {
         this.trafficService = trafficService;
         this.trafficPredictionService = trafficPredictionService;
         this.redisCacheService = redisCacheService;
+        this.roadService = roadService;
     }
 
     @GetMapping("/roads_name")
     public RoadNamesResponse roadNames() {
-        return redisCacheService.get("traffic:roads", RoadNamesResponse.class)
-                .orElseGet(() -> {
-                    RoadNamesResponse response = new RoadNamesResponse(trafficService.roadNames());
-                    redisCacheService.put("traffic:roads", response);
-                    return response;
-                });
+        return new RoadNamesResponse(roadService.getActiveRoads());
     }
 
     @GetMapping("/info/{roadName}")
