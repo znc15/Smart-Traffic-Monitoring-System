@@ -24,6 +24,18 @@ public class ApiClientEntity {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
+    @Column(name = "allowed_endpoints", columnDefinition = "TEXT")
+    private String allowedEndpoints;
+
+    @Column(name = "rate_limit", nullable = false)
+    private Integer rateLimit = 1000;
+
+    @Column(name = "last_used_at")
+    private LocalDateTime lastUsedAt;
+
     @PrePersist
     void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -63,5 +75,37 @@ public class ApiClientEntity {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public String getAllowedEndpoints() {
+        return allowedEndpoints;
+    }
+
+    public void setAllowedEndpoints(String allowedEndpoints) {
+        this.allowedEndpoints = allowedEndpoints;
+    }
+
+    public Integer getRateLimit() {
+        return rateLimit;
+    }
+
+    public void setRateLimit(Integer rateLimit) {
+        this.rateLimit = rateLimit;
+    }
+
+    public LocalDateTime getLastUsedAt() {
+        return lastUsedAt;
+    }
+
+    public void setLastUsedAt(LocalDateTime lastUsedAt) {
+        this.lastUsedAt = lastUsedAt;
     }
 }
