@@ -165,7 +165,7 @@
 import { ref, onMounted, h } from 'vue'
 import { NTag, NIcon } from 'naive-ui'
 import { CodeSlashOutline, LockClosedOutline } from '@vicons/ionicons5'
-import { API_HTTP_BASE } from '../lib/api'
+import { authFetch, endpoints } from '../lib/api'
 
 interface ApiParam {
   name: string
@@ -256,7 +256,7 @@ async function fetchDocs() {
   loading.value = true
   errorMsg.value = ''
   try {
-    const res = await fetch(`${API_HTTP_BASE}/api-docs`)
+    const res = await authFetch(endpoints.apiDocs)
     if (!res.ok) {
       errorMsg.value = `请求失败 (${res.status})`
       return

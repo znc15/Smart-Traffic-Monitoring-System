@@ -2,7 +2,7 @@
   <n-config-provider :theme-overrides="themeOverrides">
     <n-message-provider>
       <n-dialog-provider>
-        <RouterView v-if="isLoginPage" />
+        <RouterView v-if="isNoLayoutPage" />
         <AppLayout v-else>
           <RouterView />
         </AppLayout>
@@ -18,5 +18,5 @@ import { themeOverrides } from './theme'
 import AppLayout from './components/AppLayout.vue'
 
 const route = useRoute()
-const isLoginPage = computed(() => route.path === '/login')
+const isNoLayoutPage = computed(() => route.path === '/login' || route.meta.noLayout === true)
 </script>
