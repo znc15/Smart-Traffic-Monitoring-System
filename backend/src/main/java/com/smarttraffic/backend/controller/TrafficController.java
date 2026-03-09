@@ -47,6 +47,9 @@ public class TrafficController {
 
     @GetMapping("/info/{roadName}")
     public Map<String, Object> info(@PathVariable String roadName) {
+        if (!roadService.getActiveRoads().contains(roadName)) {
+            throw new AppException(HttpStatus.NOT_FOUND, "Road not found: " + roadName);
+        }
         String cacheKey = "traffic:info:" + roadName;
         return redisCacheService.get(cacheKey, Map.class)
                 .orElseGet(() -> {
@@ -59,11 +62,17 @@ public class TrafficController {
     @GetMapping(value = "/frames/{roadName}", produces = MediaType.IMAGE_JPEG_VALUE)
     public ResponseEntity<byte[]> frameAuth(@PathVariable String roadName) {
         SecurityUtils.requireCurrentUser();
+        if (!roadService.getActiveRoads().contains(roadName)) {
+            throw new AppException(HttpStatus.NOT_FOUND, "Road not found: " + roadName);
+        }
         return ResponseEntity.ok(trafficService.frame(roadName));
     }
 
     @GetMapping(value = "/frames_no_auth/{roadName}", produces = MediaType.IMAGE_JPEG_VALUE)
     public ResponseEntity<byte[]> frameNoAuth(@PathVariable String roadName) {
+        if (!roadService.getActiveRoads().contains(roadName)) {
+            throw new AppException(HttpStatus.NOT_FOUND, "Road not found: " + roadName);
+        }
         return ResponseEntity.ok(trafficService.frame(roadName));
     }
 

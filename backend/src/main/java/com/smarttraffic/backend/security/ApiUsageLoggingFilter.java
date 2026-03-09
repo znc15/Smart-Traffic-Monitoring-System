@@ -8,6 +8,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -16,12 +18,12 @@ import org.springframework.web.util.ContentCachingResponseWrapper;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 
 @Component
 @Order(200)
 public class ApiUsageLoggingFilter extends OncePerRequestFilter {
 
+    private static final Logger log = LoggerFactory.getLogger(ApiUsageLoggingFilter.class);
     private static final String API_KEY_HEADER = "X-API-Key";
 
     private final ApiUsageLogRepository apiUsageLogRepository;
@@ -64,7 +66,7 @@ public class ApiUsageLoggingFilter extends OncePerRequestFilter {
 
     private void logUsageAsync(String apiKey, String endpoint, String method,
                                 int statusCode, long responseTimeMs, String requestIp) {
-        CompletableFuture.runAsync(() -> {
+        try {
             Long clientId = null;
 
             if (apiKey != null && !apiKey.isBlank()) {
@@ -77,15 +79,17 @@ public class ApiUsageLoggingFilter extends OncePerRequestFilter {
                 }
             }
 
-            ApiUsageLogEntity log = new ApiUsageLogEntity();
-            log.setApiClientId(clientId);
-            log.setEndpoint(endpoint);
-            log.setMethod(method);
-            log.setStatusCode(statusCode);
-            log.setResponseTimeMs(responseTimeMs);
-            log.setRequestIp(requestIp);
-            apiUsageLogRepository.save(log);
-        });
+            ApiUsageLogEntity logEntry = new ApiUsageLogEntity();
+            logEntry.setApiClientId(clientId);
+            logEntry.setEndpoint(endpoint);
+            logEntry.setMethod(method);
+            logEntry.setStatusCode(statusCode);
+            logEntry.setResponseTimeMs(responseTimeMs);
+            logEntry.setRequestIp(requestIp);
+            apiUsageLogRepository.save(logEntry);
+        } catch (Exception ex) {
+            log.error("Failed to record API usage log for endpoint {}: {}", endpoint, ex.getMessage(), ex);
+        }
     }
 
     private String resolveClientIp(HttpServletRequest request) {

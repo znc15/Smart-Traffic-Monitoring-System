@@ -4,15 +4,12 @@ import com.smarttraffic.backend.dto.admin.ApiClientCreateRequest;
 import com.smarttraffic.backend.dto.admin.ApiClientResponse;
 import com.smarttraffic.backend.dto.admin.ApiClientUpdateRequest;
 import com.smarttraffic.backend.dto.admin.ApiUsageResponse;
-import com.smarttraffic.backend.exception.AppException;
-import com.smarttraffic.backend.security.CurrentUser;
 import com.smarttraffic.backend.security.SecurityUtils;
 import com.smarttraffic.backend.service.ApiClientService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -68,10 +65,7 @@ public class ApiClientController {
     }
 
     private void requireAdmin() {
-        CurrentUser user = SecurityUtils.requireCurrentUser();
-        if (!user.isAdmin()) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Admin access required");
-        }
+        SecurityUtils.requireAdmin();
     }
 }
 

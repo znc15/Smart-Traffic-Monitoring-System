@@ -11,8 +11,6 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
@@ -48,7 +46,7 @@ public class TrafficInfoWebSocketHandler extends TextWebSocketHandler {
         if (!connectionLimiter.tryAcquire(session)) {
             return;
         }
-        String roadName = extractRoadName(session, "/api/v1/ws/info/");
+        String roadName = WebSocketUtils.extractRoadName(session, "/api/v1/ws/info/");
         if (!roadService.getActiveRoads().contains(roadName)) {
             log.warn("Info WebSocket rejected: unknown road '{}', session {}", roadName, session.getId());
             connectionLimiter.release(session.getId());
@@ -62,7 +60,7 @@ public class TrafficInfoWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
         log.warn("Transport error on info session {}: {}", session.getId(), exception.getMessage());
-        cancel(session.getId());
+        WebSocketUtils.cancelScheduledTask(session.getId(), tasks);
         if (session.isOpen()) {
             session.close(CloseStatus.SERVER_ERROR);
         }
@@ -70,13 +68,13 @@ public class TrafficInfoWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        cancel(session.getId());
+        WebSocketUtils.cancelScheduledTask(session.getId(), tasks);
         connectionLimiter.release(session.getId());
     }
 
     private void sendInfo(WebSocketSession session, String roadName) {
         if (!session.isOpen()) {
-            cancel(session.getId());
+            WebSocketUtils.cancelScheduledTask(session.getId(), tasks);
             return;
         }
         try {
@@ -84,7 +82,7 @@ public class TrafficInfoWebSocketHandler extends TextWebSocketHandler {
             session.sendMessage(new TextMessage(payload));
         } catch (Exception ex) {
             log.error("Failed to send info for session {}, road '{}': {}", session.getId(), roadName, ex.getMessage(), ex);
-            cancel(session.getId());
+            WebSocketUtils.cancelScheduledTask(session.getId(), tasks);
             try {
                 session.close(CloseStatus.SERVER_ERROR);
             } catch (Exception closeEx) {
@@ -94,22 +92,10 @@ public class TrafficInfoWebSocketHandler extends TextWebSocketHandler {
     }
 
     private String extractRoadName(WebSocketSession session, String prefix) {
-        if (session.getUri() == null || session.getUri().getPath() == null) {
-            return "";
-        }
-        String path = session.getUri().getPath();
-        int index = path.indexOf(prefix);
-        if (index < 0) {
-            return "";
-        }
-        String encoded = path.substring(index + prefix.length());
-        return URLDecoder.decode(encoded, StandardCharsets.UTF_8);
+        return WebSocketUtils.extractRoadName(session, prefix);
     }
 
     private void cancel(String sessionId) {
-        ScheduledFuture<?> task = tasks.remove(sessionId);
-        if (task != null) {
-            task.cancel(true);
-        }
+        WebSocketUtils.cancelScheduledTask(sessionId, tasks);
     }
 }

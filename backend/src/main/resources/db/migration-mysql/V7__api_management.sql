@@ -77,11 +77,50 @@ CREATE TABLE IF NOT EXISTS api_usage_logs (
 );
 
 -- Indexes for common query patterns
-CREATE INDEX idx_api_usage_logs_client_time
-    ON api_usage_logs (api_client_id, created_at);
+SET @has_idx_client_time := (
+    SELECT COUNT(*)
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE()
+      AND table_name = 'api_usage_logs'
+      AND index_name = 'idx_api_usage_logs_client_time'
+);
+SET @sql_idx_client_time := IF(
+    @has_idx_client_time = 0,
+    'CREATE INDEX idx_api_usage_logs_client_time ON api_usage_logs (api_client_id, created_at)',
+    'SELECT 1'
+);
+PREPARE stmt_idx_client_time FROM @sql_idx_client_time;
+EXECUTE stmt_idx_client_time;
+DEALLOCATE PREPARE stmt_idx_client_time;
 
-CREATE INDEX idx_api_usage_logs_created_at
-    ON api_usage_logs (created_at);
+SET @has_idx_created_at := (
+    SELECT COUNT(*)
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE()
+      AND table_name = 'api_usage_logs'
+      AND index_name = 'idx_api_usage_logs_created_at'
+);
+SET @sql_idx_created_at := IF(
+    @has_idx_created_at = 0,
+    'CREATE INDEX idx_api_usage_logs_created_at ON api_usage_logs (created_at)',
+    'SELECT 1'
+);
+PREPARE stmt_idx_created_at FROM @sql_idx_created_at;
+EXECUTE stmt_idx_created_at;
+DEALLOCATE PREPARE stmt_idx_created_at;
 
-CREATE INDEX idx_api_usage_logs_endpoint
-    ON api_usage_logs (endpoint);
+SET @has_idx_endpoint := (
+    SELECT COUNT(*)
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE()
+      AND table_name = 'api_usage_logs'
+      AND index_name = 'idx_api_usage_logs_endpoint'
+);
+SET @sql_idx_endpoint := IF(
+    @has_idx_endpoint = 0,
+    'CREATE INDEX idx_api_usage_logs_endpoint ON api_usage_logs (endpoint)',
+    'SELECT 1'
+);
+PREPARE stmt_idx_endpoint FROM @sql_idx_endpoint;
+EXECUTE stmt_idx_endpoint;
+DEALLOCATE PREPARE stmt_idx_endpoint;

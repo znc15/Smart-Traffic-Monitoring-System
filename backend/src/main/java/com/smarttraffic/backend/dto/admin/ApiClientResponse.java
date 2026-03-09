@@ -3,6 +3,8 @@ package com.smarttraffic.backend.dto.admin;
 import com.smarttraffic.backend.model.ApiClientEntity;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
 
 public class ApiClientResponse {
 
@@ -10,19 +12,19 @@ public class ApiClientResponse {
     private String name;
     private String apiKey;
     private String description;
-    private String allowedEndpoints;
+    private List<String> allowedEndpoints;
     private Integer rateLimit;
     private boolean enabled;
     private LocalDateTime lastUsedAt;
     private LocalDateTime createdAt;
 
-    public static ApiClientResponse fromEntity(ApiClientEntity entity) {
+    public static ApiClientResponse fromEntity(ApiClientEntity entity, List<String> allowedEndpoints) {
         ApiClientResponse response = new ApiClientResponse();
         response.setId(entity.getId());
         response.setName(entity.getName());
         response.setApiKey(entity.getApiKey());
         response.setDescription(entity.getDescription());
-        response.setAllowedEndpoints(entity.getAllowedEndpoints());
+        response.setAllowedEndpoints(allowedEndpoints != null ? allowedEndpoints : Collections.emptyList());
         response.setRateLimit(entity.getRateLimit());
         response.setEnabled(entity.isEnabled());
         response.setLastUsedAt(entity.getLastUsedAt());
@@ -62,11 +64,11 @@ public class ApiClientResponse {
         this.description = description;
     }
 
-    public String getAllowedEndpoints() {
+    public List<String> getAllowedEndpoints() {
         return allowedEndpoints;
     }
 
-    public void setAllowedEndpoints(String allowedEndpoints) {
+    public void setAllowedEndpoints(List<String> allowedEndpoints) {
         this.allowedEndpoints = allowedEndpoints;
     }
 

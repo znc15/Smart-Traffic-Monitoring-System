@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class ApiClientUpdateRequest {
@@ -14,7 +15,7 @@ public class ApiClientUpdateRequest {
 
     private String description;
 
-    private String allowedEndpoints;
+    private List<String> allowedEndpoints;
 
     @Min(1)
     private Integer rateLimit;
@@ -47,11 +48,11 @@ public class ApiClientUpdateRequest {
         setFields.add("description");
     }
 
-    public String getAllowedEndpoints() {
+    public List<String> getAllowedEndpoints() {
         return allowedEndpoints;
     }
 
-    public void setAllowedEndpoints(String allowedEndpoints) {
+    public void setAllowedEndpoints(List<String> allowedEndpoints) {
         this.allowedEndpoints = allowedEndpoints;
         setFields.add("allowedEndpoints");
     }

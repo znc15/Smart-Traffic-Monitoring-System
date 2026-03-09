@@ -53,10 +53,7 @@ public class AdminController {
 
     @GetMapping("/resources")
     public Map<String, Object> resources() {
-        CurrentUser user = SecurityUtils.requireCurrentUser();
-        if (!user.isAdmin()) {
-            throw new AppException(HttpStatus.FORBIDDEN, "仅管理员可访问系统资源");
-        }
+        SecurityUtils.requireAdmin();
         return systemMetricsService.getSystemMetrics();
     }
 
@@ -67,10 +64,7 @@ public class AdminController {
     }
 
     private void requireAdmin() {
-        CurrentUser user = SecurityUtils.requireCurrentUser();
-        if (!user.isAdmin()) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Admin access required");
-        }
+        SecurityUtils.requireAdmin();
     }
 
     @GetMapping("/cameras")

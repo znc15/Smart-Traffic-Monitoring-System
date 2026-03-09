@@ -1,5 +1,8 @@
 package com.smarttraffic.backend.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarttraffic.backend.dto.admin.ApiClientCreateRequest;
 import com.smarttraffic.backend.dto.admin.ApiClientResponse;
 import com.smarttraffic.backend.dto.admin.ApiClientUpdateRequest;
@@ -10,31 +13,40 @@ import com.smarttraffic.backend.exception.AppException;
 import com.smarttraffic.backend.model.ApiClientEntity;
 import com.smarttraffic.backend.repository.ApiClientRepository;
 import com.smarttraffic.backend.repository.ApiUsageLogRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Base64;
+import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class ApiClientService {
 
+    private static final Logger log = LoggerFactory.getLogger(ApiClientService.class);
+
     private final ApiClientRepository apiClientRepository;
     private final ApiUsageLogRepository apiUsageLogRepository;
+    private final ObjectMapper objectMapper;
 
     public ApiClientService(ApiClientRepository apiClientRepository,
-                            ApiUsageLogRepository apiUsageLogRepository) {
+                            ApiUsageLogRepository apiUsageLogRepository,
+                            ObjectMapper objectMapper) {
         this.apiClientRepository = apiClientRepository;
         this.apiUsageLogRepository = apiUsageLogRepository;
+        this.objectMapper = objectMapper;
     }
 
     public Page<ApiClientResponse> listClients(Pageable pageable) {
-        return apiClientRepository.findAll(pageable).map(ApiClientResponse::fromEntity);
+        return apiClientRepository.findAll(pageable).map(this::toResponse);
     }
 
     @Transactional
@@ -45,12 +57,12 @@ public class ApiClientService {
         ApiClientEntity entity = new ApiClientEntity();
         entity.setName(request.getName());
         entity.setDescription(request.getDescription());
-        entity.setAllowedEndpoints(request.getAllowedEndpoints());
+        entity.setAllowedEndpoints(serializeEndpoints(request.getAllowedEndpoints()));
         entity.setApiKey(generateApiKey());
         if (request.getRateLimit() != null) {
             entity.setRateLimit(request.getRateLimit());
         }
-        return ApiClientResponse.fromEntity(apiClientRepository.save(entity));
+        return toResponse(apiClientRepository.save(entity));
     }
 
     @Transactional
@@ -68,7 +80,7 @@ public class ApiClientService {
             entity.setDescription(request.getDescription());
         }
         if (request.hasField("allowedEndpoints")) {
-            entity.setAllowedEndpoints(request.getAllowedEndpoints());
+            entity.setAllowedEndpoints(serializeEndpoints(request.getAllowedEndpoints()));
         }
         if (request.hasField("rateLimit") && request.getRateLimit() != null) {
             entity.setRateLimit(request.getRateLimit());
@@ -77,7 +89,7 @@ public class ApiClientService {
             entity.setEnabled(request.getEnabled());
         }
 
-        return ApiClientResponse.fromEntity(apiClientRepository.save(entity));
+        return toResponse(apiClientRepository.save(entity));
     }
 
     @Transactional
@@ -85,6 +97,7 @@ public class ApiClientService {
         if (!apiClientRepository.existsById(id)) {
             throw new AppException(HttpStatus.NOT_FOUND, "API Client not found");
         }
+        apiUsageLogRepository.deleteByApiClientId(id);
         apiClientRepository.deleteById(id);
     }
 
@@ -93,7 +106,7 @@ public class ApiClientService {
         ApiClientEntity entity = apiClientRepository.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "API Client not found"));
         entity.setApiKey(generateApiKey());
-        return ApiClientResponse.fromEntity(apiClientRepository.save(entity));
+        return toResponse(apiClientRepository.save(entity));
     }
 
     public ApiUsageResponse getUsageStats(Long id, int days) {
@@ -121,8 +134,38 @@ public class ApiClientService {
         return new ApiUsageResponse(totalCalls, dailyStats, endpointStats);
     }
 
+    private ApiClientResponse toResponse(ApiClientEntity entity) {
+        return ApiClientResponse.fromEntity(entity, deserializeEndpoints(entity.getAllowedEndpoints()));
+    }
+
+    private String serializeEndpoints(List<String> endpoints) {
+        if (endpoints == null || endpoints.isEmpty()) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(endpoints);
+        } catch (JsonProcessingException ex) {
+            log.error("Failed to serialize allowed endpoints: {}", ex.getMessage(), ex);
+            return null;
+        }
+    }
+
+    private List<String> deserializeEndpoints(String json) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<String>>() {});
+        } catch (JsonProcessingException ex) {
+            log.warn("Failed to deserialize allowed endpoints '{}': {}", json, ex.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
     private String generateApiKey() {
-        return UUID.randomUUID().toString();
+        byte[] bytes = new byte[32];
+        new SecureRandom().nextBytes(bytes);
+        return "stm_" + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 }
 

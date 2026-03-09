@@ -10,6 +10,8 @@ import java.util.List;
 
 public interface ApiUsageLogRepository extends JpaRepository<ApiUsageLogEntity, Long> {
 
+    void deleteByApiClientId(Long apiClientId);
+
     List<ApiUsageLogEntity> findByApiClientIdAndCreatedAtBetween(
             Long clientId,
             LocalDateTime start,

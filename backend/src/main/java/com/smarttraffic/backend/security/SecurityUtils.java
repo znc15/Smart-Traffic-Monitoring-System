@@ -16,4 +16,11 @@ public final class SecurityUtils {
         }
         return currentUser;
     }
+
+    public static void requireAdmin() {
+        CurrentUser user = requireCurrentUser();
+        if (!user.isAdmin()) {
+            throw new AppException(HttpStatus.FORBIDDEN, "Admin access required");
+        }
+    }
 }

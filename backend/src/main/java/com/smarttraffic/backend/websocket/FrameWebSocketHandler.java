@@ -10,8 +10,6 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.BinaryWebSocketHandler;
 
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
@@ -44,7 +42,7 @@ public class FrameWebSocketHandler extends BinaryWebSocketHandler {
         if (!connectionLimiter.tryAcquire(session)) {
             return;
         }
-        String roadName = extractRoadName(session, "/api/v1/ws/frames/");
+        String roadName = WebSocketUtils.extractRoadName(session, "/api/v1/ws/frames/");
         if (!roadService.getActiveRoads().contains(roadName)) {
             log.warn("Frame WebSocket rejected: unknown road '{}', session {}", roadName, session.getId());
             connectionLimiter.release(session.getId());
@@ -58,7 +56,7 @@ public class FrameWebSocketHandler extends BinaryWebSocketHandler {
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
         log.warn("Transport error on frame session {}: {}", session.getId(), exception.getMessage());
-        cancel(session.getId());
+        WebSocketUtils.cancelScheduledTask(session.getId(), tasks);
         if (session.isOpen()) {
             session.close(CloseStatus.SERVER_ERROR);
         }
@@ -66,13 +64,13 @@ public class FrameWebSocketHandler extends BinaryWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        cancel(session.getId());
+        WebSocketUtils.cancelScheduledTask(session.getId(), tasks);
         connectionLimiter.release(session.getId());
     }
 
     private void sendFrame(WebSocketSession session, String roadName) {
         if (!session.isOpen()) {
-            cancel(session.getId());
+            WebSocketUtils.cancelScheduledTask(session.getId(), tasks);
             return;
         }
         try {
@@ -80,7 +78,7 @@ public class FrameWebSocketHandler extends BinaryWebSocketHandler {
             session.sendMessage(new BinaryMessage(frame));
         } catch (Exception ex) {
             log.error("Failed to send frame for session {}, road '{}': {}", session.getId(), roadName, ex.getMessage(), ex);
-            cancel(session.getId());
+            WebSocketUtils.cancelScheduledTask(session.getId(), tasks);
             try {
                 session.close(CloseStatus.SERVER_ERROR);
             } catch (Exception closeEx) {
@@ -90,22 +88,10 @@ public class FrameWebSocketHandler extends BinaryWebSocketHandler {
     }
 
     private String extractRoadName(WebSocketSession session, String prefix) {
-        if (session.getUri() == null || session.getUri().getPath() == null) {
-            return "";
-        }
-        String path = session.getUri().getPath();
-        int index = path.indexOf(prefix);
-        if (index < 0) {
-            return "";
-        }
-        String encoded = path.substring(index + prefix.length());
-        return URLDecoder.decode(encoded, StandardCharsets.UTF_8);
+        return WebSocketUtils.extractRoadName(session, prefix);
     }
 
     private void cancel(String sessionId) {
-        ScheduledFuture<?> task = tasks.remove(sessionId);
-        if (task != null) {
-            task.cancel(true);
-        }
+        WebSocketUtils.cancelScheduledTask(sessionId, tasks);
     }
 }

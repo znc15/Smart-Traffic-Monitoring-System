@@ -57,7 +57,8 @@ backend/*.class
 *.torchscript
 *.bin
 *.npy
-
+docs/plans/
+.flowpilot/
 .workflow/
 edge/__pycache__/
 edge/tmp/

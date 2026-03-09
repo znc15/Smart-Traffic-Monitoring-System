@@ -107,7 +107,31 @@ export async function refreshRoads(): Promise<string[]> {
   const body = await res.json()
   const freshRoads: string[] = Array.isArray(body?.road_names) ? body.road_names : []
 
+  const freshSet = new Set(freshRoads)
   const currentRoads = new Set(state.roads)
+
+  // Close connections for roads that no longer exist
+  const removedRoads = state.roads.filter((road) => !freshSet.has(road))
+  removedRoads.forEach((road) => {
+    const timer = reconnectTimers.get(road)
+    if (timer !== undefined) {
+      clearTimeout(timer)
+      reconnectTimers.delete(road)
+    }
+    reconnectCounts.delete(road)
+    const ws = sockets[road]
+    if (ws) {
+      try {
+        ws.close()
+      } catch {
+        /* ignore */
+      }
+      delete sockets[road]
+    }
+    delete state.connections[road]
+    delete state.trafficData[road]
+  })
+
   const newRoads = freshRoads.filter((road) => !currentRoads.has(road))
 
   state.roads = freshRoads

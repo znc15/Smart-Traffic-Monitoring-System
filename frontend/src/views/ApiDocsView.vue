@@ -212,14 +212,6 @@ const docTitle = ref('智慧交通监控系统 API')
 const docVersion = ref('1.0')
 const baseUrl = ref('/api/v1')
 
-const METHOD_COLORS: Record<string, 'default' | 'success' | 'info' | 'warning' | 'error'> = {
-  GET: 'success',
-  POST: 'info',
-  PUT: 'warning',
-  DELETE: 'error',
-  PATCH: 'warning',
-}
-
 const paramColumns = [
   {
     title: '参数名',

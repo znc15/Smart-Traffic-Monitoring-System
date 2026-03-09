@@ -4,6 +4,8 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+import java.util.List;
+
 public class ApiClientCreateRequest {
 
     @NotBlank
@@ -12,7 +14,7 @@ public class ApiClientCreateRequest {
 
     private String description;
 
-    private String allowedEndpoints;
+    private List<String> allowedEndpoints;
 
     @Min(1)
     private Integer rateLimit;
@@ -33,11 +35,11 @@ public class ApiClientCreateRequest {
         this.description = description;
     }
 
-    public String getAllowedEndpoints() {
+    public List<String> getAllowedEndpoints() {
         return allowedEndpoints;
     }
 
-    public void setAllowedEndpoints(String allowedEndpoints) {
+    public void setAllowedEndpoints(List<String> allowedEndpoints) {
         this.allowedEndpoints = allowedEndpoints;
     }
 
