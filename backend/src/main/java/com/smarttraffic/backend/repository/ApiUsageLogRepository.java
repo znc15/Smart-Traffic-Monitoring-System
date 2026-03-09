@@ -16,6 +16,12 @@ public interface ApiUsageLogRepository extends JpaRepository<ApiUsageLogEntity, 
             LocalDateTime end
     );
 
+    long countByApiClientIdAndCreatedAtBetween(
+            Long clientId,
+            LocalDateTime start,
+            LocalDateTime end
+    );
+
     @Query("""
             SELECT CAST(a.createdAt AS date) AS day, COUNT(a) AS total
             FROM ApiUsageLogEntity a
@@ -25,6 +31,20 @@ public interface ApiUsageLogRepository extends JpaRepository<ApiUsageLogEntity, 
             ORDER BY CAST(a.createdAt AS date)
             """)
     List<Object[]> countByClientIdGroupByDay(
+            @Param("clientId") Long clientId,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
+    );
+
+    @Query("""
+            SELECT a.endpoint, COUNT(a) AS total
+            FROM ApiUsageLogEntity a
+            WHERE a.apiClientId = :clientId
+              AND a.createdAt BETWEEN :start AND :end
+            GROUP BY a.endpoint
+            ORDER BY total DESC
+            """)
+    List<Object[]> countByClientIdGroupByEndpoint(
             @Param("clientId") Long clientId,
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
@@ -42,3 +62,4 @@ public interface ApiUsageLogRepository extends JpaRepository<ApiUsageLogEntity, 
             @Param("end") LocalDateTime end
     );
 }
+

@@ -3,6 +3,7 @@ package com.smarttraffic.backend.controller;
 import com.smarttraffic.backend.dto.admin.ApiClientCreateRequest;
 import com.smarttraffic.backend.dto.admin.ApiClientResponse;
 import com.smarttraffic.backend.dto.admin.ApiClientUpdateRequest;
+import com.smarttraffic.backend.dto.admin.ApiUsageResponse;
 import com.smarttraffic.backend.exception.AppException;
 import com.smarttraffic.backend.security.CurrentUser;
 import com.smarttraffic.backend.security.SecurityUtils;
@@ -58,6 +59,14 @@ public class ApiClientController {
         return apiClientService.regenerateKey(id);
     }
 
+    @GetMapping("/{id}/usage")
+    public ApiUsageResponse getUsageStats(@PathVariable Long id,
+                                          @RequestParam(defaultValue = "30") int days) {
+        requireAdmin();
+        int clampedDays = Math.max(1, Math.min(days, 365));
+        return apiClientService.getUsageStats(id, clampedDays);
+    }
+
     private void requireAdmin() {
         CurrentUser user = SecurityUtils.requireCurrentUser();
         if (!user.isAdmin()) {
@@ -65,3 +74,4 @@ public class ApiClientController {
         }
     }
 }
+

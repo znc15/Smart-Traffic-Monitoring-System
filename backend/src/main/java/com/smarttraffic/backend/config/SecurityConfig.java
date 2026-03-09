@@ -2,6 +2,7 @@ package com.smarttraffic.backend.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarttraffic.backend.security.ApiKeyAuthenticationFilter;
+import com.smarttraffic.backend.security.ApiUsageLoggingFilter;
 import com.smarttraffic.backend.security.JwtAuthenticationFilter;
 import com.smarttraffic.backend.security.RateLimitFilter;
 import jakarta.servlet.http.HttpServletResponse;
@@ -30,6 +31,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
+    private final ApiUsageLoggingFilter apiUsageLoggingFilter;
     private final RateLimitFilter rateLimitFilter;
     private final ObjectMapper objectMapper;
     private final SecurityProperties securityProperties;
@@ -37,12 +39,14 @@ public class SecurityConfig {
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
             ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
+            ApiUsageLoggingFilter apiUsageLoggingFilter,
             RateLimitFilter rateLimitFilter,
             ObjectMapper objectMapper,
             SecurityProperties securityProperties
     ) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.apiKeyAuthenticationFilter = apiKeyAuthenticationFilter;
+        this.apiUsageLoggingFilter = apiUsageLoggingFilter;
         this.rateLimitFilter = rateLimitFilter;
         this.objectMapper = objectMapper;
         this.securityProperties = securityProperties;
@@ -83,7 +87,8 @@ public class SecurityConfig {
                         }))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(rateLimitFilter, JwtAuthenticationFilter.class)
-                .addFilterAfter(apiKeyAuthenticationFilter, JwtAuthenticationFilter.class);
+                .addFilterAfter(apiKeyAuthenticationFilter, JwtAuthenticationFilter.class)
+                .addFilterAfter(apiUsageLoggingFilter, ApiKeyAuthenticationFilter.class);
 
         return http.build();
     }
