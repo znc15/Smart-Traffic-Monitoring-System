@@ -39,8 +39,10 @@ public class CameraPollerService {
     @Scheduled(fixedRate = 3000)
     public void poll() {
         for (CameraEntity cam : cameraRepository.findByEnabledTrue()) {
-            String url = cam.getStreamUrl();
-            if (url == null || url.isBlank()) continue;
+            String nodeUrl = cam.getNodeUrl();
+            String streamUrl = cam.getStreamUrl();
+            String baseUrl = (nodeUrl != null && !nodeUrl.isBlank()) ? nodeUrl : streamUrl;
+            if (baseUrl == null || baseUrl.isBlank()) continue;
 
             String name = cam.getName();
             NodeHealth health = nodeHealthMap.computeIfAbsent(name, k -> new NodeHealth());
@@ -49,7 +51,7 @@ public class CameraPollerService {
 
             long start = System.nanoTime();
             try {
-                pollCamera(name, url);
+                pollCamera(name, baseUrl);
                 long elapsed = (System.nanoTime() - start) / 1_000_000;
                 health.online = true;
                 health.lastSuccessTime = Instant.now();

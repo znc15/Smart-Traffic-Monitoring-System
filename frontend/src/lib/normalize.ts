@@ -58,6 +58,7 @@ export type CameraItem = {
   location: string
   stream_url: string
   road_name: string
+  node_url: string
   enabled: boolean
   latitude: number | null
   longitude: number | null
@@ -71,6 +72,7 @@ export function normalizeCamera(raw: unknown): CameraItem {
     location: String(obj.location || ''),
     stream_url: String(pick(obj, 'stream_url', 'streamUrl', '')),
     road_name: String(pick(obj, 'road_name', 'roadName', '')),
+    node_url: String(pick(obj, 'node_url', 'nodeUrl', '')),
     enabled: Boolean(obj.enabled),
     latitude: obj.latitude === null || obj.latitude === undefined ? null : Number(obj.latitude),
     longitude: obj.longitude === null || obj.longitude === undefined ? null : Number(obj.longitude)

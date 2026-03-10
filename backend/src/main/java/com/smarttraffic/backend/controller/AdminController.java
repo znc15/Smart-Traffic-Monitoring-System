@@ -92,6 +92,7 @@ public class AdminController {
         if (body.hasField("location")) cam.setLocation(body.getLocation());
         if (body.hasField("enabled") && body.getEnabled() != null) cam.setEnabled(body.getEnabled());
         if (body.hasField("streamUrl")) cam.setStreamUrl(body.getStreamUrl());
+        if (body.hasField("nodeUrl")) cam.setNodeUrl(body.getNodeUrl());
         if (body.hasField("roadName")) cam.setRoadName(body.getRoadName());
         if (body.hasField("latitude")) cam.setLatitude(body.getLatitude());
         if (body.hasField("longitude")) cam.setLongitude(body.getLongitude());

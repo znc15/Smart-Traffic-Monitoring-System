@@ -67,6 +67,9 @@
                 <n-form-item label="RTSP URL" path="stream_url">
                   <n-input v-model:value="cameraForm.stream_url" placeholder="请输入流地址" />
                 </n-form-item>
+                <n-form-item label="节点地址" path="node_url">
+                  <n-input v-model:value="cameraForm.node_url" placeholder="http://192.168.1.100:8000" />
+                </n-form-item>
                 <n-form-item label="路段" path="road_name">
                   <n-input v-model:value="cameraForm.road_name" placeholder="请输入道路名称" />
                 </n-form-item>
@@ -368,6 +371,7 @@ const cameraForm = reactive({
   road_name: '',
   location: '',
   stream_url: '',
+  node_url: '',
   enabled: true,
 })
 const cameraRules: FormRules = {
@@ -504,12 +508,14 @@ const openCameraModal = (camera: CameraItem | null) => {
     cameraForm.road_name = camera.road_name
     cameraForm.location = camera.location
     cameraForm.stream_url = camera.stream_url
+    cameraForm.node_url = camera.node_url
     cameraForm.enabled = camera.enabled
   } else {
     cameraForm.name = ''
     cameraForm.road_name = ''
     cameraForm.location = ''
     cameraForm.stream_url = ''
+    cameraForm.node_url = ''
     cameraForm.enabled = true
   }
   cameraModalVisible.value = true
@@ -528,6 +534,7 @@ const handleCameraSubmit = async () => {
       road_name: cameraForm.road_name || null,
       location: cameraForm.location || null,
       stream_url: cameraForm.stream_url || null,
+      node_url: cameraForm.node_url || null,
       enabled: cameraForm.enabled,
     }
     if (cameraEditing.value) {
@@ -838,6 +845,7 @@ const cameraColumns: DataTableColumns<CameraItem> = [
   { title: '名称', key: 'name', ellipsis: { tooltip: true } },
   { title: '路段', key: 'road_name', ellipsis: { tooltip: true } },
   { title: '流地址', key: 'stream_url', ellipsis: { tooltip: true } },
+  { title: '节点地址', key: 'node_url', ellipsis: { tooltip: true } },
   {
     title: '状态',
     key: 'enabled',

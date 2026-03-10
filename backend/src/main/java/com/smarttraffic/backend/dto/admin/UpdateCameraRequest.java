@@ -23,6 +23,10 @@ public class UpdateCameraRequest {
     @Size(max = 1024)
     private String streamUrl;
 
+    @JsonAlias("node_url")
+    @Size(max = 512)
+    private String nodeUrl;
+
     @JsonAlias("road_name")
     @Size(max = 255)
     private String roadName;
@@ -54,6 +58,9 @@ public class UpdateCameraRequest {
 
     public String getStreamUrl() { return streamUrl; }
     public void setStreamUrl(String streamUrl) { this.streamUrl = streamUrl; setFields.add("streamUrl"); }
+
+    public String getNodeUrl() { return nodeUrl; }
+    public void setNodeUrl(String nodeUrl) { this.nodeUrl = nodeUrl; setFields.add("nodeUrl"); }
 
     public String getRoadName() { return roadName; }
     public void setRoadName(String roadName) { this.roadName = roadName; setFields.add("roadName"); }
