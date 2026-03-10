@@ -227,6 +227,7 @@ INIT_ADMIN_PASSWORD=Admin@12345
 |:-----|:-----|:-----|
 | `VITE_API_HTTP_BASE` | 后端 HTTP 基地址 | `https://your-domain.com` |
 | `VITE_API_WS_BASE` | 后端 WebSocket 基地址 | `wss://your-domain.com` |
+| `VITE_AMAP_KEY` | 高德地图 Web JS API Key（GIS 地图页） | `your-amap-key` |
 
 ### 边缘节点（`edge/.env`，参考 `edge/.env.example`）
 
@@ -240,8 +241,14 @@ INIT_ADMIN_PASSWORD=Admin@12345
 | `FRAME_SKIP` | 每隔多少帧处理一次 | `2` |
 | `IMGSZ` | 推理图像尺寸 | `640` |
 | `EDGE_NODE_ID` | 节点唯一标识（多节点部署时必填） | `edge-01` |
+| `EDGE_API_KEY` | 边缘节点访问密钥，与后端摄像头配置一致 | `edge-secret` |
 | `BACKEND_TELEMETRY_URL` | 后端遥测上报地址 | `http://backend:8000/api/v1/edge/telemetry` |
 | `TELEMETRY_INTERVAL_SEC` | 遥测上报间隔（秒） | `5` |
+| `ANALYSIS_ROI` | 归一化分析区域 `[x1,y1,x2,y2]` | `0.05,0.25,0.95,0.95` |
+| `LANE_SPLIT_RATIOS` | 三车道分割比例 `[left,right]` | `0.33,0.66` |
+| `SPEED_METERS_PER_PIXEL` | 像素到米的标定系数 | `0.08` |
+| `PARKING_STATIONARY_SECONDS` | 违停判定静止秒数 | `8` |
+| `WRONG_WAY_MIN_TRACK_POINTS` | 逆行判定最少轨迹点数 | `4` |
 | `CAMERA_SOURCE` | 摄像头地址（设备索引或 RTSP URL） | `0` |
 
 ---

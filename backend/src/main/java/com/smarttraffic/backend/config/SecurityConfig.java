@@ -3,6 +3,7 @@ package com.smarttraffic.backend.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarttraffic.backend.security.ApiKeyAuthenticationFilter;
 import com.smarttraffic.backend.security.ApiUsageLoggingFilter;
+import com.smarttraffic.backend.security.EdgeNodeAuthenticationFilter;
 import com.smarttraffic.backend.security.JwtAuthenticationFilter;
 import com.smarttraffic.backend.security.RateLimitFilter;
 import jakarta.servlet.http.HttpServletResponse;
@@ -32,6 +33,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
     private final ApiUsageLoggingFilter apiUsageLoggingFilter;
+    private final EdgeNodeAuthenticationFilter edgeNodeAuthenticationFilter;
     private final RateLimitFilter rateLimitFilter;
     private final ObjectMapper objectMapper;
     private final SecurityProperties securityProperties;
@@ -40,6 +42,7 @@ public class SecurityConfig {
             JwtAuthenticationFilter jwtAuthenticationFilter,
             ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
             ApiUsageLoggingFilter apiUsageLoggingFilter,
+            EdgeNodeAuthenticationFilter edgeNodeAuthenticationFilter,
             RateLimitFilter rateLimitFilter,
             ObjectMapper objectMapper,
             SecurityProperties securityProperties
@@ -47,6 +50,7 @@ public class SecurityConfig {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.apiKeyAuthenticationFilter = apiKeyAuthenticationFilter;
         this.apiUsageLoggingFilter = apiUsageLoggingFilter;
+        this.edgeNodeAuthenticationFilter = edgeNodeAuthenticationFilter;
         this.rateLimitFilter = rateLimitFilter;
         this.objectMapper = objectMapper;
         this.securityProperties = securityProperties;
@@ -87,6 +91,7 @@ public class SecurityConfig {
                         }))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(rateLimitFilter, JwtAuthenticationFilter.class)
+                .addFilterAfter(edgeNodeAuthenticationFilter, RateLimitFilter.class)
                 .addFilterAfter(apiKeyAuthenticationFilter, JwtAuthenticationFilter.class)
                 .addFilterAfter(apiUsageLoggingFilter, ApiKeyAuthenticationFilter.class);
 

@@ -6,9 +6,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface CameraRepository extends JpaRepository<CameraEntity, Long> {
     List<CameraEntity> findByEnabledTrue();
+
+    Optional<CameraEntity> findFirstByEdgeNodeIdAndNodeApiKeyAndEnabledTrue(String edgeNodeId, String nodeApiKey);
 
     /** 从数据库读取所有不重复的 roadName（排除 null 和空字符串） */
     @Query("SELECT DISTINCT c.roadName FROM CameraEntity c WHERE c.roadName IS NOT NULL AND c.roadName <> ''")

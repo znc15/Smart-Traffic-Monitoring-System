@@ -66,3 +66,4 @@ edge/models/*_openvino_model/
 .venv/
 .pytest_cache/
 __pycache__/
+.ace-tool/

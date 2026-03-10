@@ -77,6 +77,11 @@ public class AdminController {
     public CameraEntity createCamera(@Valid @RequestBody CameraEntity camera) {
         requireAdmin();
         camera.setId(null);
+        camera.setRoadName(normalizeRoadName(camera.getRoadName(), camera.getName()));
+        camera.setEdgeNodeId(trimToNull(camera.getEdgeNodeId()));
+        camera.setNodeApiKey(trimToNull(camera.getNodeApiKey()));
+        camera.setNodeUrl(trimToNull(camera.getNodeUrl()));
+        camera.setStreamUrl(trimToNull(camera.getStreamUrl()));
         CameraEntity saved = cameraRepository.save(camera);
         trafficService.reloadCameras(trafficProperties);
         invalidateTrafficCaches();
@@ -91,9 +96,11 @@ public class AdminController {
         if (body.hasField("name")) cam.setName(body.getName());
         if (body.hasField("location")) cam.setLocation(body.getLocation());
         if (body.hasField("enabled") && body.getEnabled() != null) cam.setEnabled(body.getEnabled());
-        if (body.hasField("streamUrl")) cam.setStreamUrl(body.getStreamUrl());
-        if (body.hasField("nodeUrl")) cam.setNodeUrl(body.getNodeUrl());
-        if (body.hasField("roadName")) cam.setRoadName(body.getRoadName());
+        if (body.hasField("streamUrl")) cam.setStreamUrl(trimToNull(body.getStreamUrl()));
+        if (body.hasField("nodeUrl")) cam.setNodeUrl(trimToNull(body.getNodeUrl()));
+        if (body.hasField("roadName")) cam.setRoadName(normalizeRoadName(body.getRoadName(), cam.getName()));
+        if (body.hasField("edgeNodeId")) cam.setEdgeNodeId(trimToNull(body.getEdgeNodeId()));
+        if (body.hasField("nodeApiKey")) cam.setNodeApiKey(trimToNull(body.getNodeApiKey()));
         if (body.hasField("latitude")) cam.setLatitude(body.getLatitude());
         if (body.hasField("longitude")) cam.setLongitude(body.getLongitude());
         CameraEntity saved = cameraRepository.save(cam);
@@ -175,5 +182,21 @@ public class AdminController {
         redisCacheService.evictByPrefix("traffic:info:");
         // 清除动态道路发现缓存，确保摄像头变更后道路列表实时更新
         roadService.evictRoadCache();
+    }
+
+    private static String normalizeRoadName(String roadName, String fallbackName) {
+        String normalized = trimToNull(roadName);
+        if (normalized != null) {
+            return normalized;
+        }
+        return trimToNull(fallbackName);
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

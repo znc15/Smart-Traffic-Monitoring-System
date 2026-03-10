@@ -35,12 +35,12 @@ def start_reporter_thread() -> threading.Thread | None:
 
 
 def _report_loop() -> None:
-    interval = max(1.0, config.TELEMETRY_INTERVAL_SEC)
     while not state.should_stop():
         payload = _build_payload()
         ok = _post_with_retry(payload)
         if ok:
             _flush_failed_queue()
+        interval = max(1.0, config.TELEMETRY_INTERVAL_SEC)
         state.stop_event.wait(timeout=interval)
 
 
@@ -97,7 +97,11 @@ def _post_once(payload: dict) -> bool:
     req = request.Request(
         config.BACKEND_TELEMETRY_URL,
         data=body,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "X-Edge-Node-Id": config.EDGE_NODE_ID,
+            "X-Edge-Key": config.EDGE_API_KEY,
+        },
         method="POST",
     )
     try:

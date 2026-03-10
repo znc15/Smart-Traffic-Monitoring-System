@@ -1,37 +1,35 @@
 <template>
   <section class="admin-page">
-    <n-spin :show="loading" description="加载中...">
-      <n-result v-if="errorText" status="error" :title="errorText" description="请确认您拥有管理员权限">
+    <NSpin :show="loading" description="加载中...">
+      <NResult
+        v-if="errorText"
+        status="error"
+        :title="errorText"
+        description="请确认当前账号拥有管理员权限"
+      >
         <template #footer>
-          <n-button @click="retryInit">重试</n-button>
+          <NButton @click="retryInit">重试</NButton>
         </template>
-      </n-result>
+      </NResult>
 
-      <template v-if="!loading && !errorText">
-        <n-tabs v-model:value="tab" type="line" animated>
-          <!-- Tab 1: 用户管理 -->
-          <n-tab-pane name="users" tab="用户管理">
-            <n-data-table
+      <template v-else>
+        <NTabs v-model:value="tab" type="line" animated>
+          <NTabPane name="users" tab="用户管理">
+            <NDataTable
               :columns="userColumns"
               :data="users"
-              :loading="usersLoading"
               :bordered="false"
               :single-line="false"
               size="small"
               :pagination="{ pageSize: 10 }"
-              :row-key="(row: AdminUser) => row.id"
             />
-          </n-tab-pane>
+          </NTabPane>
 
-          <!-- Tab 2: 摄像头管理 -->
-          <n-tab-pane name="cameras" tab="摄像头管理">
-            <div class="tab-toolbar">
-              <n-button type="primary" @click="openCameraModal(null)">
-                <template #icon><n-icon><AddOutline /></n-icon></template>
-                新增摄像头
-              </n-button>
+          <NTabPane name="cameras" tab="摄像头管理">
+            <div class="toolbar">
+              <NButton type="primary" @click="openCameraModal(null)">新增摄像头</NButton>
             </div>
-            <n-data-table
+            <NDataTable
               :columns="cameraColumns"
               :data="cameras"
               :loading="camerasLoading"
@@ -39,315 +37,201 @@
               :single-line="false"
               size="small"
               :pagination="{ pageSize: 10 }"
-              :row-key="(row: CameraItem) => row.id"
             />
-            <!-- 摄像头编辑弹窗 -->
-            <n-modal
-              v-model:show="cameraModalVisible"
-              preset="dialog"
-              :title="cameraEditing ? '编辑摄像头' : '新增摄像头'"
-              positive-text="确定"
-              negative-text="取消"
-              :loading="cameraSubmitting"
-              @positive-click="handleCameraSubmit"
-              @negative-click="cameraModalVisible = false"
-              style="width: 520px"
-            >
-              <n-form
-                ref="cameraFormRef"
-                :model="cameraForm"
-                :rules="cameraRules"
-                label-placement="left"
-                label-width="80"
-                class="modal-form"
-              >
-                <n-form-item label="名称" path="name">
-                  <n-input v-model:value="cameraForm.name" placeholder="请输入摄像头名称" />
-                </n-form-item>
-                <n-form-item label="RTSP URL" path="stream_url">
-                  <n-input v-model:value="cameraForm.stream_url" placeholder="请输入流地址" />
-                </n-form-item>
-                <n-form-item label="节点地址" path="node_url">
-                  <n-input v-model:value="cameraForm.node_url" placeholder="http://192.168.1.100:8000" />
-                </n-form-item>
-                <n-form-item label="路段" path="road_name">
-                  <n-input v-model:value="cameraForm.road_name" placeholder="请输入道路名称" />
-                </n-form-item>
-                <n-form-item label="位置" path="location">
-                  <n-input v-model:value="cameraForm.location" placeholder="请输入位置信息" />
-                </n-form-item>
-                <n-form-item label="启用">
-                  <n-switch v-model:value="cameraForm.enabled" />
-                </n-form-item>
-              </n-form>
-            </n-modal>
-          </n-tab-pane>
+          </NTabPane>
 
-          <!-- Tab 3: 站点设置 -->
-          <n-tab-pane name="settings" tab="站点设置">
-            <n-card :bordered="false">
-              <n-form
-                label-placement="left"
-                label-width="100"
-                :model="settings"
-              >
-                <n-form-item label="站点名称">
-                  <n-input v-model:value="settings.site_name" placeholder="请输入站点名称" />
-                </n-form-item>
-                <n-form-item label="Logo URL">
-                  <n-input v-model:value="settings.logo_url" placeholder="请输入 Logo 地址" />
-                </n-form-item>
-                <n-form-item label="公告内容">
-                  <n-input
-                    v-model:value="settings.announcement"
-                    type="textarea"
-                    :rows="4"
-                    placeholder="请输入公告内容"
-                  />
-                </n-form-item>
-                <n-form-item label="页脚文字">
-                  <n-input v-model:value="settings.footer_text" placeholder="请输入页脚文字" />
-                </n-form-item>
-                <n-form-item label=" ">
-                  <n-button type="primary" :loading="settingsSaving" @click="saveSettings">
-                    保存设置
-                  </n-button>
-                </n-form-item>
-              </n-form>
-            </n-card>
-          </n-tab-pane>
+          <NTabPane name="settings" tab="站点设置">
+            <NCard :bordered="false">
+              <NForm :model="settings" label-placement="left" label-width="100">
+                <NFormItem label="站点名称">
+                  <NInput v-model:value="settings.site_name" />
+                </NFormItem>
+                <NFormItem label="公告内容">
+                  <NInput v-model:value="settings.announcement" type="textarea" :rows="4" />
+                </NFormItem>
+                <NFormItem label="Logo URL">
+                  <NInput v-model:value="settings.logo_url" />
+                </NFormItem>
+                <NFormItem label="页脚文案">
+                  <NInput v-model:value="settings.footer_text" />
+                </NFormItem>
+                <NFormItem label=" ">
+                  <NButton type="primary" :loading="settingsSaving" @click="saveSettings">保存设置</NButton>
+                </NFormItem>
+              </NForm>
+            </NCard>
+          </NTabPane>
 
-          <!-- Tab 4: API 管理 -->
-          <n-tab-pane name="apikeys" tab="API 管理">
-            <div class="tab-toolbar">
-              <n-button type="primary" @click="openApiModal(null)">
-                <template #icon><n-icon><AddOutline /></n-icon></template>
-                新建 API Key
-              </n-button>
-            </div>
-            <n-data-table
-              :columns="apiColumns"
-              :data="apiClients"
-              :loading="apiClientsLoading"
-              :bordered="false"
-              :single-line="false"
-              size="small"
-              :pagination="{ pageSize: 10 }"
-              :row-key="(row: ApiClient) => row.id"
-            />
+          <NTabPane name="monitor" tab="系统监控">
+            <NGrid :x-gap="16" :y-gap="16" :cols="3" responsive="screen" item-responsive>
+              <NGi span="3 m:1">
+                <NCard size="small" title="CPU" :bordered="false">
+                  <NStatistic :value="resourceMetrics.cpu" suffix="%" />
+                </NCard>
+              </NGi>
+              <NGi span="3 m:1">
+                <NCard size="small" title="内存" :bordered="false">
+                  <NStatistic :value="resourceMetrics.memory" suffix="%" />
+                </NCard>
+              </NGi>
+              <NGi span="3 m:1">
+                <NCard size="small" title="磁盘" :bordered="false">
+                  <NStatistic :value="resourceMetrics.disk" suffix="%" />
+                </NCard>
+              </NGi>
+            </NGrid>
 
-            <!-- 创建/编辑弹窗 -->
-            <n-modal
-              v-model:show="apiModalVisible"
-              preset="dialog"
-              :title="apiEditing ? '编辑 API Key' : '新建 API Key'"
-              positive-text="确定"
-              negative-text="取消"
-              :loading="apiSubmitting"
-              @positive-click="handleApiSubmit"
-              @negative-click="apiModalVisible = false"
-              style="width: 560px"
-            >
-              <n-form
-                ref="apiFormRef"
-                :model="apiForm"
-                :rules="apiFormRules"
-                label-placement="left"
-                label-width="100"
-                class="modal-form"
-              >
-                <n-form-item label="名称" path="name">
-                  <n-input v-model:value="apiForm.name" placeholder="请输入名称" />
-                </n-form-item>
-                <n-form-item label="描述" path="description">
-                  <n-input v-model:value="apiForm.description" placeholder="可选描述" />
-                </n-form-item>
-                <n-form-item label="允许端点" path="allowed_endpoints">
-                  <n-input
-                    v-model:value="apiForm.allowed_endpoints_text"
-                    type="textarea"
-                    :rows="3"
-                    placeholder="每行一个端点，留空表示允许全部，例如：&#10;/api/v1/roads_name&#10;/api/v1/frames_no_auth"
-                  />
-                </n-form-item>
-                <n-form-item label="速率限制" path="rate_limit">
-                  <n-input-number
-                    v-model:value="apiForm.rate_limit"
-                    :min="1"
-                    :max="100000"
-                    placeholder="每分钟请求上限"
-                    style="width: 100%"
-                  />
-                </n-form-item>
-              </n-form>
-            </n-modal>
-
-            <!-- 新 Key 显示弹窗 -->
-            <n-modal
-              v-model:show="newKeyModalVisible"
-              preset="dialog"
-              title="API Key 已生成"
-              positive-text="已复制，关闭"
-              @positive-click="newKeyModalVisible = false"
-              style="width: 500px"
-            >
-              <n-alert type="warning" style="margin-bottom: 12px">
-                请立即复制并妥善保存此 Key，关闭后将无法再次查看完整内容。
-              </n-alert>
-              <n-input-group>
-                <n-input :value="newKeyValue" readonly style="font-family: monospace" />
-                <n-button type="primary" @click="copyToClipboard(newKeyValue)">复制</n-button>
-              </n-input-group>
-            </n-modal>
-
-            <!-- 用量统计弹窗 -->
-            <n-modal
-              v-model:show="usageModalVisible"
-              preset="card"
-              title="API 用量统计"
-              style="width: 680px"
-              :segmented="{ content: true }"
-            >
-              <n-spin :show="usageLoading">
-                <template v-if="currentUsage">
-                  <n-grid :x-gap="16" :y-gap="16" :cols="1" style="margin-bottom: 16px">
-                    <n-gi>
-                      <n-statistic label="近 30 天总调用次数" :value="currentUsage.total_calls" />
-                    </n-gi>
-                  </n-grid>
-
-                  <n-card title="每日调用趋势" size="small" :bordered="false" style="margin-bottom: 16px">
-                    <div v-if="currentUsage.daily_stats.length === 0" style="text-align:center;padding:24px">
-                      <n-empty description="暂无调用记录" />
-                    </div>
-                    <div v-else class="usage-bar-chart">
-                      <div
-                        v-for="item in currentUsage.daily_stats"
-                        :key="item.date"
-                        class="usage-bar-item"
-                      >
-                        <div class="usage-bar-label">{{ formatDate(item.date) }}</div>
-                        <div class="usage-bar-track">
-                          <div
-                            class="usage-bar-fill"
-                            :style="{ width: getBarWidth(item.count, currentUsage!.daily_stats) + '%' }"
-                          />
-                        </div>
-                        <div class="usage-bar-count">{{ item.count }}</div>
-                      </div>
-                    </div>
-                  </n-card>
-
-                  <n-card title="端点调用分布" size="small" :bordered="false">
-                    <div v-if="currentUsage.endpoint_stats.length === 0" style="text-align:center;padding:24px">
-                      <n-empty description="暂无端点统计" />
-                    </div>
-                    <n-data-table
-                      v-else
-                      :columns="usageEndpointColumns"
-                      :data="currentUsage.endpoint_stats"
-                      :bordered="false"
-                      size="small"
-                    />
-                  </n-card>
-                </template>
-                <n-empty v-else-if="!usageLoading" description="暂无数据" />
-              </n-spin>
-            </n-modal>
-          </n-tab-pane>
-
-          <!-- Tab 5: 系统监控 -->
-          <n-tab-pane name="monitor" tab="系统监控">
-            <n-grid :x-gap="16" :y-gap="16" :cols="3" responsive="screen" item-responsive>
-              <n-gi span="3 m:1">
-                <n-card title="CPU 使用率" size="small" :bordered="false" class="monitor-card">
-                  <n-progress
-                    type="circle"
-                    :percentage="resourceMetrics.cpu"
-                    :color="getProgressColor(resourceMetrics.cpu)"
-                  />
-                  <n-text class="metric-label">{{ resourceMetrics.cpu }}%</n-text>
-                </n-card>
-              </n-gi>
-              <n-gi span="3 m:1">
-                <n-card title="内存使用率" size="small" :bordered="false" class="monitor-card">
-                  <n-progress
-                    type="circle"
-                    :percentage="resourceMetrics.memory"
-                    :color="getProgressColor(resourceMetrics.memory)"
-                  />
-                  <n-text class="metric-label">{{ resourceMetrics.memory }}%</n-text>
-                </n-card>
-              </n-gi>
-              <n-gi span="3 m:1">
-                <n-card title="磁盘使用率" size="small" :bordered="false" class="monitor-card">
-                  <n-progress
-                    type="circle"
-                    :percentage="resourceMetrics.disk"
-                    :color="getProgressColor(resourceMetrics.disk)"
-                  />
-                  <n-text class="metric-label">{{ resourceMetrics.disk }}%</n-text>
-                </n-card>
-              </n-gi>
-            </n-grid>
-
-            <n-card title="节点状态" size="small" :bordered="false" style="margin-top: 16px">
-              <n-data-table
-                v-if="nodeList.length"
+            <NCard title="节点状态" size="small" :bordered="false" style="margin-top: 16px">
+              <NDataTable
                 :columns="nodeColumns"
                 :data="nodeList"
                 :bordered="false"
                 :single-line="false"
                 size="small"
+                :pagination="{ pageSize: 8 }"
               />
-              <n-empty v-else description="暂无节点数据" />
-            </n-card>
-          </n-tab-pane>
-        </n-tabs>
+            </NCard>
+
+            <NCard title="事件日志" size="small" :bordered="false" style="margin-top: 16px">
+              <NDataTable
+                :columns="eventColumns"
+                :data="eventLogs"
+                :loading="eventsLoading"
+                :bordered="false"
+                :single-line="false"
+                size="small"
+                :pagination="{ pageSize: 8 }"
+              />
+            </NCard>
+          </NTabPane>
+        </NTabs>
       </template>
-    </n-spin>
+    </NSpin>
+
+    <NModal
+      v-model:show="cameraModalVisible"
+      preset="dialog"
+      :title="cameraEditing ? '编辑摄像头' : '新增摄像头'"
+      positive-text="保存"
+      negative-text="取消"
+      :loading="cameraSubmitting"
+      style="width: 640px"
+      @positive-click="handleCameraSubmit"
+      @negative-click="cameraModalVisible = false"
+    >
+      <NForm ref="cameraFormRef" :model="cameraForm" :rules="cameraRules" label-placement="left" label-width="92">
+        <NFormItem label="名称" path="name">
+          <NInput v-model:value="cameraForm.name" />
+        </NFormItem>
+        <NFormItem label="路段" path="road_name">
+          <NInput v-model:value="cameraForm.road_name" />
+        </NFormItem>
+        <NFormItem label="节点地址" path="node_url">
+          <NInput v-model:value="cameraForm.node_url" placeholder="http://192.168.1.100:8000" />
+        </NFormItem>
+        <NFormItem label="流地址" path="stream_url">
+          <NInput v-model:value="cameraForm.stream_url" />
+        </NFormItem>
+        <NFormItem label="节点 ID" path="edge_node_id">
+          <NInput v-model:value="cameraForm.edge_node_id" />
+        </NFormItem>
+        <NFormItem label="节点密钥" path="node_api_key">
+          <NInput v-model:value="cameraForm.node_api_key" type="password" show-password-on="click" />
+        </NFormItem>
+        <NFormItem label="位置" path="location">
+          <NInput v-model:value="cameraForm.location" />
+        </NFormItem>
+        <NFormItem label="纬度" path="latitude">
+          <NInputNumber v-model:value="cameraForm.latitude" :step="0.000001" style="width: 100%" />
+        </NFormItem>
+        <NFormItem label="经度" path="longitude">
+          <NInputNumber v-model:value="cameraForm.longitude" :step="0.000001" style="width: 100%" />
+        </NFormItem>
+        <NFormItem label="启用">
+          <NSwitch v-model:value="cameraForm.enabled" />
+        </NFormItem>
+      </NForm>
+    </NModal>
+
+    <NModal
+      v-model:show="nodeConfigModalVisible"
+      preset="dialog"
+      :title="`节点配置 - ${currentNodeLabel}`"
+      positive-text="下发配置"
+      negative-text="取消"
+      :loading="nodeConfigSubmitting"
+      style="width: 720px"
+      @positive-click="saveNodeConfig"
+      @negative-click="nodeConfigModalVisible = false"
+    >
+      <NAlert type="info" style="margin-bottom: 12px">
+        直接编辑 JSON 配置，支持 ROI、测速、事件阈值与上报间隔。
+      </NAlert>
+      <NInput v-model:value="nodeConfigText" type="textarea" :rows="18" />
+    </NModal>
   </section>
 </template>
 
 <script setup lang="ts">
-import { h, onMounted, onUnmounted, reactive, ref, computed, watch } from 'vue'
+import { computed, h, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import {
-  useMessage,
+  NAlert,
+  NButton,
+  NCard,
+  NDataTable,
+  NForm,
+  NFormItem,
+  NGrid,
+  NGi,
+  NInput,
+  NInputNumber,
+  NModal,
+  NPopconfirm,
+  NResult,
+  NSpin,
+  NStatistic,
+  NSwitch,
+  NTabPane,
+  NTabs,
+  NTag,
+  type DataTableColumns,
   type FormInst,
   type FormRules,
-  type DataTableColumns,
-  NTag,
-  NButton,
-  NPopconfirm,
-  NSwitch,
-  NIcon,
+  useMessage,
 } from 'naive-ui'
-import { AddOutline, EyeOutline, EyeOffOutline, CopyOutline, RefreshOutline, BarChartOutline, TrashOutline, CreateOutline } from '@vicons/ionicons5'
 import { authFetch, endpoints } from '../lib/api'
 import {
   normalizeAdminUser,
   normalizeCamera,
   normalizeSiteSettings,
-  normalizeApiClient,
-  normalizeApiClientUsage,
   type AdminUser,
   type CameraItem,
   type SiteSettings,
-  type ApiClient,
-  type ApiClientUsage,
 } from '../lib/normalize'
+
+type AdminEventItem = {
+  id: number
+  road_name: string
+  event_type: string
+  level: string
+  start_at: string
+  payload: Record<string, unknown>
+}
 
 const message = useMessage()
 
-// --- State ---
-const tab = ref<'users' | 'cameras' | 'settings' | 'apikeys' | 'monitor'>('users')
+const tab = ref<'users' | 'cameras' | 'settings' | 'monitor'>('users')
 const loading = ref(true)
 const errorText = ref('')
-
 const users = ref<AdminUser[]>([])
-const usersLoading = ref(false)
 const cameras = ref<CameraItem[]>([])
 const camerasLoading = ref(false)
+const settingsSaving = ref(false)
+const resources = ref<Record<string, unknown>>({})
+const nodes = ref<Record<string, unknown>>({})
+const eventLogs = ref<AdminEventItem[]>([])
+const eventsLoading = ref(false)
+let monitorTimer: number | null = null
 
 const settings = reactive<SiteSettings>({
   site_name: '',
@@ -355,13 +239,7 @@ const settings = reactive<SiteSettings>({
   logo_url: '',
   footer_text: '',
 })
-const settingsSaving = ref(false)
 
-const resources = ref<Record<string, unknown>>({})
-const nodes = ref<Record<string, unknown>>({})
-let monitorTimer: number | null = null
-
-// Camera modal
 const cameraModalVisible = ref(false)
 const cameraEditing = ref<CameraItem | null>(null)
 const cameraSubmitting = ref(false)
@@ -372,135 +250,107 @@ const cameraForm = reactive({
   location: '',
   stream_url: '',
   node_url: '',
+  edge_node_id: '',
+  node_api_key: '',
+  latitude: null as number | null,
+  longitude: null as number | null,
   enabled: true,
 })
 const cameraRules: FormRules = {
   name: [{ required: true, message: '请输入摄像头名称', trigger: 'blur' }],
 }
 
-// API client state
-const apiClients = ref<ApiClient[]>([])
-const apiClientsLoading = ref(false)
-const apiModalVisible = ref(false)
-const apiEditing = ref<ApiClient | null>(null)
-const apiSubmitting = ref(false)
-const apiFormRef = ref<FormInst | null>(null)
-const apiForm = reactive({
-  name: '',
-  description: '',
-  allowed_endpoints_text: '',
-  rate_limit: 1000,
-})
-const apiFormRules: FormRules = {
-  name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-  rate_limit: [{ required: true, type: 'number', message: '请输入速率限制', trigger: 'change' }],
-}
+const nodeConfigModalVisible = ref(false)
+const nodeConfigSubmitting = ref(false)
+const currentNodeLabel = ref('')
+const currentNodeCameraId = ref<number | null>(null)
+const nodeConfigText = ref('')
 
-// Key reveal state per row
-const revealedKeys = ref<Set<number>>(new Set())
-
-// New key modal
-const newKeyModalVisible = ref(false)
-const newKeyValue = ref('')
-
-// Usage modal
-const usageModalVisible = ref(false)
-const usageLoading = ref(false)
-const currentUsage = ref<ApiClientUsage | null>(null)
-
-// --- API calls ---
 const ensureAdmin = async () => {
-  const me = await authFetch(endpoints.me)
-  if (!me.ok) throw new Error('无法验证登录状态')
-  const data = await me.json()
+  const res = await authFetch(endpoints.me)
+  if (!res.ok) throw new Error('无法验证登录状态')
+  const data = await res.json()
   const role = Number(data?.role_id ?? data?.roleId ?? 1)
   if (role !== 0) throw new Error('仅管理员可访问')
 }
 
+const normalizeEvent = (raw: Record<string, unknown>): AdminEventItem => ({
+  id: Number(raw.id || 0),
+  road_name: String(raw.road_name || raw.roadName || ''),
+  event_type: String(raw.event_type || raw.eventType || ''),
+  level: String(raw.level || ''),
+  start_at: String(raw.start_at || raw.startAt || ''),
+  payload: (raw.payload && typeof raw.payload === 'object' ? raw.payload : {}) as Record<string, unknown>,
+})
+
+const formatDateTime = (value: string | null | undefined) => {
+  if (!value) return '—'
+  return new Date(value).toLocaleString('zh-CN')
+}
+
 const fetchUsers = async () => {
-  usersLoading.value = true
-  try {
-    const res = await authFetch(endpoints.adminUsers)
-    if (!res.ok) {
-      message.error('获取用户列表失败')
-      return
-    }
-    const data = await res.json()
-    const arr = Array.isArray(data) ? data : (data?.content ?? [])
-    users.value = arr.map(normalizeAdminUser)
-  } finally {
-    usersLoading.value = false
-  }
+  const res = await authFetch(endpoints.adminUsers)
+  if (!res.ok) throw new Error('获取用户列表失败')
+  const data = await res.json()
+  users.value = (Array.isArray(data) ? data : data?.content ?? []).map(normalizeAdminUser)
 }
 
 const fetchCameras = async () => {
   camerasLoading.value = true
   try {
     const res = await authFetch(endpoints.adminCameras)
-    if (!res.ok) {
-      message.error('获取摄像头列表失败')
-      return
-    }
+    if (!res.ok) throw new Error('获取摄像头列表失败')
     const data = await res.json()
-    const arr = Array.isArray(data) ? data : (data?.content ?? [])
-    cameras.value = arr.map(normalizeCamera)
+    cameras.value = (Array.isArray(data) ? data : data?.content ?? []).map(normalizeCamera)
   } finally {
     camerasLoading.value = false
   }
 }
 
 const fetchSettings = async () => {
-  try {
-    const res = await authFetch(endpoints.siteSettings)
-    if (!res.ok) return
-    const data = normalizeSiteSettings(await res.json())
-    settings.site_name = data.site_name
-    settings.announcement = data.announcement
-    settings.logo_url = data.logo_url
-    settings.footer_text = data.footer_text
-  } catch {
-    message.error('获取站点设置失败')
-  }
+  const res = await authFetch(endpoints.siteSettings)
+  if (!res.ok) throw new Error('获取站点设置失败')
+  const data = normalizeSiteSettings(await res.json())
+  settings.site_name = data.site_name
+  settings.announcement = data.announcement
+  settings.logo_url = data.logo_url
+  settings.footer_text = data.footer_text
 }
 
 const fetchMonitor = async () => {
+  const [r1, r2] = await Promise.all([
+    authFetch(endpoints.adminResources),
+    authFetch(endpoints.adminNodes),
+  ])
+  if (r1.ok) resources.value = await r1.json()
+  if (r2.ok) nodes.value = await r2.json()
+}
+
+const fetchEvents = async () => {
+  eventsLoading.value = true
   try {
-    const [r1, r2] = await Promise.all([
-      authFetch(endpoints.adminResources),
-      authFetch(endpoints.adminNodes),
-    ])
-    if (r1.ok) resources.value = await r1.json()
-    if (r2.ok) nodes.value = await r2.json()
-  } catch {
-    message.error('获取监控数据失败')
+    const res = await authFetch(`${endpoints.adminEvents}?size=50`)
+    if (!res.ok) throw new Error('获取事件日志失败')
+    const data = await res.json()
+    eventLogs.value = (Array.isArray(data) ? data : data?.content ?? []).map(normalizeEvent)
+  } finally {
+    eventsLoading.value = false
   }
 }
 
-// --- User actions ---
-const changeRole = async (u: AdminUser, newRole: number) => {
+const retryInit = async () => {
+  loading.value = true
+  errorText.value = ''
   try {
-    await authFetch(`${endpoints.adminUsers}/${u.id}/role`, {
-      method: 'PUT',
-      body: JSON.stringify({ role_id: newRole }),
-    })
-    await fetchUsers()
-    message.success('角色已更新')
-  } catch {
-    message.error('更新角色失败，请重试')
+    await ensureAdmin()
+    await Promise.all([fetchUsers(), fetchCameras(), fetchSettings(), fetchEvents()])
+  } catch (error) {
+    errorText.value = error instanceof Error ? error.message : '加载失败'
+  } finally {
+    loading.value = false
   }
 }
 
-const toggleStatus = async (u: AdminUser) => {
-  try {
-    await authFetch(`${endpoints.adminUsers}/${u.id}/status`, { method: 'PUT' })
-    await fetchUsers()
-    message.success('状态已更新')
-  } catch {
-    message.error('更新状态失败，请重试')
-  }
-}
-
-// --- Camera actions ---
 const openCameraModal = (camera: CameraItem | null) => {
   cameraEditing.value = camera
   if (camera) {
@@ -509,6 +359,10 @@ const openCameraModal = (camera: CameraItem | null) => {
     cameraForm.location = camera.location
     cameraForm.stream_url = camera.stream_url
     cameraForm.node_url = camera.node_url
+    cameraForm.edge_node_id = camera.edge_node_id
+    cameraForm.node_api_key = camera.node_api_key
+    cameraForm.latitude = camera.latitude
+    cameraForm.longitude = camera.longitude
     cameraForm.enabled = camera.enabled
   } else {
     cameraForm.name = ''
@@ -516,6 +370,10 @@ const openCameraModal = (camera: CameraItem | null) => {
     cameraForm.location = ''
     cameraForm.stream_url = ''
     cameraForm.node_url = ''
+    cameraForm.edge_node_id = ''
+    cameraForm.node_api_key = ''
+    cameraForm.latitude = null
+    cameraForm.longitude = null
     cameraForm.enabled = true
   }
   cameraModalVisible.value = true
@@ -529,607 +387,270 @@ const handleCameraSubmit = async () => {
   }
   cameraSubmitting.value = true
   try {
-    const body = {
+    const payload = {
       name: cameraForm.name,
       road_name: cameraForm.road_name || null,
       location: cameraForm.location || null,
       stream_url: cameraForm.stream_url || null,
       node_url: cameraForm.node_url || null,
+      edge_node_id: cameraForm.edge_node_id || null,
+      node_api_key: cameraForm.node_api_key || null,
+      latitude: cameraForm.latitude,
+      longitude: cameraForm.longitude,
       enabled: cameraForm.enabled,
     }
-    if (cameraEditing.value) {
-      await authFetch(`${endpoints.adminCameras}/${cameraEditing.value.id}`, {
-        method: 'PUT',
-        body: JSON.stringify(body),
-      })
-      message.success('摄像头已更新')
-    } else {
-      await authFetch(endpoints.adminCameras, {
-        method: 'POST',
-        body: JSON.stringify(body),
-      })
-      message.success('摄像头已添加')
-    }
+    const url = cameraEditing.value ? `${endpoints.adminCameras}/${cameraEditing.value.id}` : endpoints.adminCameras
+    const method = cameraEditing.value ? 'PUT' : 'POST'
+    const res = await authFetch(url, { method, body: JSON.stringify(payload) })
+    if (!res.ok) throw new Error('保存摄像头失败')
     cameraModalVisible.value = false
     await fetchCameras()
-  } catch {
-    message.error('操作失败')
+    message.success(cameraEditing.value ? '摄像头已更新' : '摄像头已创建')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '保存失败')
   } finally {
     cameraSubmitting.value = false
   }
   return false
 }
 
-const toggleCamera = async (camera: CameraItem) => {
-  try {
-    await authFetch(`${endpoints.adminCameras}/${camera.id}`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        name: camera.name,
-        road_name: camera.road_name,
-        location: camera.location,
-        stream_url: camera.stream_url,
-        enabled: !camera.enabled,
-      }),
-    })
-    await fetchCameras()
-    message.success(camera.enabled ? '已禁用' : '已启用')
-  } catch {
-    message.error('切换摄像头状态失败，请重试')
-  }
+const toggleUserStatus = async (user: AdminUser) => {
+  await authFetch(`${endpoints.adminUsers}/${user.id}/status`, { method: 'PUT' })
+  await fetchUsers()
+  message.success('用户状态已更新')
 }
 
-const deleteCamera = async (id: number) => {
-  try {
-    await authFetch(`${endpoints.adminCameras}/${id}`, { method: 'DELETE' })
-    await fetchCameras()
-    message.success('摄像头已删除')
-  } catch {
-    message.error('删除摄像头失败，请重试')
-  }
+const toggleUserRole = async (user: AdminUser) => {
+  await authFetch(`${endpoints.adminUsers}/${user.id}/role`, {
+    method: 'PUT',
+    body: JSON.stringify({ role_id: user.role_id === 0 ? 1 : 0 }),
+  })
+  await fetchUsers()
+  message.success('用户角色已更新')
+}
+
+const toggleCamera = async (camera: CameraItem) => {
+  await authFetch(`${endpoints.adminCameras}/${camera.id}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      name: camera.name,
+      road_name: camera.road_name || null,
+      location: camera.location || null,
+      stream_url: camera.stream_url || null,
+      node_url: camera.node_url || null,
+      edge_node_id: camera.edge_node_id || null,
+      node_api_key: camera.node_api_key || null,
+      latitude: camera.latitude,
+      longitude: camera.longitude,
+      enabled: !camera.enabled,
+    }),
+  })
+  await fetchCameras()
+  message.success(camera.enabled ? '摄像头已禁用' : '摄像头已启用')
+}
+
+const deleteCamera = async (cameraId: number) => {
+  await authFetch(`${endpoints.adminCameras}/${cameraId}`, { method: 'DELETE' })
+  await fetchCameras()
+  message.success('摄像头已删除')
 }
 
 const saveSettings = async () => {
   settingsSaving.value = true
   try {
-    await authFetch(endpoints.adminSiteSettings, {
+    const res = await authFetch(endpoints.adminSiteSettings, {
       method: 'PUT',
-      body: JSON.stringify({
-        site_name: settings.site_name,
-        logo_url: settings.logo_url,
-        announcement: settings.announcement,
-        footer_text: settings.footer_text,
-      }),
+      body: JSON.stringify(settings),
     })
-    message.success('设置已保存')
-  } catch {
-    message.error('保存失败')
+    if (!res.ok) throw new Error('保存站点设置失败')
+    message.success('站点设置已保存')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '保存失败')
   } finally {
     settingsSaving.value = false
   }
 }
 
-// --- API client fetch ---
-const fetchApiClients = async () => {
-  apiClientsLoading.value = true
-  try {
-    const res = await authFetch(`${endpoints.adminApiClients}?page=0&size=100`)
-    if (!res.ok) {
-      message.error('获取 API Key 列表失败')
-      return
-    }
-    const data = await res.json()
-    const arr = Array.isArray(data) ? data : (data?.content ?? [])
-    apiClients.value = arr.map(normalizeApiClient)
-  } finally {
-    apiClientsLoading.value = false
+const openNodeConfigModal = async (row: Record<string, unknown>) => {
+  const cameraId = Number(row.camera_id || 0)
+  if (!cameraId) {
+    message.error('该节点未关联 camera_id')
+    return
   }
-}
-
-// --- API client actions ---
-const openApiModal = (client: ApiClient | null) => {
-  apiEditing.value = client
-  if (client) {
-    apiForm.name = client.name
-    apiForm.description = client.description
-    apiForm.allowed_endpoints_text = client.allowed_endpoints.join('\n')
-    apiForm.rate_limit = client.rate_limit
-  } else {
-    apiForm.name = ''
-    apiForm.description = ''
-    apiForm.allowed_endpoints_text = ''
-    apiForm.rate_limit = 1000
+  currentNodeCameraId.value = cameraId
+  currentNodeLabel.value = String(row.road_name || row.name || `节点 ${cameraId}`)
+  nodeConfigModalVisible.value = true
+  const res = await authFetch(endpoints.adminNodeConfig(cameraId))
+  if (!res.ok) {
+    message.error('读取节点配置失败')
+    return
   }
-  apiModalVisible.value = true
+  nodeConfigText.value = JSON.stringify(await res.json(), null, 2)
 }
 
-const parseEndpoints = (text: string): string[] => {
-  return text
-    .split('\n')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
-}
-
-const handleApiSubmit = async () => {
+const saveNodeConfig = async () => {
+  if (!currentNodeCameraId.value) return false
+  let payload: Record<string, unknown>
   try {
-    await apiFormRef.value?.validate()
+    payload = JSON.parse(nodeConfigText.value || '{}')
   } catch {
+    message.error('配置 JSON 不合法')
     return false
   }
-  apiSubmitting.value = true
+  nodeConfigSubmitting.value = true
   try {
-    const body = {
-      name: apiForm.name,
-      description: apiForm.description || null,
-      allowed_endpoints: parseEndpoints(apiForm.allowed_endpoints_text),
-      rate_limit: apiForm.rate_limit,
-    }
-    if (apiEditing.value) {
-      await authFetch(`${endpoints.adminApiClients}/${apiEditing.value.id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ ...body, enabled: apiEditing.value.enabled }),
-      })
-      message.success('API Key 已更新')
-      apiModalVisible.value = false
-      await fetchApiClients()
-    } else {
-      const res = await authFetch(endpoints.adminApiClients, {
-        method: 'POST',
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) {
-        message.error('创建失败')
-        return false
-      }
-      const created = normalizeApiClient(await res.json())
-      apiModalVisible.value = false
-      await fetchApiClients()
-      newKeyValue.value = created.api_key
-      newKeyModalVisible.value = true
-    }
-  } catch {
-    message.error('操作失败')
+    const res = await authFetch(endpoints.adminNodeConfig(currentNodeCameraId.value), {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error('下发节点配置失败')
+    nodeConfigText.value = JSON.stringify(await res.json(), null, 2)
+    message.success('节点配置已下发')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '下发失败')
   } finally {
-    apiSubmitting.value = false
+    nodeConfigSubmitting.value = false
   }
   return false
 }
 
-const toggleApiEnabled = async (client: ApiClient) => {
-  try {
-    await authFetch(`${endpoints.adminApiClients}/${client.id}`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        name: client.name,
-        description: client.description,
-        allowed_endpoints: client.allowed_endpoints,
-        rate_limit: client.rate_limit,
-        enabled: !client.enabled,
-      }),
-    })
-    await fetchApiClients()
-    message.success(client.enabled ? '已禁用' : '已启用')
-  } catch {
-    message.error('切换状态失败')
-  }
-}
-
-const regenerateKey = async (client: ApiClient) => {
-  try {
-    const res = await authFetch(`${endpoints.adminApiClients}/${client.id}/regenerate`, {
-      method: 'POST',
-    })
-    if (!res.ok) {
-      message.error('重新生成失败')
-      return
-    }
-    const updated = normalizeApiClient(await res.json())
-    await fetchApiClients()
-    newKeyValue.value = updated.api_key
-    newKeyModalVisible.value = true
-  } catch {
-    message.error('重新生成失败')
-  }
-}
-
-const deleteApiClient = async (id: number) => {
-  try {
-    await authFetch(`${endpoints.adminApiClients}/${id}`, { method: 'DELETE' })
-    await fetchApiClients()
-    message.success('已删除')
-  } catch {
-    message.error('删除失败')
-  }
-}
-
-const openUsageModal = async (client: ApiClient) => {
-  currentUsage.value = null
-  usageModalVisible.value = true
-  usageLoading.value = true
-  try {
-    const res = await authFetch(`${endpoints.adminApiClients}/${client.id}/usage?days=30`)
-    if (!res.ok) {
-      message.error('获取用量失败')
-      return
-    }
-    currentUsage.value = normalizeApiClientUsage(await res.json())
-  } catch {
-    message.error('获取用量失败')
-  } finally {
-    usageLoading.value = false
-  }
-}
-
-const copyToClipboard = async (text: string) => {
-  try {
-    await navigator.clipboard.writeText(text)
-    message.success('已复制到剪贴板')
-  } catch {
-    message.error('复制失败，请手动复制')
-  }
-}
-
-const maskKey = (key: string): string => {
-  if (!key || key.length <= 8) return key
-  return `${key.slice(0, 4)}${'*'.repeat(Math.max(key.length - 8, 4))}${key.slice(-4)}`
-}
-
-const formatDate = (dateStr: string): string => {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  return `${d.getMonth() + 1}/${d.getDate()}`
-}
-
-const formatDateTime = (dateStr: string | null): string => {
-  if (!dateStr) return '—'
-  const d = new Date(dateStr)
-  return d.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-}
-
-const getBarWidth = (count: number, stats: { date: string; count: number }[]): number => {
-  const max = Math.max(...stats.map((s) => s.count), 1)
-  return Math.round((count / max) * 100)
-}
-
-// --- User table columns ---
-const userColumns: DataTableColumns<AdminUser> = [
-  { title: '用户名', key: 'username', ellipsis: { tooltip: true } },
-  { title: '邮箱', key: 'email', ellipsis: { tooltip: true } },
-  {
-    title: '角色',
-    key: 'role_id',
-    width: 120,
-    render(row) {
-      return h(NTag, {
-        type: row.role_id === 0 ? 'warning' : 'info',
-        size: 'small',
-        round: true,
-      }, { default: () => (row.role_id === 0 ? '管理员' : '用户') })
-    },
-  },
-  {
-    title: '状态',
-    key: 'enabled',
-    width: 80,
-    render(row) {
-      return h(NTag, {
-        type: row.enabled ? 'success' : 'error',
-        size: 'small',
-      }, { default: () => (row.enabled ? '启用' : '禁用') })
-    },
-  },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 200,
-    render(row) {
-      return h('div', { style: 'display:flex;gap:8px' }, [
-        h(NButton, {
-          size: 'small',
-          secondary: true,
-          onClick: () => changeRole(row, row.role_id === 0 ? 1 : 0),
-        }, { default: () => '切换角色' }),
-        h(NButton, {
-          size: 'small',
-          secondary: true,
-          type: row.enabled ? 'error' : 'success',
-          onClick: () => toggleStatus(row),
-        }, { default: () => (row.enabled ? '禁用' : '启用') }),
-      ])
-    },
-  },
-]
-
-// --- Camera table columns ---
-const cameraColumns: DataTableColumns<CameraItem> = [
-  { title: '名称', key: 'name', ellipsis: { tooltip: true } },
-  { title: '路段', key: 'road_name', ellipsis: { tooltip: true } },
-  { title: '流地址', key: 'stream_url', ellipsis: { tooltip: true } },
-  { title: '节点地址', key: 'node_url', ellipsis: { tooltip: true } },
-  {
-    title: '状态',
-    key: 'enabled',
-    width: 80,
-    render(row) {
-      return h(NTag, {
-        type: row.enabled ? 'success' : 'error',
-        size: 'small',
-      }, { default: () => (row.enabled ? '启用' : '禁用') })
-    },
-  },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 240,
-    render(row) {
-      return h('div', { style: 'display:flex;gap:8px' }, [
-        h(NButton, {
-          size: 'small',
-          secondary: true,
-          onClick: () => openCameraModal(row),
-        }, { default: () => '编辑' }),
-        h(NButton, {
-          size: 'small',
-          secondary: true,
-          type: row.enabled ? 'error' : 'success',
-          onClick: () => toggleCamera(row),
-        }, { default: () => (row.enabled ? '禁用' : '启用') }),
-        h(NPopconfirm, {
-          onPositiveClick: () => deleteCamera(row.id),
-        }, {
-          trigger: () => h(NButton, {
-            size: 'small',
-            type: 'error',
-            secondary: true,
-          }, { default: () => '删除' }),
-          default: () => '确定删除该摄像头？',
-        }),
-      ])
-    },
-  },
-]
-
-// --- API client table columns ---
-const apiColumns: DataTableColumns<ApiClient> = [
-  { title: '名称', key: 'name', ellipsis: { tooltip: true }, width: 140 },
-  {
-    title: 'API Key',
-    key: 'api_key',
-    width: 220,
-    render(row) {
-      const revealed = revealedKeys.value.has(row.id)
-      const displayKey = revealed ? row.api_key : maskKey(row.api_key)
-      return h('div', { style: 'display:flex;align-items:center;gap:6px' }, [
-        h('span', { style: 'font-family:monospace;font-size:12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, displayKey),
-        h(NButton, {
-          size: 'tiny',
-          quaternary: true,
-          onClick: () => {
-            const next = new Set(revealedKeys.value)
-            if (next.has(row.id)) next.delete(row.id)
-            else next.add(row.id)
-            revealedKeys.value = next
-          },
-        }, {
-          icon: () => h(NIcon, {}, { default: () => h(revealed ? EyeOffOutline : EyeOutline) }),
-        }),
-        h(NButton, {
-          size: 'tiny',
-          quaternary: true,
-          onClick: () => copyToClipboard(row.api_key),
-        }, {
-          icon: () => h(NIcon, {}, { default: () => h(CopyOutline) }),
-        }),
-      ])
-    },
-  },
-  { title: '描述', key: 'description', ellipsis: { tooltip: true } },
-  {
-    title: '速率限制',
-    key: 'rate_limit',
-    width: 100,
-    render(row) {
-      return h('span', {}, `${row.rate_limit}/min`)
-    },
-  },
-  {
-    title: '状态',
-    key: 'enabled',
-    width: 80,
-    render(row) {
-      return h(NSwitch, {
-        value: row.enabled,
-        size: 'small',
-        onUpdateValue: () => toggleApiEnabled(row),
-      })
-    },
-  },
-  {
-    title: '创建时间',
-    key: 'created_at',
-    width: 150,
-    render(row) {
-      return h('span', {}, formatDateTime(row.created_at))
-    },
-  },
-  {
-    title: '最近使用',
-    key: 'last_used_at',
-    width: 150,
-    render(row) {
-      return h('span', {}, formatDateTime(row.last_used_at))
-    },
-  },
-  {
-    title: '操作',
-    key: 'actions',
-    width: 200,
-    render(row) {
-      return h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' }, [
-        h(NButton, {
-          size: 'small',
-          secondary: true,
-          onClick: () => openApiModal(row),
-        }, {
-          icon: () => h(NIcon, {}, { default: () => h(CreateOutline) }),
-          default: () => '编辑',
-        }),
-        h(NPopconfirm, {
-          onPositiveClick: () => regenerateKey(row),
-        }, {
-          trigger: () => h(NButton, {
-            size: 'small',
-            secondary: true,
-            type: 'warning',
-          }, {
-            icon: () => h(NIcon, {}, { default: () => h(RefreshOutline) }),
-            default: () => '重新生成',
-          }),
-          default: () => '重新生成后旧 Key 立即失效，确认？',
-        }),
-        h(NButton, {
-          size: 'small',
-          secondary: true,
-          type: 'info',
-          onClick: () => openUsageModal(row),
-        }, {
-          icon: () => h(NIcon, {}, { default: () => h(BarChartOutline) }),
-          default: () => '用量',
-        }),
-        h(NPopconfirm, {
-          onPositiveClick: () => deleteApiClient(row.id),
-        }, {
-          trigger: () => h(NButton, {
-            size: 'small',
-            type: 'error',
-            secondary: true,
-          }, {
-            icon: () => h(NIcon, {}, { default: () => h(TrashOutline) }),
-          }),
-          default: () => '确定删除此 API Key？',
-        }),
-      ])
-    },
-  },
-]
-
-// --- Usage endpoint columns ---
-const usageEndpointColumns: DataTableColumns = [
-  { title: '端点', key: 'endpoint', ellipsis: { tooltip: true } },
-  { title: '调用次数', key: 'count', width: 100 },
-]
-
-// --- Monitor computed ---
 const resourceMetrics = computed(() => {
-  const r = resources.value as Record<string, unknown>
-  const mem = (r.memory as Record<string, unknown>) ?? {}
-  const disk = (r.disk as Record<string, unknown>) ?? {}
+  const memory = (resources.value.memory as Record<string, unknown> | undefined) ?? {}
+  const disk = (resources.value.disk as Record<string, unknown> | undefined) ?? {}
   return {
-    cpu:    Math.round(Number(r.cpu_percent ?? r.cpuPercent ?? 0)),
-    memory: Math.round(Number(mem.percent ?? 0)),
-    disk:   Math.round(Number(disk.percent ?? 0)),
+    cpu: Math.round(Number(resources.value.cpu_percent ?? 0)),
+    memory: Math.round(Number(memory.percent ?? 0)),
+    disk: Math.round(Number(disk.percent ?? 0)),
   }
 })
 
-const getProgressColor = (pct: number) => {
-  if (pct >= 90) return '#d03050'
-  if (pct >= 70) return '#f0a020'
-  return '#18a058'
-}
-
-// Node list: parse nodes map from { nodes: { name: {...} } } response
 const nodeList = computed(() => {
-  const n = nodes.value as Record<string, unknown>
-  const nodeMap = (n.nodes ?? n) as Record<string, unknown>
-  if (typeof nodeMap !== 'object' || nodeMap === null || Array.isArray(nodeMap)) return []
-  return Object.entries(nodeMap).map(([nodeName, info]) => ({
-    name: nodeName,
+  const nodeMap = ((nodes.value.nodes ?? nodes.value) || {}) as Record<string, unknown>
+  return Object.entries(nodeMap).map(([name, info]) => ({
+    name,
     ...(typeof info === 'object' && info !== null ? (info as Record<string, unknown>) : {}),
   }))
 })
 
-const nodeColumns: DataTableColumns = [
-  { title: '节点名称', key: 'name', ellipsis: { tooltip: true } },
+const userColumns: DataTableColumns<AdminUser> = [
+  { title: '用户名', key: 'username' },
+  { title: '邮箱', key: 'email' },
+  {
+    title: '角色',
+    key: 'role_id',
+    render: (row) => h(NTag, { type: row.role_id === 0 ? 'warning' : 'info' }, { default: () => (row.role_id === 0 ? '管理员' : '用户') }),
+  },
   {
     title: '状态',
+    key: 'enabled',
+    render: (row) => h(NTag, { type: row.enabled ? 'success' : 'error' }, { default: () => (row.enabled ? '启用' : '禁用') }),
+  },
+  {
+    title: '操作',
+    key: 'actions',
+    width: 220,
+    render: (row) => h('div', { style: 'display:flex;gap:8px' }, [
+      h(NButton, { size: 'small', secondary: true, onClick: () => toggleUserRole(row) }, { default: () => '切换角色' }),
+      h(NButton, { size: 'small', secondary: true, type: row.enabled ? 'error' : 'success', onClick: () => toggleUserStatus(row) }, { default: () => (row.enabled ? '禁用' : '启用') }),
+    ]),
+  },
+]
+
+const cameraColumns: DataTableColumns<CameraItem> = [
+  { title: '名称', key: 'name' },
+  { title: '路段', key: 'road_name' },
+  { title: '节点 ID', key: 'edge_node_id' },
+  { title: '节点地址', key: 'node_url' },
+  {
+    title: '坐标',
+    key: 'coords',
+    render: (row) => (row.latitude == null || row.longitude == null ? '—' : `${row.latitude.toFixed(4)}, ${row.longitude.toFixed(4)}`),
+  },
+  {
+    title: '状态',
+    key: 'enabled',
+    render: (row) => h(NTag, { type: row.enabled ? 'success' : 'error' }, { default: () => (row.enabled ? '启用' : '禁用') }),
+  },
+  {
+    title: '操作',
+    key: 'actions',
+    width: 260,
+    render: (row) => h('div', { style: 'display:flex;gap:8px' }, [
+      h(NButton, { size: 'small', secondary: true, onClick: () => openCameraModal(row) }, { default: () => '编辑' }),
+      h(NButton, { size: 'small', secondary: true, type: row.enabled ? 'error' : 'success', onClick: () => toggleCamera(row) }, { default: () => (row.enabled ? '禁用' : '启用') }),
+      h(NPopconfirm, { onPositiveClick: () => deleteCamera(row.id) }, {
+        trigger: () => h(NButton, { size: 'small', secondary: true, type: 'error' }, { default: () => '删除' }),
+        default: () => '确定删除该摄像头？',
+      }),
+    ]),
+  },
+]
+
+const nodeColumns: DataTableColumns = [
+  { title: '节点', key: 'name' },
+  { title: '道路', key: 'road_name' },
+  { title: '节点 ID', key: 'edge_node_id' },
+  {
+    title: '在线',
     key: 'online',
-    width: 90,
-    render(row: Record<string, unknown>) {
-      const isOnline = Boolean(row.online)
-      return h(NTag, {
-        type: isOnline ? 'success' : 'error',
-        size: 'small',
-      }, { default: () => (isOnline ? '在线' : '离线') })
-    },
+    render: (row: Record<string, unknown>) => h(NTag, { type: row.online ? 'success' : 'error' }, { default: () => (row.online ? '在线' : '离线') }),
   },
   {
     title: '延迟',
     key: 'latency_ms',
-    width: 90,
-    render(row: Record<string, unknown>) {
-      const ms = row.latency_ms
-      return h('span', {}, ms != null ? `${ms} ms` : '—')
-    },
+    render: (row: Record<string, unknown>) => `${row.latency_ms ?? '—'} ms`,
   },
   {
-    title: '错误次数',
-    key: 'error_count',
-    width: 90,
-    render(row: Record<string, unknown>) {
-      return h('span', {}, row.error_count != null ? String(row.error_count) : '—')
-    },
-  },
-  {
-    title: '最近成功时间',
+    title: '最近成功',
     key: 'last_success_time',
-    ellipsis: { tooltip: true },
-    render(row: Record<string, unknown>) {
-      const t = row.last_success_time
-      return h('span', {}, t ? formatDateTime(String(t)) : '—')
+    render: (row: Record<string, unknown>) => formatDateTime(String(row.last_success_time || '')),
+  },
+  {
+    title: '操作',
+    key: 'actions',
+    render: (row: Record<string, unknown>) => h(NButton, { size: 'small', secondary: true, onClick: () => openNodeConfigModal(row) }, { default: () => '查看配置' }),
+  },
+]
+
+const eventColumns: DataTableColumns<AdminEventItem> = [
+  { title: '道路', key: 'road_name' },
+  {
+    title: '事件',
+    key: 'event_type',
+    render: (row) => h(NTag, { type: row.event_type === 'wrong_way_suspected' ? 'error' : row.event_type === 'illegal_parking_suspected' ? 'warning' : 'info' }, { default: () => row.event_type }),
+  },
+  { title: '级别', key: 'level' },
+  {
+    title: '时间',
+    key: 'start_at',
+    render: (row) => formatDateTime(row.start_at),
+  },
+  {
+    title: '摘要',
+    key: 'payload',
+    render: (row) => {
+      const trackId = row.payload.track_id != null ? `track=${row.payload.track_id}` : ''
+      const speed = row.payload.speed_kmh != null ? ` speed=${row.payload.speed_kmh}` : ''
+      return `${trackId}${speed}`.trim() || '—'
     },
   },
 ]
 
-// --- Init & lifecycle ---
-const retryInit = async () => {
-  loading.value = true
-  errorText.value = ''
-  try {
-    await ensureAdmin()
-    await Promise.all([fetchUsers(), fetchCameras(), fetchSettings()])
-  } catch (err) {
-    errorText.value = err instanceof Error ? err.message : '加载失败'
-  } finally {
-    loading.value = false
-  }
-}
-
 watch(tab, async (value) => {
   if (value === 'monitor') {
-    await fetchMonitor()
+    await Promise.all([fetchMonitor(), fetchEvents()])
     if (monitorTimer) window.clearInterval(monitorTimer)
-    monitorTimer = window.setInterval(fetchMonitor, 5000)
-  } else {
-    if (monitorTimer) {
-      window.clearInterval(monitorTimer)
-      monitorTimer = null
-    }
-    if (value === 'apikeys' && apiClients.value.length === 0) {
-      await fetchApiClients()
-    }
+    monitorTimer = window.setInterval(() => {
+      fetchMonitor()
+      fetchEvents()
+    }, 5000)
+  } else if (monitorTimer) {
+    window.clearInterval(monitorTimer)
+    monitorTimer = null
   }
 })
 
-onMounted(async () => {
-  try {
-    await ensureAdmin()
-    await Promise.all([fetchUsers(), fetchCameras(), fetchSettings()])
-  } catch (err) {
-    errorText.value = err instanceof Error ? err.message : '加载失败'
-  } finally {
-    loading.value = false
-  }
-})
+onMounted(retryInit)
 
 onUnmounted(() => {
   if (monitorTimer) {
@@ -1140,78 +661,11 @@ onUnmounted(() => {
 
 <style scoped>
 .admin-page {
-  max-width: 1200px;
+  max-width: 1240px;
   margin: 0 auto;
 }
 
-.tab-toolbar {
+.toolbar {
   margin-bottom: 12px;
-}
-
-.modal-form {
-  margin-top: 16px;
-}
-
-.monitor-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-}
-
-.monitor-card :deep(.n-progress) {
-  width: 120px;
-}
-
-.metric-label {
-  margin-top: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #6b7280;
-}
-
-.usage-bar-chart {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 4px 0;
-}
-
-.usage-bar-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-}
-
-.usage-bar-label {
-  width: 36px;
-  flex-shrink: 0;
-  color: #6b7280;
-  text-align: right;
-}
-
-.usage-bar-track {
-  flex: 1;
-  background: #f0f0f0;
-  border-radius: 4px;
-  height: 14px;
-  overflow: hidden;
-}
-
-.usage-bar-fill {
-  height: 100%;
-  background: #2080f0;
-  border-radius: 4px;
-  transition: width 0.3s ease;
-  min-width: 2px;
-}
-
-.usage-bar-count {
-  width: 40px;
-  flex-shrink: 0;
-  color: #374151;
-  font-weight: 500;
-  text-align: right;
 }
 </style>

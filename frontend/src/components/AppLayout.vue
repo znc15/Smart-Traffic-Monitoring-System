@@ -65,6 +65,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { NIcon } from 'naive-ui'
 import {
   SpeedometerOutline,
+  MapOutline,
   BarChartOutline,
   SettingsOutline,
   CarOutline,
@@ -137,6 +138,11 @@ const menuOptions = [
     icon: renderIcon(SpeedometerOutline),
   },
   {
+    label: 'GIS 地图',
+    key: '/map',
+    icon: renderIcon(MapOutline),
+  },
+  {
     label: '数据分析',
     key: '/analytics',
     icon: renderIcon(BarChartOutline),
@@ -152,6 +158,7 @@ const activeKey = computed(() => route.path)
 
 const pageTitleMap: Record<string, string> = {
   '/dashboard': '仪表盘',
+  '/map': 'GIS 地图',
   '/analytics': '数据分析',
   '/admin': '系统管理',
 }

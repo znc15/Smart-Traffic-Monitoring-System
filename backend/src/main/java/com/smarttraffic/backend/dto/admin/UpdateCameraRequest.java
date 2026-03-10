@@ -27,6 +27,14 @@ public class UpdateCameraRequest {
     @Size(max = 512)
     private String nodeUrl;
 
+    @JsonAlias("edge_node_id")
+    @Size(max = 128)
+    private String edgeNodeId;
+
+    @JsonAlias("node_api_key")
+    @Size(max = 255)
+    private String nodeApiKey;
+
     @JsonAlias("road_name")
     @Size(max = 255)
     private String roadName;
@@ -61,6 +69,12 @@ public class UpdateCameraRequest {
 
     public String getNodeUrl() { return nodeUrl; }
     public void setNodeUrl(String nodeUrl) { this.nodeUrl = nodeUrl; setFields.add("nodeUrl"); }
+
+    public String getEdgeNodeId() { return edgeNodeId; }
+    public void setEdgeNodeId(String edgeNodeId) { this.edgeNodeId = edgeNodeId; setFields.add("edgeNodeId"); }
+
+    public String getNodeApiKey() { return nodeApiKey; }
+    public void setNodeApiKey(String nodeApiKey) { this.nodeApiKey = nodeApiKey; setFields.add("nodeApiKey"); }
 
     public String getRoadName() { return roadName; }
     public void setRoadName(String roadName) { this.roadName = roadName; setFields.add("roadName"); }

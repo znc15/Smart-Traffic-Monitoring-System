@@ -196,15 +196,64 @@ public class ApiDocsController {
                         "/api/v1/edge/telemetry",
                         "POST",
                         "边缘节点上报遥测数据",
-                        "无需认证",
+                        "Edge Node Headers",
                         List.of(
+                                buildParam("X-Edge-Node-Id", "header", "边缘节点 ID", true),
+                                buildParam("X-Edge-Key", "header", "边缘节点密钥", true),
                                 buildParam("node_id", "body", "节点 ID", true),
                                 buildParam("road_name", "body", "道路名称", true),
                                 buildParam("vehicle_count", "body", "车辆计数", true),
                                 buildParam("timestamp", "body", "时间戳（ISO 8601）", true)
                         ),
                         Map.of("message", "telemetry accepted"),
-                        "curl -X POST -H 'Content-Type: application/json' -d '{...}' https://host/api/v1/edge/telemetry"
+                        "curl -X POST -H 'X-Edge-Node-Id: edge-node-1' -H 'X-Edge-Key: edge-secret' -H 'Content-Type: application/json' -d '{...}' https://host/api/v1/edge/telemetry"
+                ),
+                buildEndpoint(
+                        "/api/v1/map/overview",
+                        "GET",
+                        "获取 GIS 地图总览数据，包含点位、拥堵指数与快照地址",
+                        "无需认证",
+                        List.of(),
+                        Map.of("updated_at", "2026-03-10T10:00:00", "items", List.of()),
+                        "curl https://host/api/v1/map/overview"
+                ),
+                buildEndpoint(
+                        "/api/v1/admin/events",
+                        "GET",
+                        "管理员查询事件日志，支持按道路、事件类型、时间范围过滤",
+                        "管理员 Bearer Token",
+                        List.of(
+                                buildParam("road_name", "query", "道路名称过滤", false),
+                                buildParam("event_type", "query", "事件类型过滤", false),
+                                buildParam("start_at", "query", "开始时间，ISO 8601 格式", false),
+                                buildParam("end_at", "query", "结束时间，ISO 8601 格式", false)
+                        ),
+                        Map.of("content", List.of(), "totalElements", 0),
+                        "curl -H 'Authorization: Bearer <token>' 'https://host/api/v1/admin/events?event_type=wrong_way_suspected'"
+                ),
+                buildEndpoint(
+                        "/api/v1/admin/nodes/{cameraId}/config",
+                        "GET",
+                        "管理员获取边缘节点当前配置",
+                        "管理员 Bearer Token",
+                        List.of(
+                                buildParam("cameraId", "path", "摄像头 ID", true)
+                        ),
+                        Map.of("analysis_roi", List.of(), "telemetry_interval_sec", 3),
+                        "curl -H 'Authorization: Bearer <token>' https://host/api/v1/admin/nodes/1/config"
+                ),
+                buildEndpoint(
+                        "/api/v1/admin/nodes/{cameraId}/config",
+                        "PUT",
+                        "管理员远程下发边缘节点配置",
+                        "管理员 Bearer Token",
+                        List.of(
+                                buildParam("cameraId", "path", "摄像头 ID", true),
+                                buildParam("analysis_roi", "body", "ROI 多边形或矩形配置", false),
+                                buildParam("telemetry_interval_sec", "body", "上报间隔秒数", false)
+                        ),
+                        Map.of("status", "ok"),
+                        "curl -X PUT -H 'Authorization: Bearer <token>' -H 'Content-Type: application/json' -d '{\"telemetry_interval_sec\":2}' https://host/api/v1/admin/nodes/1/config"
                 )
         );
     }

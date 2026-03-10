@@ -22,6 +22,12 @@ public class CameraEntity {
     @Column(name = "node_url", length = 512)
     private String nodeUrl;
 
+    @Column(name = "edge_node_id", length = 128)
+    private String edgeNodeId;
+
+    @Column(name = "node_api_key", length = 255)
+    private String nodeApiKey;
+
     @Column(name = "road_name")
     private String roadName;
 
@@ -53,6 +59,10 @@ public class CameraEntity {
     public void setStreamUrl(String streamUrl) { this.streamUrl = streamUrl; }
     public String getNodeUrl() { return nodeUrl; }
     public void setNodeUrl(String nodeUrl) { this.nodeUrl = nodeUrl; }
+    public String getEdgeNodeId() { return edgeNodeId; }
+    public void setEdgeNodeId(String edgeNodeId) { this.edgeNodeId = edgeNodeId; }
+    public String getNodeApiKey() { return nodeApiKey; }
+    public void setNodeApiKey(String nodeApiKey) { this.nodeApiKey = nodeApiKey; }
     public String getRoadName() { return roadName; }
     public void setRoadName(String roadName) { this.roadName = roadName; }
     public Double getLatitude() { return latitude; }

@@ -59,6 +59,8 @@ export type CameraItem = {
   stream_url: string
   road_name: string
   node_url: string
+  edge_node_id: string
+  node_api_key: string
   enabled: boolean
   latitude: number | null
   longitude: number | null
@@ -73,6 +75,8 @@ export function normalizeCamera(raw: unknown): CameraItem {
     stream_url: String(pick(obj, 'stream_url', 'streamUrl', '')),
     road_name: String(pick(obj, 'road_name', 'roadName', '')),
     node_url: String(pick(obj, 'node_url', 'nodeUrl', '')),
+    edge_node_id: String(pick(obj, 'edge_node_id', 'edgeNodeId', '')),
+    node_api_key: String(pick(obj, 'node_api_key', 'nodeApiKey', '')),
     enabled: Boolean(obj.enabled),
     latitude: obj.latitude === null || obj.latitude === undefined ? null : Number(obj.latitude),
     longitude: obj.longitude === null || obj.longitude === undefined ? null : Number(obj.longitude)
@@ -148,5 +152,114 @@ export function normalizeApiClientUsage(raw: unknown): ApiClientUsage {
           count: Number(e.count || 0),
         }))
       : [],
+  }
+}
+
+export type MapOverviewPoint = {
+  camera_id: number
+  name: string
+  road_name: string
+  edge_node_id: string
+  latitude: number
+  longitude: number
+  online: boolean
+  density_status: string
+  congestion_index: number
+  count_car: number
+  count_motor: number
+  count_person: number
+  speed_car: number
+  speed_motor: number
+  snapshot_url: string
+  updated_at: string | null
+}
+
+export function normalizeMapOverviewPoint(raw: unknown): MapOverviewPoint {
+  const obj = (raw || {}) as Record<string, unknown>
+  return {
+    camera_id: Number(pick(obj, 'camera_id', 'cameraId', 0)),
+    name: String(obj.name || ''),
+    road_name: String(pick(obj, 'road_name', 'roadName', '')),
+    edge_node_id: String(pick(obj, 'edge_node_id', 'edgeNodeId', '')),
+    latitude: Number(obj.latitude || 0),
+    longitude: Number(obj.longitude || 0),
+    online: Boolean(obj.online),
+    density_status: String(pick(obj, 'density_status', 'densityStatus', 'unknown')),
+    congestion_index: Number(pick(obj, 'congestion_index', 'congestionIndex', 0)),
+    count_car: Number(pick(obj, 'count_car', 'countCar', 0)),
+    count_motor: Number(pick(obj, 'count_motor', 'countMotor', 0)),
+    count_person: Number(pick(obj, 'count_person', 'countPerson', 0)),
+    speed_car: Number(pick(obj, 'speed_car', 'speedCar', 0)),
+    speed_motor: Number(pick(obj, 'speed_motor', 'speedMotor', 0)),
+    snapshot_url: String(
+      pick(obj, 'snapshot_url', 'snapshotUrl', String(pick(obj, 'frame_url', 'frameUrl', ''))),
+    ),
+    updated_at: pick(obj, 'updated_at', 'updatedAt', null) as string | null,
+  }
+}
+
+export type NodeRuntimeConfig = {
+  road_name: string
+  mode: string
+  camera_source: string
+  analysis_roi: unknown
+  lane_split_ratios: number[]
+  speed_meters_per_pixel: number
+  parking_stationary_seconds: number
+  wrong_way_min_track_points: number
+  telemetry_interval_sec: number
+}
+
+export function normalizeNodeRuntimeConfig(raw: unknown): NodeRuntimeConfig {
+  const obj = (raw || {}) as Record<string, unknown>
+  const ratios = pick(obj, 'lane_split_ratios', 'laneSplitRatios', [] as unknown)
+  return {
+    road_name: String(pick(obj, 'road_name', 'roadName', '')),
+    mode: String(obj.mode || ''),
+    camera_source: String(pick(obj, 'camera_source', 'cameraSource', '')),
+    analysis_roi: pick(obj, 'analysis_roi', 'analysisRoi', null),
+    lane_split_ratios: Array.isArray(ratios) ? ratios.map((value) => Number(value || 0)) : [],
+    speed_meters_per_pixel: Number(
+      pick(obj, 'speed_meters_per_pixel', 'speedMetersPerPixel', 0),
+    ),
+    parking_stationary_seconds: Number(
+      pick(obj, 'parking_stationary_seconds', 'parkingStationarySeconds', 0),
+    ),
+    wrong_way_min_track_points: Number(
+      pick(obj, 'wrong_way_min_track_points', 'wrongWayMinTrackPoints', 0),
+    ),
+    telemetry_interval_sec: Number(
+      pick(obj, 'telemetry_interval_sec', 'telemetryIntervalSec', 0),
+    ),
+  }
+}
+
+export type TrafficEventItem = {
+  id: number
+  road_name: string
+  edge_node_id: string
+  event_type: string
+  level: string
+  start_at: string | null
+  end_at: string | null
+  created_at: string | null
+  payload: Record<string, unknown>
+}
+
+export function normalizeTrafficEvent(raw: unknown): TrafficEventItem {
+  const obj = (raw || {}) as Record<string, unknown>
+  return {
+    id: Number(obj.id || 0),
+    road_name: String(pick(obj, 'road_name', 'roadName', '')),
+    edge_node_id: String(pick(obj, 'edge_node_id', 'edgeNodeId', '')),
+    event_type: String(pick(obj, 'event_type', 'eventType', '')),
+    level: String(obj.level || ''),
+    start_at: pick(obj, 'start_at', 'startAt', null) as string | null,
+    end_at: pick(obj, 'end_at', 'endAt', null) as string | null,
+    created_at: pick(obj, 'created_at', 'createdAt', null) as string | null,
+    payload:
+      obj.payload && typeof obj.payload === 'object'
+        ? (obj.payload as Record<string, unknown>)
+        : {},
   }
 }

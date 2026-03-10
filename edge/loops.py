@@ -12,9 +12,8 @@ import numpy as np
 
 import config
 from state import state
-from detector import estimate_speed
 from overlay import draw_overlay
-from traffic_enrichment import build_events, build_lane_stats, count_person
+from traffic_enrichment import analyze_tracked_objects, count_person, fallback_speed, reset_track_history
 from tracking_engine import TrackingEngine
 
 
@@ -45,6 +44,7 @@ def camera_loop() -> None:
     last_inference_ms = 0.0
     last_objects: list[dict] = []
     tracking_engine = TrackingEngine()
+    reset_track_history()
 
     try:
         while not state.should_stop():
@@ -84,12 +84,12 @@ def camera_loop() -> None:
                 fps_counter = 0
                 fps_timer = time.time()
 
-            # 速度估算
-            speed_car = estimate_speed(count_car)
-            speed_motor = estimate_speed(count_motor)
             count_person_now = count_person(last_objects)
-            lane_stats = build_lane_stats(last_objects, frame.shape[1])
-            events = build_events(count_car + count_motor, speed_car, speed_motor)
+            analysis = analyze_tracked_objects(last_objects, frame.shape[1], frame.shape[0])
+            speed_car = analysis["speed_car"] or fallback_speed(count_car)
+            speed_motor = analysis["speed_motor"] or fallback_speed(count_motor)
+            lane_stats = analysis["lane_stats"]
+            events = analysis["events"]
 
             # 在帧上叠加信息栏
             draw_overlay(annotated, count_car, count_motor, speed_car, speed_motor,
@@ -171,6 +171,7 @@ def _sim_video_loop(videos: list[Path]) -> None:
         last_inference_ms = 0.0
         last_objects: list[dict] = []
         tracking_engine = TrackingEngine()
+        reset_track_history()
 
         try:
             while not state.should_stop():
@@ -202,11 +203,12 @@ def _sim_video_loop(videos: list[Path]) -> None:
                     fps_counter = 0
                     fps_timer = time.time()
 
-                speed_car = estimate_speed(count_car)
-                speed_motor = estimate_speed(count_motor)
                 count_person_now = count_person(last_objects)
-                lane_stats = build_lane_stats(last_objects, frame.shape[1])
-                events = build_events(count_car + count_motor, speed_car, speed_motor)
+                analysis = analyze_tracked_objects(last_objects, frame.shape[1], frame.shape[0])
+                speed_car = analysis["speed_car"] or fallback_speed(count_car)
+                speed_motor = analysis["speed_motor"] or fallback_speed(count_motor)
+                lane_stats = analysis["lane_stats"]
+                events = analysis["events"]
 
                 draw_overlay(annotated, count_car, count_motor, speed_car, speed_motor,
                              inference_ms, current_fps)
@@ -247,6 +249,7 @@ def _sim_image_loop(images: list[Path]) -> None:
     last_inference_ms = 0.0
     last_objects: list[dict] = []
     tracking_engine = TrackingEngine()
+    reset_track_history()
 
     while not state.should_stop():
         img_path = images[img_idx % len(images)]
@@ -280,11 +283,12 @@ def _sim_image_loop(images: list[Path]) -> None:
             fps_counter = 0
             fps_timer = time.time()
 
-        speed_car = estimate_speed(count_car)
-        speed_motor = estimate_speed(count_motor)
         count_person_now = count_person(last_objects)
-        lane_stats = build_lane_stats(last_objects, frame.shape[1])
-        events = build_events(count_car + count_motor, speed_car, speed_motor)
+        analysis = analyze_tracked_objects(last_objects, frame.shape[1], frame.shape[0])
+        speed_car = analysis["speed_car"] or fallback_speed(count_car)
+        speed_motor = analysis["speed_motor"] or fallback_speed(count_motor)
+        lane_stats = analysis["lane_stats"]
+        events = analysis["events"]
 
         draw_overlay(annotated, count_car, count_motor, speed_car, speed_motor,
                      inference_ms, current_fps)
@@ -320,8 +324,8 @@ def _sim_random_loop() -> None:
         # 随机交通数据
         count_car = random.randint(0, 12)
         count_motor = random.randint(0, 8)
-        speed_car = estimate_speed(count_car)
-        speed_motor = estimate_speed(count_motor)
+        speed_car = fallback_speed(count_car)
+        speed_motor = fallback_speed(count_motor)
 
         # 生成模拟帧（深灰底图）
         frame = np.full((480, 640, 3), 35, dtype=np.uint8)

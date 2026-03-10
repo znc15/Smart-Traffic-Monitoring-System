@@ -5,7 +5,6 @@ YOLOv8 车辆检测模块
 
 import threading
 import time
-import random
 from pathlib import Path
 
 import cv2
@@ -286,19 +285,3 @@ def redraw_detections(frame: np.ndarray, objects_list: list[dict]) -> np.ndarray
         cv2.putText(annotated, label, (x1, y1 - 6),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
     return annotated
-
-
-# ---------------------------------------------------------------------------
-# 速度估算（占位实现）
-# ---------------------------------------------------------------------------
-def estimate_speed(count: int) -> float:
-    """
-    简易速度估算（占位实现）
-    真实场景应基于目标跟踪 + 标定距离计算
-    """
-    if count == 0:
-        return 0.0
-    # 车辆越多 → 速度越慢的简单反比模型
-    base = 60.0
-    factor = max(0.2, 1.0 - count * 0.05)
-    return round(base * factor + random.uniform(-5, 5), 1)

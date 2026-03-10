@@ -45,6 +45,7 @@
 |:-----|:---------|:-----|
 | `/login` | `LoginView.vue` | 用户登录 / 注册页 |
 | `/dashboard` | `DashboardView.vue` | 首页监控大屏 — 实时路况、车流统计、告警信息 |
+| `/map` | `MapView.vue` | GIS 地图 — 高德底图、拥堵热力、节点快照 |
 | `/analytics` | `AnalyticsView.vue` | 分析报表 — 历史趋势、多维度对比 |
 | `/admin` | `AdminView.vue` | 管理后台 — 用户管理、Edge 节点管理、系统配置 |
 
@@ -59,10 +60,12 @@ frontend/
 │   ├── views/               # 页面视图
 │   │   ├── LoginView.vue
 │   │   ├── DashboardView.vue
+│   │   ├── MapView.vue
 │   │   ├── AnalyticsView.vue
 │   │   └── AdminView.vue
 │   ├── lib/                 # 工具库
 │   │   ├── api.ts           #   API 请求封装
+│   │   ├── amap.ts          #   高德地图脚本加载
 │   │   └── normalize.ts     #   数据格式化 / 字段兼容
 │   ├── store/               # 状态管理
 │   ├── App.vue              # 根组件
@@ -117,12 +120,14 @@ docker run -p 80:80 traffic-frontend
 |:-----|:-----|:-------|
 | `VITE_API_HTTP_BASE` | 后端 HTTP 接口基址 | `http://localhost:8000` |
 | `VITE_API_WS_BASE` | 后端 WebSocket 基址 | `ws://localhost:8000` |
+| `VITE_AMAP_KEY` | 高德地图 Web JS API Key | 空 |
 
 示例 `.env.local`：
 
 ```env
 VITE_API_HTTP_BASE=https://api.example.com
 VITE_API_WS_BASE=wss://api.example.com
+VITE_AMAP_KEY=your_amap_web_js_key
 ```
 
 ---

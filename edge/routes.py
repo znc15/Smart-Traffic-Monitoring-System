@@ -16,7 +16,7 @@ from typing import AsyncGenerator, Optional
 
 import cv2
 import numpy as np
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, Header, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
@@ -73,6 +73,12 @@ class ConfigUpdateRequest(BaseModel):
     tracker_backend: Optional[str] = Field(None, pattern=r"^(bytetrack|simple)$", description="跟踪后端: bytetrack 或 simple")
     tracker_strict: Optional[bool] = Field(None, description="ByteTrack 严格模式，失败时是否禁止回退")
     tracker_cfg: Optional[str] = Field(None, max_length=128, description="Ultralytics tracker 配置文件名")
+    analysis_roi: Optional[list[float]] = Field(None, min_length=4, max_length=4, description="归一化 ROI: [x1, y1, x2, y2]")
+    lane_split_ratios: Optional[list[float]] = Field(None, min_length=2, max_length=2, description="三车道分割点: [left, right]")
+    speed_meters_per_pixel: Optional[float] = Field(None, gt=0.0, le=10.0, description="像素到米的标定系数")
+    parking_stationary_seconds: Optional[float] = Field(None, ge=1.0, le=120.0, description="违停判定静止秒数")
+    wrong_way_min_track_points: Optional[int] = Field(None, ge=2, le=30, description="逆行判定最少轨迹点数")
+    telemetry_interval_sec: Optional[float] = Field(None, ge=1.0, le=60.0, description="主动上报间隔秒数")
 
     @field_validator('imgsz')
     @classmethod
@@ -80,6 +86,32 @@ class ConfigUpdateRequest(BaseModel):
         if v is not None and v % 32 != 0:
             raise ValueError('imgsz must be a multiple of 32')
         return v
+
+    @field_validator("analysis_roi")
+    @classmethod
+    def validate_roi(cls, value: Optional[list[float]]) -> Optional[list[float]]:
+        if value is None:
+            return value
+        if len(value) != 4:
+            raise ValueError("analysis_roi must contain exactly 4 values")
+        x1, y1, x2, y2 = [float(v) for v in value]
+        if min(x1, y1, x2, y2) < 0 or max(x1, y1, x2, y2) > 1:
+            raise ValueError("analysis_roi must be normalized between 0 and 1")
+        if x2 <= x1 or y2 <= y1:
+            raise ValueError("analysis_roi must satisfy x2>x1 and y2>y1")
+        return [x1, y1, x2, y2]
+
+    @field_validator("lane_split_ratios")
+    @classmethod
+    def validate_lane_splits(cls, value: Optional[list[float]]) -> Optional[list[float]]:
+        if value is None:
+            return value
+        if len(value) != 2:
+            raise ValueError("lane_split_ratios must contain exactly 2 values")
+        left, right = [float(v) for v in value]
+        if min(left, right) <= 0 or max(left, right) >= 1 or right <= left:
+            raise ValueError("lane_split_ratios must satisfy 0<left<right<1")
+        return [left, right]
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +142,26 @@ def _current_config() -> dict:
         "tracker_backend": config.TRACKER_BACKEND,
         "tracker_strict": config.TRACKER_STRICT,
         "tracker_cfg": config.TRACKER_CFG,
+        "edge_node_id": config.EDGE_NODE_ID,
+        "edge_api_key_configured": bool(config.EDGE_API_KEY),
+        "analysis_roi": config.ANALYSIS_ROI,
+        "lane_split_ratios": config.LANE_SPLIT_RATIOS,
+        "speed_meters_per_pixel": config.SPEED_METERS_PER_PIXEL,
+        "parking_stationary_seconds": config.PARKING_STATIONARY_SECONDS,
+        "wrong_way_min_track_points": config.WRONG_WAY_MIN_TRACK_POINTS,
+        "telemetry_interval_sec": config.TELEMETRY_INTERVAL_SEC,
     }
+
+
+def _require_edge_access(x_edge_key: str | None, x_edge_node_id: str | None = None) -> None:
+    expected_key = config.EDGE_API_KEY.strip()
+    if not expected_key:
+        return
+    if (x_edge_key or "").strip() != expected_key:
+        raise HTTPException(status_code=401, detail="Invalid edge key")
+    expected_node_id = config.EDGE_NODE_ID.strip()
+    if expected_node_id and x_edge_node_id is not None and x_edge_node_id.strip() not in {"", expected_node_id}:
+        raise HTTPException(status_code=401, detail="Invalid edge node id")
 
 # ---------------------------------------------------------------------------
 # 预计算占位 JPEG（1x1 灰色图），避免每次循环重复编码
@@ -127,8 +178,12 @@ _stream_count = 0
 
 
 @router.get("/api/traffic", response_model=None)
-def get_traffic() -> JSONResponse:
+def get_traffic(
+    x_edge_key: str | None = Header(default=None),
+    x_edge_node_id: str | None = Header(default=None),
+) -> JSONResponse:
     """交通数据 + 边缘节点性能指标（后端每 3 秒轮询此接口）"""
+    _require_edge_access(x_edge_key, x_edge_node_id)
     data = state.get_traffic()
     data["edge_metrics"] = state.get_edge_metrics()
     return JSONResponse(content=data)
@@ -145,8 +200,12 @@ def get_frame() -> Response:
 
 
 @router.get("/api/metrics", response_model=None)
-def get_metrics() -> JSONResponse:
+def get_metrics(
+    x_edge_key: str | None = Header(default=None),
+    x_edge_node_id: str | None = Header(default=None),
+) -> JSONResponse:
     """详细性能指标（独立端点）"""
+    _require_edge_access(x_edge_key, x_edge_node_id)
     return JSONResponse(content=state.get_edge_metrics())
 
 
@@ -336,8 +395,12 @@ async def video_stream() -> StreamingResponse | JSONResponse:
 # 配置读写 API
 # ---------------------------------------------------------------------------
 @router.get("/api/config", response_model=None)
-def get_config() -> JSONResponse:
+def get_config(
+    x_edge_key: str | None = Header(default=None),
+    x_edge_node_id: str | None = Header(default=None),
+) -> JSONResponse:
     """返回当前运行配置"""
+    _require_edge_access(x_edge_key, x_edge_node_id)
     return JSONResponse(content=_current_config())
 
 
@@ -371,8 +434,13 @@ def get_models() -> JSONResponse:
         "current": config.MODEL_NAME,
     })
 @router.put("/api/config", response_model=None)
-def update_config(body: ConfigUpdateRequest) -> JSONResponse:
+def update_config(
+    body: ConfigUpdateRequest,
+    x_edge_key: str | None = Header(default=None),
+    x_edge_node_id: str | None = Header(default=None),
+) -> JSONResponse:
     """更新运行配置（仅更新传入的字段，未传入的保持不变），并触发检测循环热重启"""
+    _require_edge_access(x_edge_key, x_edge_node_id)
     # Snapshot current values before mutation, used to detect what changed
     old_model = config.MODEL_NAME
     old_openvino = config.USE_OPENVINO
@@ -383,6 +451,12 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
     old_tracker_backend = config.TRACKER_BACKEND
     old_tracker_strict = config.TRACKER_STRICT
     old_tracker_cfg = config.TRACKER_CFG
+    old_analysis_roi = list(config.ANALYSIS_ROI)
+    old_lane_split_ratios = list(config.LANE_SPLIT_RATIOS)
+    old_speed_meters_per_pixel = config.SPEED_METERS_PER_PIXEL
+    old_parking_stationary_seconds = config.PARKING_STATIONARY_SECONDS
+    old_wrong_way_min_track_points = config.WRONG_WAY_MIN_TRACK_POINTS
+    old_telemetry_interval_sec = config.TELEMETRY_INTERVAL_SEC
 
     # 逐字段检查并更新 config 模块变量
     if body.mode is not None:
@@ -434,6 +508,18 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
         config.TRACKER_STRICT = body.tracker_strict
     if body.tracker_cfg is not None:
         config.TRACKER_CFG = (body.tracker_cfg.strip() if body.tracker_cfg else "") or "bytetrack.yaml"
+    if body.analysis_roi is not None:
+        config.ANALYSIS_ROI = [float(v) for v in body.analysis_roi]
+    if body.lane_split_ratios is not None:
+        config.LANE_SPLIT_RATIOS = [float(v) for v in body.lane_split_ratios]
+    if body.speed_meters_per_pixel is not None:
+        config.SPEED_METERS_PER_PIXEL = float(body.speed_meters_per_pixel)
+    if body.parking_stationary_seconds is not None:
+        config.PARKING_STATIONARY_SECONDS = float(body.parking_stationary_seconds)
+    if body.wrong_way_min_track_points is not None:
+        config.WRONG_WAY_MIN_TRACK_POINTS = int(body.wrong_way_min_track_points)
+    if body.telemetry_interval_sec is not None:
+        config.TELEMETRY_INTERVAL_SEC = float(body.telemetry_interval_sec)
 
     # Determine whether a full restart is needed.
     # frame_skip, jpeg_quality are read dynamically in the loop — no restart required.
@@ -448,7 +534,13 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
         or config.TRACKER_BACKEND != old_tracker_backend
         or config.TRACKER_STRICT != old_tracker_strict
         or config.TRACKER_CFG != old_tracker_cfg
+        or config.ANALYSIS_ROI != old_analysis_roi
+        or config.LANE_SPLIT_RATIOS != old_lane_split_ratios
+        or config.SPEED_METERS_PER_PIXEL != old_speed_meters_per_pixel
+        or config.PARKING_STATIONARY_SECONDS != old_parking_stationary_seconds
+        or config.WRONG_WAY_MIN_TRACK_POINTS != old_wrong_way_min_track_points
     )
+    telemetry_changed = config.TELEMETRY_INTERVAL_SEC != old_telemetry_interval_sec
     needs_restart = model_changed or body.mode is not None
 
     restarted = False
@@ -473,6 +565,7 @@ def update_config(body: ConfigUpdateRequest) -> JSONResponse:
 
     result = _current_config()
     result["restarted"] = restarted
+    result["telemetry_interval_updated"] = telemetry_changed
     return JSONResponse(content=result)
 
 

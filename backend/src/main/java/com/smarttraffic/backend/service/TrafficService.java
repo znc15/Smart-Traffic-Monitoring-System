@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,8 +44,8 @@ public class TrafficService {
             }
         } else {
             for (CameraEntity cam : cameras) {
-                boolean isRemote = cam.getStreamUrl() != null && !cam.getStreamUrl().isBlank();
-                snapshots.put(cam.getName(), new Snapshot(
+                boolean isRemote = isRemoteCamera(cam);
+                snapshots.put(cameraKey(cam), new Snapshot(
                         isRemote ? 0 : randomCount(),
                         isRemote ? 0 : randomCount(),
                         isRemote ? 0 : randomCount(),
@@ -126,18 +127,17 @@ public class TrafficService {
 
     public void reloadCameras(TrafficProperties trafficProperties) {
         List<CameraEntity> cameras = cameraRepository.findByEnabledTrue();
-        List<String> names = cameras.isEmpty()
+        List<String> roadKeys = cameras.isEmpty()
                 ? trafficProperties.roadsAsList()
-                : cameras.stream().map(CameraEntity::getName).toList();
-        // 构建远程摄像头名称集合
-        java.util.Set<String> remoteNames = cameras.stream()
-                .filter(c -> c.getStreamUrl() != null && !c.getStreamUrl().isBlank())
-                .map(CameraEntity::getName)
-                .collect(java.util.stream.Collectors.toSet());
+                : cameras.stream().map(TrafficService::cameraKey).toList();
+        HashSet<String> remoteKeys = cameras.stream()
+                .filter(TrafficService::isRemoteCamera)
+                .map(TrafficService::cameraKey)
+                .collect(java.util.stream.Collectors.toCollection(HashSet::new));
         // Add new cameras
-        for (String name : names) {
-            boolean isRemote = remoteNames.contains(name);
-            snapshots.putIfAbsent(name, new Snapshot(
+        for (String roadKey : roadKeys) {
+            boolean isRemote = remoteKeys.contains(roadKey);
+            snapshots.putIfAbsent(roadKey, new Snapshot(
                     isRemote ? 0 : randomCount(),
                     isRemote ? 0 : randomCount(),
                     isRemote ? 0 : randomCount(),
@@ -147,8 +147,20 @@ public class TrafficService {
             ));
         }
         // Remove deleted cameras
-        snapshots.keySet().retainAll(new java.util.HashSet<>(names));
-        frameCache.keySet().retainAll(new java.util.HashSet<>(names));
+        snapshots.keySet().retainAll(new HashSet<>(roadKeys));
+        frameCache.keySet().retainAll(new HashSet<>(roadKeys));
+    }
+
+    private static boolean isRemoteCamera(CameraEntity camera) {
+        return (camera.getNodeUrl() != null && !camera.getNodeUrl().isBlank())
+                || (camera.getStreamUrl() != null && !camera.getStreamUrl().isBlank());
+    }
+
+    private static String cameraKey(CameraEntity camera) {
+        if (camera.getRoadName() != null && !camera.getRoadName().isBlank()) {
+            return camera.getRoadName().trim();
+        }
+        return camera.getName();
     }
 
     private static String computeDensityStatus(Snapshot snapshot, boolean online, long busyThreshold, long congestedThreshold) {

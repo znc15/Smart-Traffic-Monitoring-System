@@ -1,4 +1,5 @@
 export const TOKEN_KEY = 'access_token'
+export const AMAP_KEY = String(import.meta.env.VITE_AMAP_KEY || '')
 
 const HTTP_BASE_ROOT = import.meta.env.VITE_API_HTTP_BASE || 'http://localhost:8000'
 const WS_BASE_ROOT = import.meta.env.VITE_API_WS_BASE || 'ws://localhost:8000'
@@ -12,6 +13,7 @@ export const endpoints = {
   me: `${API_HTTP_BASE}/auth/me`,
   siteSettings: `${API_HTTP_BASE}/site-settings`,
   roads: `${API_HTTP_BASE}/roads_name`,
+  mapOverview: `${API_HTTP_BASE}/map/overview`,
   infoWs: (roadName: string) => `${API_WS_BASE}/ws/info/${encodeURIComponent(roadName)}`,
   frameNoAuth: (roadName: string) => `${API_HTTP_BASE}/frames_no_auth/${encodeURIComponent(roadName)}`,
   reportExport: `${API_HTTP_BASE}/reports/traffic/export`,
@@ -20,6 +22,8 @@ export const endpoints = {
   adminSiteSettings: `${API_HTTP_BASE}/admin/site-settings`,
   adminResources: `${API_HTTP_BASE}/admin/resources`,
   adminNodes: `${API_HTTP_BASE}/admin/nodes`,
+  adminEvents: `${API_HTTP_BASE}/admin/events`,
+  adminNodeConfig: (cameraId: number) => `${API_HTTP_BASE}/admin/nodes/${cameraId}/config`,
   adminApiClients: `${API_HTTP_BASE}/admin/api-clients`,
 }
 

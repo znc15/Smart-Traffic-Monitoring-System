@@ -3,8 +3,31 @@
 通过环境变量或 CLI 参数注入，支持模拟模式和摄像头模式
 """
 
+import math
 import os
 from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# 环境变量解析辅助
+# ---------------------------------------------------------------------------
+def _parse_float_list(name: str, default: list[float], expected_len: int) -> list[float]:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return list(default)
+
+    try:
+        values = [float(part.strip()) for part in raw.split(",")]
+    except ValueError:
+        return list(default)
+
+    if len(values) != expected_len:
+        return list(default)
+
+    if not all(math.isfinite(value) for value in values):
+        return list(default)
+
+    return values
+
 
 # 模型存放目录（edge/models/）
 MODELS_DIR = Path(__file__).parent / "models"
@@ -62,8 +85,18 @@ UVICORN_WORKERS = int(os.environ.get("UVICORN_WORKERS", "1"))
 
 # 主动上报到云端后端（可选）
 EDGE_NODE_ID = os.environ.get("EDGE_NODE_ID", "edge-01")
+EDGE_API_KEY = os.environ.get("EDGE_API_KEY", "").strip()
 BACKEND_TELEMETRY_URL = os.environ.get("BACKEND_TELEMETRY_URL", "").strip()
 TELEMETRY_INTERVAL_SEC = float(os.environ.get("TELEMETRY_INTERVAL_SEC", "3"))
+
+# 交通分析参数（均支持热更新）
+# analysis_roi: [x1, y1, x2, y2]，归一化到 0~1 的矩形 ROI
+ANALYSIS_ROI = _parse_float_list("ANALYSIS_ROI", [0.05, 0.25, 0.95, 0.95], 4)
+# lane_split_ratios: 左/中/右三车道分割点，归一化到 0~1
+LANE_SPLIT_RATIOS = _parse_float_list("LANE_SPLIT_RATIOS", [0.33, 0.66], 2)
+SPEED_METERS_PER_PIXEL = float(os.environ.get("SPEED_METERS_PER_PIXEL", "0.08"))
+PARKING_STATIONARY_SECONDS = float(os.environ.get("PARKING_STATIONARY_SECONDS", "8"))
+WRONG_WAY_MIN_TRACK_POINTS = int(os.environ.get("WRONG_WAY_MIN_TRACK_POINTS", "4"))
 
 # COCO 类别映射
 CAR_CLASSES = {2, 5, 7}       # car, bus, truck → 归为"汽车"
