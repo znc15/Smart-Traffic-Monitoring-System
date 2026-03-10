@@ -70,7 +70,6 @@ import {
   CarOutline,
   PersonOutline,
   LogOutOutline,
-  CodeSlashOutline,
 } from '@vicons/ionicons5'
 import { clearToken, endpoints, authFetch } from '../lib/api'
 import { normalizeSiteSettings } from '../lib/normalize'
@@ -147,11 +146,6 @@ const menuOptions = [
     key: '/admin',
     icon: renderIcon(SettingsOutline),
   },
-  {
-    label: 'API 文档',
-    key: '/api-docs',
-    icon: renderIcon(CodeSlashOutline),
-  },
 ]
 
 const activeKey = computed(() => route.path)
@@ -160,7 +154,6 @@ const pageTitleMap: Record<string, string> = {
   '/dashboard': '仪表盘',
   '/analytics': '数据分析',
   '/admin': '系统管理',
-  '/api-docs': 'API 文档',
 }
 
 const pageTitle = computed(() => {

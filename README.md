@@ -295,6 +295,192 @@ docker compose down
 
 ---
 
+## API 文档
+
+> 后端同时提供机器可读的 API 文档端点：`GET /api/v1/api-docs`，返回 JSON 格式的完整文档数据，可用于第三方集成。
+
+### 认证方式
+
+系统支持两种认证机制：
+
+| 机制 | 请求头 | 适用端点 | 获取方式 |
+|:-----|:-------|:---------|:---------|
+| **Bearer Token（JWT）** | `Authorization: Bearer <token>` | 所有需要登录的端点 | 调用 `POST /api/v1/auth/login` 获取 `access_token` |
+| **API Key** | `X-API-Key: <your-key>` | MaaS 开放接口 | 由管理员在系统管理后台创建 |
+
+> Token 同时写入 HttpOnly Cookie（`access_token`），WebSocket 连接可通过 Cookie 或 query 参数 `?token=<jwt>` 传递。
+
+---
+
+### 公开 HTTP 端点（无需认证）
+
+| 方法 | 路径 | 描述 |
+|:-----|:-----|:-----|
+| GET | `/api/v1/api-docs` | 获取机器可读 API 文档（JSON） |
+| GET | `/api/v1/site-settings` | 获取站点配置（名称、公告、Logo） |
+| GET | `/api/v1/roads_name` | 获取所有已启用道路名称列表 |
+| GET | `/api/v1/info/{roadName}` | 获取指定道路实时交通信息 |
+| GET | `/api/v1/frames_no_auth/{roadName}` | 获取指定道路摄像头最新帧（JPEG） |
+| GET | `/api/v1/traffic/predictions` | 获取指定道路交通流量预测数据 |
+| POST | `/api/v1/auth/register` | 用户注册 |
+| POST | `/api/v1/auth/login` | 用户登录，返回 JWT |
+| POST | `/api/v1/edge/telemetry` | 边缘节点上报遥测数据 |
+
+---
+
+### 需要 Bearer Token 的端点
+
+| 方法 | 路径 | 描述 |
+|:-----|:-----|:-----|
+| GET | `/api/v1/auth/me` | 获取当前登录用户信息 |
+| GET | `/api/v1/frames/{roadName}` | 获取摄像头最新帧（需认证） |
+| GET | `/api/v1/reports/traffic/export` | 导出交通报告（JSON / XLSX） |
+| PUT | `/api/v1/users/password` | 修改当前用户密码 |
+| PUT | `/api/v1/users/profile` | 更新当前用户个人资料 |
+
+---
+
+### 管理员端点（需要 Bearer Token + 管理员权限）
+
+| 方法 | 路径 | 描述 |
+|:-----|:-----|:-----|
+| GET | `/api/v1/admin/users` | 获取用户列表（分页） |
+| PUT | `/api/v1/admin/users/{id}/role` | 修改用户角色（`role_id`: 0=普通用户, 1=管理员） |
+| PUT | `/api/v1/admin/users/{id}/status` | 切换用户启用状态 |
+| GET | `/api/v1/admin/cameras` | 获取摄像头列表（分页） |
+| POST | `/api/v1/admin/cameras` | 创建摄像头 |
+| PUT | `/api/v1/admin/cameras/{id}` | 更新摄像头配置 |
+| DELETE | `/api/v1/admin/cameras/{id}` | 删除摄像头 |
+| GET | `/api/v1/admin/resources` | 获取系统资源指标（CPU、内存等） |
+| GET | `/api/v1/admin/nodes` | 获取边缘节点健康状态 |
+| PUT | `/api/v1/admin/site-settings` | 更新站点配置 |
+| GET | `/api/v1/admin/api-clients` | 获取 MaaS API 客户端列表 |
+| POST | `/api/v1/admin/api-clients` | 创建 MaaS API 客户端 |
+| PUT | `/api/v1/admin/api-clients/{id}` | 更新 API 客户端 |
+| DELETE | `/api/v1/admin/api-clients/{id}` | 删除 API 客户端 |
+| POST | `/api/v1/admin/api-clients/{id}/regenerate` | 重新生成 API Key |
+| GET | `/api/v1/admin/api-clients/{id}/usage` | 获取 API 客户端调用统计 |
+
+---
+
+### MaaS 开放接口（使用 X-API-Key）
+
+| 方法 | 路径 | 描述 |
+|:-----|:-----|:-----|
+| GET | `/api/v1/maas/congestion` | 获取指定地理范围内的实时拥堵数据 |
+
+**参数：**
+
+| 参数 | 类型 | 说明 | 必填 |
+|:-----|:-----|:-----|:-----|
+| `min_lat` | query | 最小纬度（-90 ~ 90） | 是 |
+| `max_lat` | query | 最大纬度（-90 ~ 90） | 是 |
+| `min_lng` | query | 最小经度（-180 ~ 180） | 是 |
+| `max_lng` | query | 最大经度（-180 ~ 180） | 是 |
+
+---
+
+### WebSocket 端点
+
+所有 WebSocket 连接需携带 JWT 进行认证（通过 Cookie `access_token` 或 query 参数 `?token=<jwt>`）。
+
+| 路径 | 描述 | 认证 |
+|:-----|:-----|:-----|
+| `/api/v1/ws/info/{roadName}` | 实时交通信息推送（JSON 数据流） | Bearer Token |
+| `/api/v1/ws/frames/{roadName}` | 实时视频帧推送（JPEG 二进制流） | Bearer Token |
+| `/api/v1/admin/ws/resources` | 系统资源监控推送（CPU/内存/连接数） | 管理员 Bearer Token |
+
+---
+
+### 请求与响应格式
+
+**通用请求格式：**
+
+```
+Content-Type: application/json
+Authorization: Bearer <token>
+```
+
+**通用响应格式（错误）：**
+
+```json
+{
+  "status": 400,
+  "error": "Bad Request",
+  "message": "错误描述"
+}
+```
+
+**登录响应：**
+
+```json
+{
+  "access_token": "<jwt>",
+  "token_type": "Bearer"
+}
+```
+
+**交通信息响应示例（`/api/v1/info/{roadName}`）：**
+
+```json
+{
+  "road_name": "road1",
+  "vehicle_count": 42,
+  "congestion_level": "moderate"
+}
+```
+
+---
+
+### curl 示例
+
+```bash
+# 用户登录，获取 token
+curl -X POST \
+  -d 'username=admin&password=Admin@12345' \
+  http://localhost:8000/api/v1/auth/login
+
+# 获取道路列表（无需认证）
+curl http://localhost:8000/api/v1/roads_name
+
+# 获取实时交通信息（无需认证）
+curl http://localhost:8000/api/v1/info/road1
+
+# 获取交通预测（无需认证）
+curl 'http://localhost:8000/api/v1/traffic/predictions?road_name=road1&horizon_minutes=60'
+
+# 导出交通报告（需认证）
+curl -H 'Authorization: Bearer <token>' \
+  'http://localhost:8000/api/v1/reports/traffic/export?format=json&granularity=hourly'
+
+# 导出 Excel 报告（需认证）
+curl -H 'Authorization: Bearer <token>' \
+  'http://localhost:8000/api/v1/reports/traffic/export?format=xlsx' \
+  --output report.xlsx
+
+# MaaS 拥堵查询（使用 API Key）
+curl -H 'X-API-Key: your-api-key' \
+  'http://localhost:8000/api/v1/maas/congestion?min_lat=30&max_lat=31&min_lng=120&max_lng=121'
+
+# 修改密码（需认证）
+curl -X PUT \
+  -H 'Authorization: Bearer <token>' \
+  -H 'Content-Type: application/json' \
+  -d '{"old_password":"old","new_password":"new"}' \
+  http://localhost:8000/api/v1/users/password
+
+# 边缘节点上报遥测（无需认证）
+curl -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{"node_id":"node-01","road_name":"road1","vehicle_count":30,"timestamp":"2026-03-10T08:00:00Z"}' \
+  http://localhost:8000/api/v1/edge/telemetry
+
+# 获取机器可读 API 文档
+curl http://localhost:8000/api/v1/api-docs
+```
+
+---
+
 <div align="center">
 
 **Smart Traffic Monitoring System** · 智能交通监控系统

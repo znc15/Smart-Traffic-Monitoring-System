@@ -21,7 +21,6 @@ export const endpoints = {
   adminResources: `${API_HTTP_BASE}/admin/resources`,
   adminNodes: `${API_HTTP_BASE}/admin/nodes`,
   adminApiClients: `${API_HTTP_BASE}/admin/api-clients`,
-  apiDocs: `${API_HTTP_BASE}/api-docs`,
 }
 
 export function getToken(): string | null {
