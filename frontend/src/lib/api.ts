@@ -1,8 +1,31 @@
 export const TOKEN_KEY = 'access_token'
 export const AMAP_KEY = String(import.meta.env.VITE_AMAP_KEY || '')
 
-const HTTP_BASE_ROOT = import.meta.env.VITE_API_HTTP_BASE || 'http://localhost:8000'
-const WS_BASE_ROOT = import.meta.env.VITE_API_WS_BASE || 'ws://localhost:8000'
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '')
+}
+
+function resolveHttpBaseRoot(): string {
+  const configured = trimTrailingSlash(String(import.meta.env.VITE_API_HTTP_BASE || ''))
+  if (configured) return configured
+  if (typeof window !== 'undefined') {
+    return trimTrailingSlash(window.location.origin)
+  }
+  return 'http://127.0.0.1:8000'
+}
+
+function resolveWsBaseRoot(): string {
+  const configured = trimTrailingSlash(String(import.meta.env.VITE_API_WS_BASE || ''))
+  if (configured) return configured
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${protocol}//${window.location.host}`
+  }
+  return 'ws://127.0.0.1:8000'
+}
+
+const HTTP_BASE_ROOT = resolveHttpBaseRoot()
+const WS_BASE_ROOT = resolveWsBaseRoot()
 
 export const API_HTTP_BASE = `${HTTP_BASE_ROOT}/api/v1`
 export const API_WS_BASE = `${WS_BASE_ROOT}/api/v1`

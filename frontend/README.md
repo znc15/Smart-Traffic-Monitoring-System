@@ -93,6 +93,7 @@ pnpm dev --port 5174
 ```
 
 启动后访问 [http://localhost:5174](http://localhost:5174)。
+需要局域网调试时，Vite 现在默认监听 `0.0.0.0`，可直接从 `http://<你的IP>:5174` 访问。
 
 ---
 
@@ -118,8 +119,8 @@ docker run -p 80:80 traffic-frontend
 
 | 变量 | 说明 | 默认值 |
 |:-----|:-----|:-------|
-| `VITE_API_HTTP_BASE` | 后端 HTTP 接口基址 | `http://localhost:8000` |
-| `VITE_API_WS_BASE` | 后端 WebSocket 基址 | `ws://localhost:8000` |
+| `VITE_API_HTTP_BASE` | 后端 HTTP 接口基址 | 当前页面同源地址 |
+| `VITE_API_WS_BASE` | 后端 WebSocket 基址 | 当前页面同源地址 |
 | `VITE_AMAP_KEY` | 高德地图 Web JS API Key | 空 |
 
 示例 `.env.local`：
@@ -129,6 +130,9 @@ VITE_API_HTTP_BASE=https://api.example.com
 VITE_API_WS_BASE=wss://api.example.com
 VITE_AMAP_KEY=your_amap_web_js_key
 ```
+
+如果你通过 Nginx / Gateway 反向代理访问前端，通常**不需要**设置 `VITE_API_HTTP_BASE` / `VITE_API_WS_BASE`；
+保留为空即可，前端会自动请求当前域名下的 `/api/...`。
 
 ---
 

@@ -8,6 +8,7 @@ Usage:
   python main.py --mode camera --url rtsp://...     # 指定 RTSP 地址
   python main.py --mode camera --url 0              # 本地摄像头设备 0
   python main.py --port 9000 --road "XX路段"        # 自定义端口和路段名
+  python main.py --host 0.0.0.0 --public-host 192.168.1.88
 """
 
 import os
@@ -86,13 +87,13 @@ def restart_loop(model_changed: bool = False) -> None:
 # ---------------------------------------------------------------------------
 # 自动打开浏览器（后台线程，延迟等待服务器就绪）
 # ---------------------------------------------------------------------------
-def _open_browser(port: int, timeout: float = 10.0) -> None:
+def _open_browser(port: int, host: str, timeout: float = 10.0) -> None:
     """在后台线程中轮询 /health 端点，服务器就绪后打开浏览器"""
     import time
     import urllib.request
     import urllib.error
 
-    url = f"http://localhost:{port}"
+    url = f"http://{host}:{port}"
     health_url = f"{url}/health"
     deadline = time.monotonic() + timeout
     interval = 0.3  # 轮询间隔（秒）
@@ -144,12 +145,17 @@ async def lifespan(application: FastAPI):
     # 注册重启回调到 state，供 routes.py 调用（避免循环导入）
     state.restart_callback = restart_loop
 
-    # 打印仪表盘访问地址
-    print(f"[INFO] Dashboard: http://localhost:{config.HTTP_PORT}")
+    dashboard_host = config.get_access_host()
+    print(f"[INFO] Dashboard: http://{dashboard_host}:{config.HTTP_PORT}")
+    print(f"[INFO] Listen: http://{config.HTTP_HOST}:{config.HTTP_PORT}")
 
     # 自动打开浏览器（除非被禁用）
     if not config.NO_BROWSER:
-        bt = threading.Thread(target=_open_browser, args=(config.HTTP_PORT,), daemon=True)
+        bt = threading.Thread(
+            target=_open_browser,
+            args=(config.HTTP_PORT, dashboard_host),
+            daemon=True,
+        )
         bt.start()
 
     yield
@@ -208,6 +214,14 @@ def parse_args() -> argparse.Namespace:
         help="HTTP 服务端口 (默认读取 $PORT 或 8000)",
     )
     p.add_argument(
+        "--host", default=None,
+        help="HTTP 监听地址，支持 0.0.0.0 / 127.0.0.1 / 自定义 IP (默认读取 $HOST 或 0.0.0.0)",
+    )
+    p.add_argument(
+        "--public-host", default=None,
+        help="对外访问地址，用于日志与自动打开浏览器 (默认读取 $PUBLIC_HOST)",
+    )
+    p.add_argument(
         "--imgsz", type=int, default=None,
         help="YOLO 输入分辨率 (默认读取 $IMGSZ 或 320)",
     )
@@ -259,6 +273,10 @@ def apply_args(args: argparse.Namespace) -> int:
         config.USE_OPENVINO = False
     if args.no_browser:
         config.NO_BROWSER = True
+    if args.host is not None:
+        config.HTTP_HOST = args.host.strip() or config.HTTP_HOST
+    if args.public_host is not None:
+        config.PUBLIC_HOST = args.public_host.strip()
     if args.imgsz is not None:
         config.IMGSZ = args.imgsz
     if args.frame_skip is not None:
@@ -313,7 +331,7 @@ if __name__ == "__main__":
     port = apply_args(args)
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
+        host=config.HTTP_HOST,
         port=port,
         workers=config.UVICORN_WORKERS,
     )

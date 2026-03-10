@@ -24,11 +24,15 @@
       <n-grid-item span="24 l:17">
         <n-card size="small" :bordered="false" class="map-card">
           <div ref="mapContainerRef" class="map-canvas" />
-          <n-alert v-if="!AMAP_KEY" type="warning" class="map-overlay">
+          <n-alert v-if="mapError" type="error" class="map-overlay">
+            {{ mapError }}
+          </n-alert>
+          <n-alert v-else-if="!AMAP_KEY" type="warning" class="map-overlay">
             未配置 `VITE_AMAP_KEY`，当前仅展示点位列表与数据卡片。
           </n-alert>
-          <n-alert v-else-if="mapError" type="error" class="map-overlay">
-            {{ mapError }}
+          <n-alert v-else-if="!mappableItems.length && !loading" type="info" class="map-overlay">
+            当前没有可绘制的点位坐标。
+            已加载 {{ items.length }} 个节点，其中 {{ missingCoordinateCount }} 个缺少经纬度。
           </n-alert>
         </n-card>
       </n-grid-item>
@@ -112,6 +116,12 @@ const markerMap = new Map<string, any>()
 const filteredItems = computed(() =>
   onlineOnly.value ? items.value.filter((item) => item.online) : items.value,
 )
+const mappableItems = computed(() =>
+  filteredItems.value.filter((item) => Number.isFinite(item.latitude) && Number.isFinite(item.longitude) && item.latitude !== 0 && item.longitude !== 0),
+)
+const missingCoordinateCount = computed(
+  () => filteredItems.value.length - mappableItems.value.length,
+)
 const onlineCount = computed(() => filteredItems.value.filter((item) => item.online).length)
 const highCongestionCount = computed(
   () => filteredItems.value.filter((item) => item.congestion_index >= 0.7).length,
@@ -192,7 +202,8 @@ const destroyMap = () => {
 }
 
 const renderMap = async () => {
-  if (!mapContainerRef.value || !filteredItems.value.length || !AMAP_KEY) {
+  if (!mapContainerRef.value || !mappableItems.value.length || !AMAP_KEY) {
+    destroyMap()
     return
   }
   try {
@@ -203,7 +214,7 @@ const renderMap = async () => {
       mapInstance = new AMap.Map(mapContainerRef.value, {
         viewMode: '3D',
         zoom: 12,
-        center: [filteredItems.value[0].longitude, filteredItems.value[0].latitude],
+        center: [mappableItems.value[0].longitude, mappableItems.value[0].latitude],
         mapStyle: 'amap://styles/light',
       })
       mapInstance.addControl(new AMap.Scale())
@@ -214,16 +225,14 @@ const renderMap = async () => {
     mapInstance.clearMap()
     markerMap.clear()
 
-    const heatPoints = filteredItems.value
-      .filter((item) => item.latitude && item.longitude)
+    const heatPoints = mappableItems.value
       .map((item) => ({
         lng: item.longitude,
         lat: item.latitude,
         count: Math.max(1, Math.round(item.congestion_index * 100)),
       }))
 
-    const markers = filteredItems.value
-      .filter((item) => item.latitude && item.longitude)
+    const markers = mappableItems.value
       .map((item) => {
         const marker = new AMap.Marker({
           position: [item.longitude, item.latitude],
@@ -281,9 +290,7 @@ const refreshOverview = async () => {
         : Array.isArray(payload?.content)
           ? payload.content
           : []
-    items.value = rawItems
-      .map((item: unknown) => normalizeMapOverviewPoint(item))
-      .filter((item: MapOverviewPoint) => item.latitude !== 0 && item.longitude !== 0)
+    items.value = rawItems.map((item: unknown) => normalizeMapOverviewPoint(item))
     selectedItem.value = items.value[0] || null
     await nextTick()
     await renderMap()
@@ -305,8 +312,8 @@ const focusMarker = (item: MapOverviewPoint) => {
   }
 }
 
-watch(filteredItems, async (value) => {
-  if (!value.length) {
+watch([filteredItems, mappableItems], async ([value, drawable]) => {
+  if (!value.length || !drawable.length || !AMAP_KEY) {
     destroyMap()
     return
   }

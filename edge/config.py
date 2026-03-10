@@ -57,6 +57,12 @@ USE_OPENVINO = os.environ.get("OPENVINO", "true").lower() in ("1", "true", "yes"
 # 启动时是否自动打开浏览器（Docker/无头环境设为 true 禁用）
 NO_BROWSER = os.environ.get("NO_BROWSER", "false").lower() in ("1", "true", "yes")
 
+# HTTP 监听地址（支持 0.0.0.0 / 自定义 IP 绑定）
+HTTP_HOST = os.environ.get("HOST", "0.0.0.0").strip() or "0.0.0.0"
+
+# 对外访问地址（可选）；为空时自动根据 HTTP_HOST 推导
+PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "").strip()
+
 # HTTP 服务端口（CLI 参数 > 环境变量 > 默认 8000）
 HTTP_PORT = int(os.environ.get("PORT", "8000"))
 
@@ -97,6 +103,20 @@ LANE_SPLIT_RATIOS = _parse_float_list("LANE_SPLIT_RATIOS", [0.33, 0.66], 2)
 SPEED_METERS_PER_PIXEL = float(os.environ.get("SPEED_METERS_PER_PIXEL", "0.08"))
 PARKING_STATIONARY_SECONDS = float(os.environ.get("PARKING_STATIONARY_SECONDS", "8"))
 WRONG_WAY_MIN_TRACK_POINTS = int(os.environ.get("WRONG_WAY_MIN_TRACK_POINTS", "4"))
+
+
+def get_access_host() -> str:
+    """
+    返回推荐给浏览器/日志的访问地址。
+    0.0.0.0 / :: 属于绑定地址，不能直接当成访问 URL 对外展示。
+    """
+    if PUBLIC_HOST:
+        return PUBLIC_HOST
+    if HTTP_HOST in {"0.0.0.0", ""}:
+        return "127.0.0.1"
+    if HTTP_HOST == "::":
+        return "localhost"
+    return HTTP_HOST
 
 # COCO 类别映射
 CAR_CLASSES = {2, 5, 7}       # car, bus, truck → 归为"汽车"

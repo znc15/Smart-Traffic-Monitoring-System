@@ -182,7 +182,7 @@ cd backend && mvn -B spring-boot:run
 cd frontend && pnpm install && pnpm dev --port 5174
 
 # 4. 启动边缘端（可选，模拟模式）
-cd edge && python main.py --mode sim --port 9000 --no-browser
+cd edge && python main.py --mode sim --host 0.0.0.0 --public-host 127.0.0.1 --port 9000 --no-browser
 ```
 
 ---
@@ -229,6 +229,10 @@ INIT_ADMIN_PASSWORD=Admin@12345
 | `VITE_API_WS_BASE` | 后端 WebSocket 基地址 | `wss://your-domain.com` |
 | `VITE_AMAP_KEY` | 高德地图 Web JS API Key（GIS 地图页） | `your-amap-key` |
 
+说明：
+前端在未设置 `VITE_API_HTTP_BASE` / `VITE_API_WS_BASE` 时，会默认回落到当前页面同源地址。
+如果你通过 `http://<server-ip>:5173` 访问网关，这样可以避免浏览器错误请求自己的 `localhost:8000`。
+
 ### 边缘节点（`edge/.env`，参考 `edge/.env.example`）
 
 | 变量 | 说明 | 示例 |
@@ -240,6 +244,8 @@ INIT_ADMIN_PASSWORD=Admin@12345
 | `USE_OPENVINO` | 是否启用 OpenVINO 加速 | `false` |
 | `FRAME_SKIP` | 每隔多少帧处理一次 | `2` |
 | `IMGSZ` | 推理图像尺寸 | `640` |
+| `HOST` | Edge HTTP 监听地址，支持 `0.0.0.0` / 自定义 IP | `0.0.0.0` |
+| `PUBLIC_HOST` | Edge 对外展示地址，用于日志与自动打开浏览器 | `192.168.1.88` |
 | `EDGE_NODE_ID` | 节点唯一标识（多节点部署时必填） | `edge-01` |
 | `EDGE_API_KEY` | 边缘节点访问密钥，与后端摄像头配置一致 | `edge-secret` |
 | `BACKEND_TELEMETRY_URL` | 后端遥测上报地址 | `http://backend:8000/api/v1/edge/telemetry` |

@@ -1,6 +1,5 @@
 package com.smarttraffic.backend.service;
 
-import com.smarttraffic.backend.config.NetworkProperties;
 import com.smarttraffic.backend.model.CameraEntity;
 import com.smarttraffic.backend.model.TrafficSampleEntity;
 import com.smarttraffic.backend.repository.CameraRepository;
@@ -23,18 +22,15 @@ public class MapOverviewService {
     private final CameraRepository cameraRepository;
     private final TrafficSampleRepository trafficSampleRepository;
     private final TrafficService trafficService;
-    private final NetworkProperties networkProperties;
 
     public MapOverviewService(
             CameraRepository cameraRepository,
             TrafficSampleRepository trafficSampleRepository,
-            TrafficService trafficService,
-            NetworkProperties networkProperties
+            TrafficService trafficService
     ) {
         this.cameraRepository = cameraRepository;
         this.trafficSampleRepository = trafficSampleRepository;
         this.trafficService = trafficService;
-        this.networkProperties = networkProperties;
     }
 
     public Map<String, Object> overview() {
@@ -91,7 +87,7 @@ public class MapOverviewService {
 
     private String buildFrameUrl(String roadName) {
         String encodedRoad = URLEncoder.encode(roadName, StandardCharsets.UTF_8);
-        return networkProperties.getBaseUrlApi() + "/api/v1/frames_no_auth/" + encodedRoad;
+        return "/api/v1/frames_no_auth/" + encodedRoad;
     }
 
     private static String roadKey(CameraEntity camera) {
