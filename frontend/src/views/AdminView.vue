@@ -297,34 +297,7 @@
                 :single-line="false"
                 size="small"
               />
-              <n-descriptions v-else-if="Object.keys(nodes).length" bordered :column="2">
-                <n-descriptions-item
-                  v-for="(val, key) in nodes"
-                  :key="String(key)"
-                  :label="String(key)"
-                >
-                  {{ typeof val === 'object' ? JSON.stringify(val) : val }}
-                </n-descriptions-item>
-              </n-descriptions>
               <n-empty v-else description="暂无节点数据" />
-            </n-card>
-
-            <n-card
-              v-if="Object.keys(resources).length"
-              title="资源详情"
-              size="small"
-              :bordered="false"
-              style="margin-top: 16px"
-            >
-              <n-descriptions bordered :column="2">
-                <n-descriptions-item
-                  v-for="(val, key) in resources"
-                  :key="String(key)"
-                  :label="String(key)"
-                >
-                  {{ typeof val === 'object' ? JSON.stringify(val) : val }}
-                </n-descriptions-item>
-              </n-descriptions>
             </n-card>
           </n-tab-pane>
         </n-tabs>
@@ -1041,10 +1014,12 @@ const usageEndpointColumns: DataTableColumns = [
 // --- Monitor computed ---
 const resourceMetrics = computed(() => {
   const r = resources.value as Record<string, unknown>
+  const mem = (r.memory as Record<string, unknown>) ?? {}
+  const disk = (r.disk as Record<string, unknown>) ?? {}
   return {
-    cpu: Math.round(Number(r.cpu_percent ?? r.cpuPercent ?? 0)),
-    memory: Math.round(Number(r.memory_percent ?? r.memoryPercent ?? 0)),
-    disk: Math.round(Number(r.disk_percent ?? r.diskPercent ?? 0)),
+    cpu:    Math.round(Number(r.cpu_percent ?? r.cpuPercent ?? 0)),
+    memory: Math.round(Number(mem.percent ?? 0)),
+    disk:   Math.round(Number(disk.percent ?? 0)),
   }
 })
 
@@ -1054,29 +1029,57 @@ const getProgressColor = (pct: number) => {
   return '#18a058'
 }
 
-// Node list: try to parse nodes as array for table display
+// Node list: parse nodes map from { nodes: { name: {...} } } response
 const nodeList = computed(() => {
-  const n = nodes.value
-  if (Array.isArray(n)) return n
-  return []
+  const n = nodes.value as Record<string, unknown>
+  const nodeMap = (n.nodes ?? n) as Record<string, unknown>
+  if (typeof nodeMap !== 'object' || nodeMap === null || Array.isArray(nodeMap)) return []
+  return Object.entries(nodeMap).map(([nodeName, info]) => ({
+    name: nodeName,
+    ...(typeof info === 'object' && info !== null ? (info as Record<string, unknown>) : {}),
+  }))
 })
 
 const nodeColumns: DataTableColumns = [
-  { title: '节点', key: 'name', ellipsis: { tooltip: true } },
+  { title: '节点名称', key: 'name', ellipsis: { tooltip: true } },
   {
     title: '状态',
-    key: 'status',
-    width: 100,
+    key: 'online',
+    width: 90,
     render(row: Record<string, unknown>) {
-      const status = String(row.status ?? row.state ?? 'unknown')
-      const isOnline = ['online', 'running', 'healthy', 'up'].includes(status.toLowerCase())
+      const isOnline = Boolean(row.online)
       return h(NTag, {
         type: isOnline ? 'success' : 'error',
         size: 'small',
-      }, { default: () => status })
+      }, { default: () => (isOnline ? '在线' : '离线') })
     },
   },
-  { title: '地址', key: 'address', ellipsis: { tooltip: true } },
+  {
+    title: '延迟',
+    key: 'latency_ms',
+    width: 90,
+    render(row: Record<string, unknown>) {
+      const ms = row.latency_ms
+      return h('span', {}, ms != null ? `${ms} ms` : '—')
+    },
+  },
+  {
+    title: '错误次数',
+    key: 'error_count',
+    width: 90,
+    render(row: Record<string, unknown>) {
+      return h('span', {}, row.error_count != null ? String(row.error_count) : '—')
+    },
+  },
+  {
+    title: '最近成功时间',
+    key: 'last_success_time',
+    ellipsis: { tooltip: true },
+    render(row: Record<string, unknown>) {
+      const t = row.last_success_time
+      return h('span', {}, t ? formatDateTime(String(t)) : '—')
+    },
+  },
 ]
 
 // --- Init & lifecycle ---
