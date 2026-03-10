@@ -344,6 +344,7 @@ import {
   NButton,
   NPopconfirm,
   NSwitch,
+  NIcon,
 } from 'naive-ui'
 import { AddOutline, EyeOutline, EyeOffOutline, CopyOutline, RefreshOutline, BarChartOutline, TrashOutline, CreateOutline } from '@vicons/ionicons5'
 import { authFetch, endpoints } from '../lib/api'
@@ -929,14 +930,14 @@ const apiColumns: DataTableColumns<ApiClient> = [
             revealedKeys.value = next
           },
         }, {
-          icon: () => h('n-icon', {}, { default: () => h(revealed ? EyeOffOutline : EyeOutline) }),
+          icon: () => h(NIcon, {}, { default: () => h(revealed ? EyeOffOutline : EyeOutline) }),
         }),
         h(NButton, {
           size: 'tiny',
           quaternary: true,
           onClick: () => copyToClipboard(row.api_key),
         }, {
-          icon: () => h('n-icon', {}, { default: () => h(CopyOutline) }),
+          icon: () => h(NIcon, {}, { default: () => h(CopyOutline) }),
         }),
       ])
     },
@@ -989,7 +990,7 @@ const apiColumns: DataTableColumns<ApiClient> = [
           secondary: true,
           onClick: () => openApiModal(row),
         }, {
-          icon: () => h('n-icon', {}, { default: () => h(CreateOutline) }),
+          icon: () => h(NIcon, {}, { default: () => h(CreateOutline) }),
           default: () => '编辑',
         }),
         h(NPopconfirm, {
@@ -1000,7 +1001,7 @@ const apiColumns: DataTableColumns<ApiClient> = [
             secondary: true,
             type: 'warning',
           }, {
-            icon: () => h('n-icon', {}, { default: () => h(RefreshOutline) }),
+            icon: () => h(NIcon, {}, { default: () => h(RefreshOutline) }),
             default: () => '重新生成',
           }),
           default: () => '重新生成后旧 Key 立即失效，确认？',
@@ -1011,7 +1012,7 @@ const apiColumns: DataTableColumns<ApiClient> = [
           type: 'info',
           onClick: () => openUsageModal(row),
         }, {
-          icon: () => h('n-icon', {}, { default: () => h(BarChartOutline) }),
+          icon: () => h(NIcon, {}, { default: () => h(BarChartOutline) }),
           default: () => '用量',
         }),
         h(NPopconfirm, {
@@ -1022,7 +1023,7 @@ const apiColumns: DataTableColumns<ApiClient> = [
             type: 'error',
             secondary: true,
           }, {
-            icon: () => h('n-icon', {}, { default: () => h(TrashOutline) }),
+            icon: () => h(NIcon, {}, { default: () => h(TrashOutline) }),
           }),
           default: () => '确定删除此 API Key？',
         }),
