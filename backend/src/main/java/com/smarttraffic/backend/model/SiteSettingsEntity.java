@@ -23,6 +23,9 @@ public class SiteSettingsEntity {
     @Column(name = "footer_text", columnDefinition = "TEXT")
     private String footerText;
 
+    @Column(name = "amap_key")
+    private String amapKey;
+
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
@@ -42,6 +45,8 @@ public class SiteSettingsEntity {
     public void setLogoUrl(String logoUrl) { this.logoUrl = logoUrl; }
     public String getFooterText() { return footerText; }
     public void setFooterText(String footerText) { this.footerText = footerText; }
+    public String getAmapKey() { return amapKey; }
+    public void setAmapKey(String amapKey) { this.amapKey = amapKey; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

@@ -146,6 +146,7 @@ python main.py --mode sim --port 8000 --no-browser
 - `frontend` 的 `VITE_*` 是 build-time config（构建时注入），不是 runtime config（运行时注入）。
 - 主站 Docker 一键启动时，frontend 默认从根 `.env` 的 `BACKEND_PUBLIC_HTTP_BASE / BACKEND_PUBLIC_WS_BASE` 取地址。
 - 如果修改了这些地址，必须重新执行 `docker compose build frontend gateway` 或重新构建前端镜像。
+- `VITE_AMAP_KEY` 现在只作为部署 fallback；管理员可在“系统管理 -> 站点设置”里覆盖高德地图 Key，刷新 `/map` 即可生效，无需重建 frontend。
 
 ## 生产环境要点
 

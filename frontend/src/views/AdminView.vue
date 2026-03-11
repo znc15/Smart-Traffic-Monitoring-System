@@ -55,6 +55,12 @@
                 <NFormItem label="页脚文案">
                   <NInput v-model:value="settings.footer_text" />
                 </NFormItem>
+                <NFormItem label="高德地图 Key">
+                  <NInput v-model:value="settings.amap_key" clearable />
+                  <div class="form-hint">
+                    留空表示继续使用部署阶段的 `VITE_AMAP_KEY`，保存后刷新地图页即可采用后台值。
+                  </div>
+                </NFormItem>
                 <NFormItem label=" ">
                   <NButton type="primary" :loading="settingsSaving" @click="saveSettings">保存设置</NButton>
                 </NFormItem>
@@ -281,6 +287,7 @@ const settings = reactive<SiteSettings>({
   announcement: '',
   logo_url: '',
   footer_text: '',
+  amap_key: '',
 })
 
 const cameraModalVisible = ref(false)
@@ -398,6 +405,7 @@ const fetchSettings = async () => {
   settings.announcement = data.announcement
   settings.logo_url = data.logo_url
   settings.footer_text = data.footer_text
+  settings.amap_key = data.amap_key
 }
 
 const fetchMonitor = async () => {
@@ -566,6 +574,12 @@ const saveSettings = async () => {
       body: JSON.stringify(settings),
     })
     if (!res.ok) throw new Error('保存站点设置失败')
+    const saved = normalizeSiteSettings(await res.json())
+    settings.site_name = saved.site_name
+    settings.announcement = saved.announcement
+    settings.logo_url = saved.logo_url
+    settings.footer_text = saved.footer_text
+    settings.amap_key = saved.amap_key
     message.success('站点设置已保存')
   } catch (error) {
     message.error(error instanceof Error ? error.message : '保存失败')
@@ -905,6 +919,13 @@ onUnmounted(() => {
 
 .toolbar {
   margin-bottom: 12px;
+}
+
+.form-hint {
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .node-toolbar {

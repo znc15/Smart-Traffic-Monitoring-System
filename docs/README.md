@@ -36,6 +36,7 @@ docs/
 说明：
 - 根 `.env` 现在同时驱动 backend runtime 与 frontend build-time 的公共地址变量。
 - `frontend` 的 `VITE_*` 是 build-time config，修改后必须重新构建。
+- `VITE_AMAP_KEY` 作为地图页的部署 fallback；后台“站点设置”可在运行时覆盖它。
 
 ## deploy
 

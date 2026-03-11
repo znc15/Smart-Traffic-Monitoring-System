@@ -23,6 +23,10 @@ public class UpdateSiteSettingsRequest {
     @Size(max = 1000, message = "页脚文本不能超过1000个字符")
     private String footerText;
 
+    @JsonAlias("amap_key")
+    @Size(max = 255, message = "高德地图 Key 不能超过255个字符")
+    private String amapKey;
+
     @JsonIgnore
     private final Set<String> setFields = new HashSet<>();
 
@@ -42,4 +46,7 @@ public class UpdateSiteSettingsRequest {
 
     public String getFooterText() { return footerText; }
     public void setFooterText(String footerText) { this.footerText = footerText; setFields.add("footerText"); }
+
+    public String getAmapKey() { return amapKey; }
+    public void setAmapKey(String amapKey) { this.amapKey = amapKey; setFields.add("amapKey"); }
 }

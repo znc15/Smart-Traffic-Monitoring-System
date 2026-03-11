@@ -3,6 +3,7 @@ import {
   normalizeAdminNodeHealth,
   normalizeMapOverviewPoint,
   normalizeNodeRuntimeConfig,
+  normalizeSiteSettings,
   normalizeTrafficEvent,
   normalizeTrafficInfo,
 } from './normalize'
@@ -86,6 +87,24 @@ describe('lib/normalize', () => {
       parking_stationary_seconds: 6,
       wrong_way_min_track_points: 5,
       telemetry_interval_sec: 4.5,
+    })
+  })
+
+  it('should normalize site settings with amap_key from mixed payload styles', () => {
+    const settings = normalizeSiteSettings({
+      siteName: '智慧交通',
+      announcement: '欢迎使用',
+      logo_url: 'https://example.com/logo.png',
+      footerText: 'demo footer',
+      amapKey: 'demo-amap-key',
+    })
+
+    expect(settings).toEqual({
+      site_name: '智慧交通',
+      announcement: '欢迎使用',
+      logo_url: 'https://example.com/logo.png',
+      footer_text: 'demo footer',
+      amap_key: 'demo-amap-key',
     })
   })
 

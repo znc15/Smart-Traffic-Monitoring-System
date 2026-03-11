@@ -103,6 +103,7 @@ export type SiteSettings = {
   announcement: string
   logo_url: string
   footer_text: string
+  amap_key: string
 }
 
 export function normalizeSiteSettings(raw: unknown): SiteSettings {
@@ -111,7 +112,8 @@ export function normalizeSiteSettings(raw: unknown): SiteSettings {
     site_name: String(pick(obj, 'site_name', 'siteName', '智能交通监控系统')),
     announcement: String(obj.announcement || ''),
     logo_url: String(pick(obj, 'logo_url', 'logoUrl', '')),
-    footer_text: String(pick(obj, 'footer_text', 'footerText', ''))
+    footer_text: String(pick(obj, 'footer_text', 'footerText', '')),
+    amap_key: String(pick(obj, 'amap_key', 'amapKey', '')),
   }
 }
 

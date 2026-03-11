@@ -65,13 +65,14 @@ pnpm dev
 |------|------|
 | `VITE_API_HTTP_BASE` | HTTP API 基地址 |
 | `VITE_API_WS_BASE` | WebSocket 基地址 |
-| `VITE_AMAP_KEY` | 高德地图 Web JS API Key |
+| `VITE_AMAP_KEY` | 高德地图 Web JS API Key（部署 fallback） |
 
 重要说明：
 - `VITE_*` 是 build-time config（构建时注入）
 - 修改后必须重新执行 `pnpm build` 或重新构建 Docker 镜像
 - 运行中的 Nginx 容器不会读取 `docker run -e VITE_*`
 - 如果你通过仓库根 `docker-compose.yml` 构建主站，frontend 默认从根 `.env` 的 `BACKEND_PUBLIC_HTTP_BASE / BACKEND_PUBLIC_WS_BASE` 取值
+- 地图页优先读取后台“站点设置”里的 `amap_key`；只有后台留空时，才回退到 `VITE_AMAP_KEY`
 
 ### 同源部署（推荐）
 
@@ -83,7 +84,7 @@ VITE_API_WS_BASE=
 VITE_AMAP_KEY=your_amap_key
 ```
 
-留空后，前端会自动回退到当前页面同源地址。
+留空后，前端会自动回退到当前页面同源地址。高德地图 Key 也可改为在后台“站点设置”中维护。
 
 ### 跨域部署
 

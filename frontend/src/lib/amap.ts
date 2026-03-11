@@ -1,30 +1,42 @@
-import { AMAP_KEY } from './api'
-
 declare global {
   interface Window {
     AMap?: any
-    __amapLoaderPromise__?: Promise<any>
+    __amapLoaderPromises__?: Partial<Record<string, Promise<any>>>
   }
 }
 
-export async function ensureAmap() {
-  if (!AMAP_KEY) {
+const getLoaderMap = () => {
+  if (!window.__amapLoaderPromises__) {
+    window.__amapLoaderPromises__ = {}
+  }
+  return window.__amapLoaderPromises__
+}
+
+export async function ensureAmap(key: string) {
+  const normalizedKey = String(key || '').trim()
+  if (!normalizedKey) {
     throw new Error('缺少 VITE_AMAP_KEY')
   }
   if (window.AMap) {
     return window.AMap
   }
-  if (!window.__amapLoaderPromise__) {
-    window.__amapLoaderPromise__ = new Promise((resolve, reject) => {
-      const script = document.createElement('script')
-      script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(
-        AMAP_KEY,
-      )}&plugin=AMap.HeatMap,AMap.Scale,AMap.ToolBar`
-      script.async = true
-      script.onload = () => resolve(window.AMap)
-      script.onerror = () => reject(new Error('高德地图脚本加载失败'))
-      document.head.appendChild(script)
-    })
+  const loaderMap = getLoaderMap()
+  if (loaderMap[normalizedKey]) {
+    return loaderMap[normalizedKey]
   }
-  return window.__amapLoaderPromise__
+  const promise = new Promise<any>((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(
+      normalizedKey,
+    )}&plugin=AMap.HeatMap,AMap.Scale,AMap.ToolBar`
+    script.async = true
+    script.onload = () => resolve(window.AMap)
+    script.onerror = () => {
+      delete loaderMap[normalizedKey]
+      reject(new Error('高德地图脚本加载失败'))
+    }
+    document.head.appendChild(script)
+  })
+  loaderMap[normalizedKey] = promise
+  return promise
 }

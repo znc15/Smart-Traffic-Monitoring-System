@@ -30,10 +30,7 @@ public class SiteSettingsController {
 
     @PutMapping("/api/v1/admin/site-settings")
     public SiteSettingsEntity update(@Valid @RequestBody UpdateSiteSettingsRequest body) {
-        var user = SecurityUtils.requireCurrentUser();
-        if (!user.isAdmin()) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Admin only");
-        }
+        SecurityUtils.requireAdmin();
 
         if (body.hasField("logoUrl")) {
             String logoUrl = body.getLogoUrl();
@@ -49,6 +46,15 @@ public class SiteSettingsController {
         if (body.hasField("announcement")) settings.setAnnouncement(body.getAnnouncement());
         if (body.hasField("logoUrl")) settings.setLogoUrl(body.getLogoUrl());
         if (body.hasField("footerText")) settings.setFooterText(body.getFooterText());
+        if (body.hasField("amapKey")) settings.setAmapKey(normalizeOptionalText(body.getAmapKey()));
         return repo.save(settings);
+    }
+
+    private String normalizeOptionalText(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

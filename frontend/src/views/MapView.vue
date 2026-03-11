@@ -9,8 +9,8 @@
           </div>
         </div>
         <n-space>
-          <n-tag :type="AMAP_KEY ? 'success' : 'warning'" round>
-            {{ AMAP_KEY ? 'AMap 已配置' : '缺少 VITE_AMAP_KEY' }}
+          <n-tag :type="effectiveAmapKey ? 'success' : 'warning'" round>
+            {{ amapStatusText }}
           </n-tag>
           <n-button tertiary @click="onlineOnly = !onlineOnly">
             {{ onlineOnly ? '显示全部节点' : '仅看在线节点' }}
@@ -27,8 +27,8 @@
           <n-alert v-if="mapError" type="error" class="map-overlay">
             {{ mapError }}
           </n-alert>
-          <n-alert v-else-if="!AMAP_KEY" type="warning" class="map-overlay">
-            未配置 `VITE_AMAP_KEY`，当前仅展示点位列表与数据卡片。
+          <n-alert v-else-if="!effectiveAmapKey" type="warning" class="map-overlay">
+            未配置后台 `amap_key`，且缺少部署 fallback `VITE_AMAP_KEY`，当前仅展示点位列表与数据卡片。
           </n-alert>
           <n-alert v-else-if="!mappableItems.length && !loading" type="info" class="map-overlay">
             当前没有可绘制的点位坐标。
@@ -98,7 +98,12 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { NAlert, NButton, NCard, NEmpty, NGrid, NGridItem, NSpace, NStatistic, NTag, useMessage } from 'naive-ui'
 import { AMAP_KEY, authFetch, endpoints } from '../lib/api'
 import { ensureAmap } from '../lib/amap'
-import { normalizeMapOverviewPoint, type MapOverviewPoint } from '../lib/normalize'
+import {
+  normalizeMapOverviewPoint,
+  normalizeSiteSettings,
+  type MapOverviewPoint,
+  type SiteSettings,
+} from '../lib/normalize'
 
 const message = useMessage()
 const loading = ref(false)
@@ -107,6 +112,7 @@ const items = ref<MapOverviewPoint[]>([])
 const selectedItem = ref<MapOverviewPoint | null>(null)
 const onlineOnly = ref(false)
 const mapContainerRef = ref<HTMLDivElement | null>(null)
+const siteSettings = ref<SiteSettings>(normalizeSiteSettings({}))
 
 let mapInstance: any = null
 let infoWindow: any = null
@@ -126,6 +132,16 @@ const onlineCount = computed(() => filteredItems.value.filter((item) => item.onl
 const highCongestionCount = computed(
   () => filteredItems.value.filter((item) => item.congestion_index >= 0.7).length,
 )
+const effectiveAmapKey = computed(() => {
+  const runtimeKey = siteSettings.value.amap_key.trim()
+  return runtimeKey || String(AMAP_KEY || '').trim()
+})
+const amapStatusText = computed(() => {
+  if (!effectiveAmapKey.value) {
+    return '缺少高德地图 Key'
+  }
+  return siteSettings.value.amap_key.trim() ? 'AMap 已由后台配置' : 'AMap 使用部署 fallback'
+})
 const selectedSnapshot = computed(() => {
   if (!selectedItem.value) return ''
   return (
@@ -202,12 +218,12 @@ const destroyMap = () => {
 }
 
 const renderMap = async () => {
-  if (!mapContainerRef.value || !mappableItems.value.length || !AMAP_KEY) {
+  if (!mapContainerRef.value || !mappableItems.value.length || !effectiveAmapKey.value) {
     destroyMap()
     return
   }
   try {
-    const AMap = await ensureAmap()
+    const AMap = await ensureAmap(effectiveAmapKey.value)
     if (!AMap || !mapContainerRef.value) return
 
     if (!mapInstance) {
@@ -274,14 +290,30 @@ const renderMap = async () => {
   }
 }
 
+const fetchSiteSettings = async () => {
+  try {
+    const res = await fetch(endpoints.siteSettings)
+    if (!res.ok) {
+      return normalizeSiteSettings({})
+    }
+    return normalizeSiteSettings(await res.json())
+  } catch {
+    return normalizeSiteSettings({})
+  }
+}
+
 const refreshOverview = async () => {
   loading.value = true
   mapError.value = ''
   try {
-    const res = await authFetch(endpoints.mapOverview)
+    const [res, latestSiteSettings] = await Promise.all([
+      authFetch(endpoints.mapOverview),
+      fetchSiteSettings(),
+    ])
     if (!res.ok) {
       throw new Error('获取地图总览失败')
     }
+    siteSettings.value = latestSiteSettings
     const payload = await res.json()
     const rawItems = Array.isArray(payload)
       ? payload
@@ -312,8 +344,8 @@ const focusMarker = (item: MapOverviewPoint) => {
   }
 }
 
-watch([filteredItems, mappableItems], async ([value, drawable]) => {
-  if (!value.length || !drawable.length || !AMAP_KEY) {
+watch([filteredItems, mappableItems, effectiveAmapKey], async ([value, drawable, key]) => {
+  if (!value.length || !drawable.length || !key) {
     destroyMap()
     return
   }
