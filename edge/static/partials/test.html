@@ -1,0 +1,131 @@
+<!-- ===== 测试 Tab ===== -->
+<div id="tabTest" class="tab-content" style="display:none;">
+
+  <div id="testDropZone" class="relative border-2 border-dashed border-slate-300 rounded-xl bg-white
+        hover:border-blue-500 transition-colors cursor-pointer p-8 text-center mb-6"
+       onclick="document.getElementById('testFileInput').click()">
+    <input type="file" id="testFileInput" class="hidden"
+           accept="image/jpeg,image/png,image/bmp,image/webp,video/mp4,video/avi,video/quicktime,.jpg,.jpeg,.png,.bmp,.webp,.mp4,.avi,.mov">
+    <svg class="w-12 h-12 mx-auto mb-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+    </svg>
+    <p class="text-slate-600 font-medium mb-1">拖拽图片或视频文件到此处，或点击选择</p>
+    <p class="text-xs text-slate-400">支持格式：JPG, PNG, BMP, WebP, MP4, AVI, MOV</p>
+    <p class="text-xs text-slate-400 mt-1">图片最大 10MB / 视频最大 100MB</p>
+    <div id="testDropOverlay" class="absolute inset-0 bg-blue-500/10 border-2 border-blue-500 rounded-xl
+          flex items-center justify-center pointer-events-none" style="display:none;">
+      <p class="text-blue-400 font-semibold text-lg">释放文件以上传</p>
+    </div>
+  </div>
+
+  <div id="testResultArea" style="display:none;" class="mb-6">
+
+    <div id="testLoading" style="display:none;"
+         class="bg-white border border-slate-200 rounded-xl p-10 text-center">
+      <div class="spinner mx-auto mb-3" style="width:32px;height:32px;border-width:3px;"></div>
+      <p id="testLoadingText" class="text-slate-600">检测中...</p>
+    </div>
+
+    <div id="testImageResult" style="display:none;">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div class="bg-white border border-slate-200 rounded-xl p-3">
+          <p class="text-xs text-slate-500 mb-2 font-medium">原始图片</p>
+          <img id="testOriginalImg" class="w-full rounded-lg object-contain" style="max-height:400px;" alt="原图">
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl p-3">
+          <p class="text-xs text-slate-500 mb-2 font-medium">检测标注</p>
+          <img id="testAnnotatedImg" class="w-full rounded-lg object-contain" style="max-height:400px;" alt="标注图">
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-3 mb-4">
+        <div class="bg-white border border-slate-200 rounded-xl p-4 text-center">
+          <p class="text-xs text-slate-500 mb-1">汽车数量</p>
+          <p id="testCountCar" class="text-2xl font-bold text-blue-500">0</p>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl p-4 text-center">
+          <p class="text-xs text-slate-500 mb-1">摩托/非机动车</p>
+          <p id="testCountMotor" class="text-2xl font-bold text-emerald-500">0</p>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl p-4 text-center">
+          <p class="text-xs text-slate-500 mb-1">推理时间</p>
+          <p class="text-2xl font-bold text-amber-500"><span id="testInferenceMs">0</span><span class="text-sm font-normal text-slate-400 ml-1">ms</span></p>
+        </div>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-slate-50 text-slate-600 text-xs">
+              <th class="text-left px-4 py-2.5 font-medium">类别</th>
+              <th class="text-left px-4 py-2.5 font-medium">置信度</th>
+              <th class="text-left px-4 py-2.5 font-medium">坐标 (x1, y1, x2, y2)</th>
+            </tr>
+          </thead>
+          <tbody id="testObjectsTable" class="text-slate-700">
+          </tbody>
+        </table>
+        <div id="testNoObjects" class="text-center text-slate-400 text-sm py-4" style="display:none;">
+          未检测到目标
+        </div>
+      </div>
+    </div>
+
+    <div id="testVideoResult" style="display:none;">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div class="bg-white border border-slate-200 rounded-xl p-4 text-center">
+          <p class="text-xs text-slate-500 mb-1">总帧数</p>
+          <p id="testTotalFrames" class="text-xl font-bold text-slate-700">0</p>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl p-4 text-center">
+          <p class="text-xs text-slate-500 mb-1">处理帧数</p>
+          <p id="testProcessedFrames" class="text-xl font-bold text-blue-500">0</p>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl p-4 text-center">
+          <p class="text-xs text-slate-500 mb-1">平均汽车数</p>
+          <p id="testAvgCar" class="text-xl font-bold text-blue-500">0</p>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl p-4 text-center">
+          <p class="text-xs text-slate-500 mb-1">平均摩托车数</p>
+          <p id="testAvgMotor" class="text-xl font-bold text-emerald-500">0</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div class="bg-white border border-slate-200 rounded-xl p-4 text-center">
+          <p class="text-xs text-slate-500 mb-1">平均推理时间</p>
+          <p class="text-xl font-bold text-amber-500"><span id="testAvgInference">0</span><span class="text-sm font-normal text-slate-400 ml-1">ms</span></p>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-xl p-4 text-center">
+          <p class="text-xs text-slate-500 mb-1">视频时长</p>
+          <p class="text-xl font-bold text-slate-700"><span id="testDuration">0</span><span class="text-sm font-normal text-slate-400 ml-1">秒</span></p>
+        </div>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-xl p-4">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-sm text-slate-700 font-medium">标注视频预览</p>
+          <a id="testVideoDownload" href="#" download class="btn-primary text-xs py-2 px-4" style="text-decoration:none;">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            下载视频
+          </a>
+        </div>
+        <video id="testVideoPlayer" class="w-full rounded-lg" style="max-height:420px; background:#0f172a;"
+               controls preload="metadata"></video>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="testHistorySection">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-sm font-semibold text-slate-700">测试历史</h3>
+      <span id="testHistoryCount" class="text-xs text-slate-400">0 / 10</span>
+    </div>
+    <div id="testHistoryList" class="space-y-2">
+      <div id="testHistoryEmpty" class="text-center text-slate-400 text-sm py-6">
+        暂无测试记录，上传文件开始检测
+      </div>
+    </div>
+  </div>
+
+</div>

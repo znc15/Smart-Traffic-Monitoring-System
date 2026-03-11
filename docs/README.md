@@ -1,82 +1,75 @@
 # 文档中心
 
-> 智能交通监控系统（Smart Traffic Monitoring System）项目文档目录，涵盖部署指南、答辩材料、需求追溯与性能报告。
-
----
+本目录汇总项目部署、答辩、需求追溯与性能验收材料。
 
 ## 目录总览
 
-```
+```text
 docs/
-├── deploy/                        # 部署文档
-│   ├── local.md                   # 本地开发部署
-│   ├── docker.md                  # Docker 容器部署
-│   └── production.md              # 生产环境部署
-├── defense/                       # 答辩与演示材料
-│   ├── index.md                   # 答辩文档索引
-│   ├── demo-script.md             # 演示脚本
-│   ├── screenshot-checklist.md    # 截图清单
-│   ├── risk-closure.md            # 风险关闭记录
-│   └── metrics-table.md           # 指标表
-├── requirements/                  # 需求管理
-│   └── traceability.md            # 需求追溯矩阵
-└── reports/                       # 报告模板
-    ├── gap-baseline.md            # 差距基线分析
-    └── perf-evidence-template.md  # 性能证据模板
+├── deploy/
+│   ├── local.md
+│   ├── docker.md
+│   └── production.md
+├── defense/
+├── requirements/
+└── reports/
 ```
 
----
+## 推荐阅读顺序
 
-## deploy — 部署文档
+1. [`deploy/local.md`](deploy/local.md)：本地开发与联调
+2. [`deploy/docker.md`](deploy/docker.md)：单机 Compose 启动
+3. [`deploy/production.md`](deploy/production.md)：生产环境配置与上线
 
-提供从本地开发到生产上线的完整部署指引。
+## 配置文件配套关系
 
-| 文件 | 说明 | 适用场景 |
-|------|------|----------|
-| [local.md](deploy/local.md) | 本地开发环境搭建与启动流程 | 日常开发、调试 |
-| [docker.md](deploy/docker.md) | Docker Compose 一键部署 | 集成测试、演示环境 |
-| [production.md](deploy/production.md) | 生产环境部署与运维配置 | 正式上线、性能调优 |
+部署文档会同时引用以下配置模板：
 
-**推荐阅读顺序**：`local.md` → `docker.md` → `production.md`
+| 文件 | 作用 |
+|------|------|
+| [`../.env.example`](../.env.example) | 根 `docker compose` 运行时变量 |
+| [`../backend/.env.example`](../backend/.env.example) | backend 完整配置参考 |
+| [`../frontend/.env.example`](../frontend/.env.example) | frontend 构建变量说明 |
+| `frontend/.env.production` | frontend 生产构建变量，需自行创建 |
+| [`../edge/.env.example`](../edge/.env.example) | edge 节点运行时变量 |
 
----
+说明：
+- 根 `.env` 只影响 `docker-compose.yml` 中显式使用的变量。
+- `frontend` 的 `VITE_*` 是 build-time config，修改后必须重新构建。
 
-## defense — 答辩与演示材料
+## deploy
 
-答辩准备所需的全部材料，从演示脚本到风险闭环记录。
+| 文件 | 说明 | 场景 |
+|------|------|------|
+| [local.md](deploy/local.md) | 本地开发环境搭建与校验 | 日常开发 |
+| [docker.md](deploy/docker.md) | 根 Compose 一键部署 | 演示、联调、单机测试 |
+| [production.md](deploy/production.md) | 生产上线与运维配置 | 正式环境 |
+
+## defense
 
 | 文件 | 说明 |
 |------|------|
-| [index.md](defense/index.md) | 答辩文档总索引，串联所有材料 |
-| [demo-script.md](defense/demo-script.md) | 演示流程脚本，含操作步骤与话术 |
-| [screenshot-checklist.md](defense/screenshot-checklist.md) | 截图清单，确保关键界面全部留档 |
-| [risk-closure.md](defense/risk-closure.md) | 风险关闭记录，展示问题解决过程 |
-| [metrics-table.md](defense/metrics-table.md) | 核心指标汇总表（性能、准确率等） |
+| [index.md](defense/index.md) | 答辩材料总索引 |
+| [demo-script.md](defense/demo-script.md) | 演示脚本 |
+| [screenshot-checklist.md](defense/screenshot-checklist.md) | 截图清单 |
+| [risk-closure.md](defense/risk-closure.md) | 风险闭环记录 |
+| [metrics-table.md](defense/metrics-table.md) | 指标汇总 |
 
----
-
-## requirements — 需求管理
+## requirements
 
 | 文件 | 说明 |
 |------|------|
-| [traceability.md](requirements/traceability.md) | 需求追溯矩阵，将需求项映射到代码实现与测试用例 |
+| [traceability.md](requirements/traceability.md) | 需求追溯矩阵 |
 
-需求追溯矩阵确保每个功能需求都有对应的实现与验证，是答辩时证明项目完整性的重要依据。
-
----
-
-## reports — 报告模板
+## reports
 
 | 文件 | 说明 |
 |------|------|
-| [gap-baseline.md](reports/gap-baseline.md) | 差距基线分析，对比目标指标与当前状态 |
-| [perf-evidence-template.md](reports/perf-evidence-template.md) | 性能证据模板，用于记录与呈现测试结果 |
-
----
+| [gap-baseline.md](reports/gap-baseline.md) | 差距基线分析 |
+| [perf-evidence-template.md](reports/perf-evidence-template.md) | 性能证据模板 |
 
 ## 使用建议
 
-1. **首次接触项目**：先阅读 `deploy/local.md` 搭建本地环境，再浏览其余文档了解全貌。
-2. **准备答辩**：按 `defense/index.md` 索引逐项检查，配合 `screenshot-checklist.md` 确认截图完备。
-3. **性能验收**：使用 `reports/perf-evidence-template.md` 模板记录测试数据，填入 `defense/metrics-table.md`。
-4. **需求变更**：及时更新 `requirements/traceability.md`，保持需求与实现的同步。
+1. 第一次接手项目时，先看 `deploy/local.md` 和仓库根 `README.md`。
+2. 需要 Docker 部署时，再看 `deploy/docker.md`。
+3. 上生产前，务必完整走一遍 `deploy/production.md` 里的变量准备与验收清单。

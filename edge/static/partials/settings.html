@@ -1,0 +1,176 @@
+<!-- ===== 设置 Tab ===== -->
+<div id="tabSettings" class="tab-content" style="display:none;">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <div class="settings-card">
+      <h4>视频源设置</h4>
+      <div class="mb-4">
+        <label class="form-label">模式选择</label>
+        <div class="mode-group">
+          <button type="button" class="mode-btn active" id="modeSimBtn" onclick="setMode('sim')">模拟 (sim)</button>
+          <button type="button" class="mode-btn" id="modeCameraBtn" onclick="setMode('camera')">摄像头 (camera)</button>
+        </div>
+      </div>
+      <div class="mb-4">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <button type="button" class="btn-scan" id="scanCamerasBtn" onclick="settings_scanCameras()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            扫描本地摄像头
+          </button>
+          <button type="button" class="btn-scan" id="scanCamerasServerBtn" onclick="settings_scanCamerasServer()" style="color:#94a3b8; font-size:0.75rem;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+            服务端扫描（RTSP/网络摄像头）
+          </button>
+        </div>
+        <div id="cameraListContainer" class="camera-list" style="display:none;"></div>
+      </div>
+      <div>
+        <label class="form-label">摄像头源</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="text" id="settingCameraSource" class="form-input" disabled
+                 placeholder="RTSP URL / 设备号 / 视频文件路径" style="flex:1;"
+                 oninput="settings_updateTestBtn()">
+          <button type="button" class="btn-test" id="probeBtn" onclick="settings_probeConnection()" disabled>测试</button>
+        </div>
+        <div id="probeResult" style="display:none;"></div>
+        <div id="cameraPreviewSection" style="margin-top:12px;">
+          <button type="button" class="btn-test" onclick="settings_previewCamera()" id="previewBtn">
+            抓帧测试
+          </button>
+          <div id="previewResult" style="display:none; margin-top:10px;">
+            <div style="display:flex; gap:8px; align-items:start; flex-wrap:wrap;">
+              <img id="previewImage" style="max-width:100%; border-radius:8px; border:1px solid #e2e8f0;" />
+            </div>
+            <div id="previewStats" style="margin-top:8px; font-size:0.8rem; color:#64748b;"></div>
+          </div>
+        </div>
+        <p class="text-xs text-slate-400 mt-1" id="cameraSourceHint">模拟模式下无需配置摄像头源</p>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h4>模型设置</h4>
+      <div class="mb-4">
+        <label class="form-label">检测模型</label>
+        <select id="settingModel" class="form-select">
+          <option value="">加载中...</option>
+        </select>
+      </div>
+      <div class="flex items-center justify-between">
+        <div>
+          <label class="form-label mb-0">OpenVINO 加速</label>
+          <p class="text-xs text-slate-400">启用 Intel OpenVINO 推理加速</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="settingOpenVINO">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h4>检测设置</h4>
+      <div class="mb-4">
+        <label class="form-label">置信度阈值: <span id="confidenceDisplay" class="text-blue-500 font-mono">0.50</span></label>
+        <input type="range" id="settingConfidence" class="custom-range" min="0.1" max="0.9" step="0.05" value="0.5">
+        <div class="flex justify-between text-xs text-slate-500 mt-1">
+          <span>0.1 (宽松)</span>
+          <span>0.9 (严格)</span>
+        </div>
+      </div>
+      <div>
+        <label class="form-label">路段名称</label>
+        <input type="text" id="settingRoadName" class="form-input" placeholder="例如：主干道A段">
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h4>节点访问鉴权</h4>
+      <div>
+        <label class="form-label">X-Edge-Key</label>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <input
+            type="password"
+            id="edgeAccessKey"
+            class="form-input"
+            placeholder="留空表示节点未启用访问密钥"
+            style="flex:1; min-width:240px;"
+            autocomplete="off"
+          >
+          <button type="button" class="btn-test" onclick="saveEdgeAccessKey()">保存</button>
+          <button type="button" class="btn-test" onclick="clearEdgeAccessKey()">清空</button>
+        </div>
+        <div id="edgeAccessHint" class="text-xs text-slate-400 mt-2">
+          仅保存在当前浏览器 localStorage，用于为受保护接口自动附加 `X-Edge-Key`。
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h4>性能调优 (Performance Tuning)</h4>
+
+      <div style="margin-bottom:16px;">
+        <label class="form-label">当前资源等级</label>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span id="perfResourceBadge" class="resource-badge medium">
+            <span class="badge-dot"></span>
+            <span id="perfResourceLabel">medium</span>
+          </span>
+          <span id="perfHardwareInfo" class="text-xs text-slate-400">-- cores / -- GB RAM</span>
+        </div>
+        <div class="resource-info" id="perfResourceChips"></div>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label">帧跳过 (Frame Skip): <span id="perfFrameSkipDisplay" class="text-blue-500 font-mono">1</span></label>
+        <div class="slider-row">
+          <input type="range" id="perfFrameSkip" class="custom-range" min="1" max="10" step="1" value="1">
+          <span class="slider-value" id="perfFrameSkipValue">1</span>
+        </div>
+        <div class="flex justify-between text-xs text-slate-500 mt-1">
+          <span>1 (每帧推理)</span>
+          <span>10 (跳过更多)</span>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label">推理分辨率 (IMGSZ)</label>
+        <select id="perfImgsz" class="form-select">
+          <option value="160">160</option>
+          <option value="320">320</option>
+          <option value="480">480</option>
+          <option value="640" selected>640</option>
+        </select>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label">JPEG 质量: <span id="perfJpegQualityDisplay" class="text-blue-500 font-mono">80</span></label>
+        <div class="slider-row">
+          <input type="range" id="perfJpegQuality" class="custom-range" min="30" max="100" step="5" value="80">
+          <span class="slider-value" id="perfJpegQualityValue">80</span>
+        </div>
+        <div class="flex justify-between text-xs text-slate-500 mt-1">
+          <span>30 (低质量)</span>
+          <span>100 (高质量)</span>
+        </div>
+      </div>
+
+      <div>
+        <label class="form-label">量化模式 (Quantize)</label>
+        <select id="perfQuantize" class="form-select">
+          <option value="none">none (无量化)</option>
+          <option value="fp16">fp16 (半精度)</option>
+          <option value="int8">int8 (整数量化)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="settings-card flex items-end justify-end gap-3">
+      <button type="button" class="btn-secondary" onclick="resetSettings()">重置</button>
+      <button type="button" class="btn-primary" id="applyBtn" onclick="applySettings()">
+        应用设置
+      </button>
+    </div>
+
+  </div>
+</div>

@@ -1,6 +1,6 @@
-# 本地部署教程（Local）
+# 本地开发部署
 
-本教程目标：从零启动后，可访问页面并完成接口验证。
+目标：在本机完成 backend + frontend 联调，必要时再单独启动 edge。
 
 ## 1. 前置依赖
 
@@ -9,31 +9,32 @@
 - Java 17+
 - Maven 3.9+
 - Python 3.10+
-- Docker + Docker Compose
+- Docker Compose
 
-## 2. 启动基础依赖（数据库与缓存）
+## 2. 启动数据库与缓存
 
-项目根目录执行：
+在项目根目录执行：
 
 ```bash
 docker compose up -d database mysql redis
-```
-
-验证：
-
-```bash
 docker compose ps database mysql redis
 ```
 
-期望状态：3 个服务均为 `healthy`。
+预期：
+- `database`、`mysql`、`redis` 全部为 `healthy`
 
-## 3. 启动后端
+## 3. 启动 backend
+
+`backend/src/main/resources/application.yml` 的默认值是面向纯本地运行的；
+如果你使用仓库自带 Compose 起依赖，需要显式覆盖数据库名、密码和 Redis 端口。
 
 ```bash
 cd backend
 SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/transportation_system \
 SPRING_DATASOURCE_USERNAME=postgres \
 SPRING_DATASOURCE_PASSWORD=odoo \
+SPRING_REDIS_HOST=localhost \
+SPRING_REDIS_PORT=6380 \
 JWT_SECRET=change-this-dev-secret-change-this-dev-secret \
 mvn -B spring-boot:run
 ```
@@ -44,30 +45,69 @@ mvn -B spring-boot:run
 curl http://localhost:8000/api/v1/site-settings
 ```
 
-## 4. 启动 Vue 前端
+## 4. 启动 frontend
 
 ```bash
 cd frontend
 pnpm install
-pnpm dev --port 5174
+pnpm dev
 ```
 
-浏览器访问：`http://localhost:5174`
+说明：
+- Vite 默认监听 `0.0.0.0:5174`
+- 开发模式下已内置代理：
+  - `/api` -> `http://127.0.0.1:8000`
+  - `/api/v1/ws` -> `ws://127.0.0.1:8000`
 
-## 5. 启动 Edge（可选）
+访问：
+- `http://localhost:5174`
+
+## 5. 启动 edge（可选）
+
+仿真模式：
 
 ```bash
 cd edge
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python main.py --mode sim --port 9000 --no-browser
+python main.py --mode sim --port 8000 --no-browser
 ```
 
-## 6. 本地门禁
+摄像头模式：
 
-项目根目录执行：
+```bash
+python main.py --mode camera --url 0 --road "人民路" --port 8000 --no-browser
+```
+
+说明：
+- edge 默认端口是 `8000`，不是 `9000`
+- 无头环境请显式加 `--no-browser`
+- 生产/容器环境使用 `camera` 模式时，必须设置 `--url` 或 `CAMERA_URL`，否则会进入交互选择
+
+## 6. 本地验收
+
+```bash
+curl -I http://localhost:8000/api/v1/site-settings
+curl -I http://localhost:5174
+```
+
+如果 edge 已启动：
+
+```bash
+curl http://localhost:8000/health
+curl http://localhost:8000/api/metrics
+```
+
+## 7. 本地门禁
+
+回到仓库根目录执行：
 
 ```bash
 ./scripts/local-gate.sh
 ```
+
+门禁顺序：
+- `backend`：`mvn -B test`
+- `edge`：`python -m py_compile *.py` + `pytest -q tests`
+- `frontend`：`pnpm test` + `pnpm build`

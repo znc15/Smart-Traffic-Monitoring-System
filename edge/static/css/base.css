@@ -1,0 +1,101 @@
+body {
+  background: #f8fafc;
+  color: #1e293b;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.progress-bar {
+  transition: width 0.6s ease, background-color 0.6s ease;
+}
+
+@keyframes pulse-green {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
+  }
+
+  50% {
+    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+  }
+}
+
+@keyframes pulse-red {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
+  }
+
+  50% {
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+  }
+}
+
+.status-online {
+  animation: pulse-green 2s infinite;
+}
+
+.status-offline {
+  animation: pulse-red 1.5s infinite;
+}
+
+@keyframes toastIn {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes toastOut {
+  to {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.partial-load-error {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  border-radius: 12px;
+  color: #9a3412;
+  padding: 24px;
+  text-align: center;
+}
+
+.partial-load-error h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.partial-load-error p {
+  color: #c2410c;
+  font-size: 0.875rem;
+}
+
+.partial-loading {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  color: #1d4ed8;
+  padding: 24px;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 500;
+}

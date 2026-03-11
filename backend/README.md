@@ -1,149 +1,56 @@
 # Smart Traffic Backend
 
-> Spring Boot 后端服务 —— 负责鉴权、交通数据汇聚、智能预测、MaaS 开放接口与报表导出。
-
----
+Spring Boot 后端服务，负责鉴权、交通数据汇聚、预测、MaaS 开放接口、报表导出与边缘节点接入。
 
 ## 技术栈
 
 | 组件 | 版本 / 说明 |
 |------|-------------|
-| **Spring Boot** | 3.4.2 (Java 17) |
-| **Spring Security + JWT** | JJWT 0.12.6，Bearer Token 鉴权 |
-| **Spring Data JPA** | ORM 持久层 |
-| **Flyway** | 数据库版本迁移（支持 PostgreSQL & MySQL） |
-| **Spring Data Redis** | 缓存层 |
-| **WebSocket** | 实时数据推送 |
-| **Apache POI** | XLSX 报表导出 |
-| **PostgreSQL** | 16，主库 |
-| **MySQL** | 8.4，可选镜像双写 |
-| **Redis** | 7，缓存 |
+| Spring Boot | 3.4.2 |
+| Java | 17 |
+| Spring Security + JWT | JJWT 0.13.0 |
+| Spring Data JPA | ORM 持久层 |
+| Flyway | PostgreSQL / MySQL 迁移 |
+| Spring Data Redis | 缓存 |
+| WebSocket | 实时推送 |
+| Apache POI | XLSX 导出 |
 
----
+## 本地启动
 
-## 目录结构
-
-```
-backend/
-├── src/main/java/com/smarttraffic/backend/
-│   ├── config/          # 安全、JWT、数据库、WebSocket、CORS、Redis 配置
-│   ├── controller/      # REST 控制器（Auth、Traffic、Report、MaaS、Admin、Edge 等）
-│   ├── dto/             # 数据传输对象
-│   ├── exception/       # 全局异常处理
-│   ├── model/           # JPA 实体（User、TrafficData 等）
-│   ├── repository/      # 数据访问层
-│   ├── security/        # JWT Token 提供者、API Key 认证过滤器
-│   ├── service/         # 业务逻辑（含 analytics 子包）
-│   └── websocket/       # WebSocket 处理器
-├── src/main/resources/
-│   ├── application.yml
-│   ├── db/migration/         # PostgreSQL Flyway 迁移脚本
-│   └── db/migration-mysql/   # MySQL Flyway 迁移脚本
-├── pom.xml
-├── Dockerfile
-└── README.md
-```
-
----
-
-## API 参考
-
-### 认证
-
-| 方法 | 路径 | 说明 | 鉴权 |
-|------|------|------|------|
-| `POST` | `/api/v1/auth/register` | 用户注册 | 无 |
-| `POST` | `/api/v1/auth/login` | 用户登录，返回 JWT | 无 |
-| `GET` | `/api/v1/auth/me` | 获取当前登录用户信息 | Bearer Token |
-
-### 边缘设备
-
-| 方法 | 路径 | 说明 | 鉴权 |
-|------|------|------|------|
-| `POST` | `/api/v1/edge/telemetry` | 边缘节点遥测数据上报 | Bearer Token |
-
-### 交通数据
-
-| 方法 | 路径 | 说明 | 鉴权 |
-|------|------|------|------|
-| `GET` | `/api/v1/traffic/predictions` | 获取交通流量预测 | Bearer Token |
-
-### MaaS 开放接口
-
-| 方法 | 路径 | 说明 | 鉴权 |
-|------|------|------|------|
-| `GET` | `/api/v1/maas/congestion` | 查询拥堵状况 | `X-API-Key` |
-
-### 报表
-
-| 方法 | 路径 | 说明 | 鉴权 |
-|------|------|------|------|
-| `GET` | `/api/v1/reports/traffic/export` | 导出交通报表（JSON / XLSX） | Bearer Token |
-
-> 报表接口支持 `granularity` 和 `format` 查询参数。
-
----
-
-## 配置参考
-
-### 安全配置
-
-| 环境变量 | 说明 | 示例 |
-|----------|------|------|
-| `JWT_SECRET` | JWT 签名密钥 | `my-super-secret-key` |
-| `APP_CORS_ALLOWED_ORIGINS` | 允许的跨域来源 | `http://localhost:5173` |
-| `APP_WS_ALLOW_QUERY_TOKEN` | 是否允许 WebSocket 通过 query 传递 Token | `true` |
-| `INIT_ADMIN_USERNAME` | 初始管理员用户名 | `admin` |
-| `INIT_ADMIN_PASSWORD` | 初始管理员密码 | `admin123` |
-
-### 数据库配置
-
-| 环境变量 | 说明 | 示例 |
-|----------|------|------|
-| `SPRING_DATASOURCE_URL` | 主数据源 JDBC URL | `jdbc:postgresql://localhost:5432/traffic` |
-| `SPRING_DATASOURCE_USERNAME` | 数据库用户名 | `postgres` |
-| `SPRING_DATASOURCE_PASSWORD` | 数据库密码 | `postgres` |
-| `SPRING_FLYWAY_LOCATIONS` | Flyway 迁移脚本路径 | `classpath:db/migration` |
-| `APP_DB_PRIMARY` | 主库类型 | `postgres` \| `mysql` |
-| `APP_DB_MIRROR_WRITE` | 是否启用镜像双写 | `true` \| `false` |
-
-### Redis 配置
-
-| 环境变量 | 说明 | 示例 |
-|----------|------|------|
-| `SPRING_REDIS_HOST` | Redis 主机地址 | `localhost` |
-| `SPRING_REDIS_PORT` | Redis 端口 | `6379` |
-| `APP_REDIS_CACHE_ENABLED` | 是否启用 Redis 缓存 | `true` |
-| `APP_CACHE_TTL_SECONDS` | 缓存 TTL（秒） | `300` |
-
----
-
-## 本地开发
-
-### 前置条件
-
-- Java 17+
-- Maven 3.8+
-- PostgreSQL 16（或 MySQL 8.4）
-- Redis 7
-
-### 启动
+如果数据库与缓存来自仓库根 `docker compose up -d database mysql redis`，
+建议使用下面这组环境变量启动 backend：
 
 ```bash
 cd backend
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/transportation_system \
+SPRING_DATASOURCE_USERNAME=postgres \
+SPRING_DATASOURCE_PASSWORD=odoo \
+SPRING_REDIS_HOST=localhost \
+SPRING_REDIS_PORT=6380 \
+JWT_SECRET=change-this-dev-secret-change-this-dev-secret \
 mvn -B spring-boot:run
 ```
 
-服务默认监听 `8000` 端口。
+验证：
 
-### 构建
+```bash
+curl http://localhost:8000/api/v1/site-settings
+```
+
+说明：
+- 默认监听端口是 `8000`
+- `application.yml` 中的默认数据库名是 `traffic_db` / 密码 `password`
+- 如果你直接沿用根 Compose 起的依赖，必须显式覆盖为 `transportation_system` / `odoo`
+
+## 构建与测试
 
 ```bash
 cd backend
+mvn -B test
 mvn -B clean package -DskipTests
 ```
 
-### Docker
+Docker 构建：
 
 ```bash
 cd backend
@@ -151,62 +58,147 @@ docker build -t smart-traffic-backend .
 docker run -p 8000:8000 smart-traffic-backend
 ```
 
----
+## 关键接口与鉴权
 
-## 测试
+### 登录与注册
+
+| 方法 | 路径 | 鉴权 |
+|------|------|------|
+| `POST` | `/api/v1/auth/register` | 无 |
+| `POST` | `/api/v1/auth/login` | 无 |
+| `GET` | `/api/v1/auth/me` | Bearer Token / Cookie |
+
+注意：
+- `POST /api/v1/auth/login` 当前接受 `application/x-www-form-urlencoded`
+- 请求字段名是 `username`
+- 但后端目前按“邮箱”匹配登录，因此接入方请传用户邮箱到 `username`
+
+### 公开接口
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/api/v1/api-docs` | 机器可读 API 文档 |
+| `GET` | `/api/v1/site-settings` | 站点配置 |
+| `GET` | `/api/v1/roads_name` | 道路列表 |
+| `GET` | `/api/v1/frames_no_auth/{roadName}` | 无鉴权帧图 |
+| `GET` | `/api/v1/traffic/predictions` | 交通预测 |
+
+### 专用鉴权接口
+
+| 方法 | 路径 | 鉴权方式 |
+|------|------|----------|
+| `POST` | `/api/v1/edge/telemetry` | `X-Edge-Node-Id` + `X-Edge-Key` |
+| `GET` | `/api/v1/maas/**` | `X-API-Key` |
+| `GET` | `/api/v1/reports/traffic/export` | Bearer Token / Cookie |
+
+说明：
+- `edge/telemetry` 不是 Bearer Token
+- `maas` 路由在 Spring Security 中是公开路由，但会由专用 API Key filter 校验
+
+## 配置参考
+
+完整变量见 [`backend/.env.example`](.env.example)。
+
+### 基础运行
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `SERVER_PORT` | HTTP 端口 | `8000` |
+| `APP_ENV` | 运行环境 | `development` |
+| `BASE_URL_API` | 对外 API 基址 | `http://localhost:8000` |
+
+### 鉴权与安全
+
+| 变量 | 说明 |
+|------|------|
+| `JWT_SECRET` | JWT 密钥，生产环境必须替换 |
+| `ACCESS_TOKEN_EXPIRE_DAYS` | Access token 有效期 |
+| `APP_CORS_ALLOWED_ORIGINS` | 允许的跨域来源 |
+| `APP_WS_ALLOW_QUERY_TOKEN` | 是否允许 WS 使用 query token |
+
+生产建议：
+- `APP_ENV=production`
+- 精确设置 `APP_CORS_ALLOWED_ORIGINS`
+- 除非兼容旧客户端，否则 `APP_WS_ALLOW_QUERY_TOKEN=false`
+
+### 数据库与缓存
+
+| 变量 | 说明 |
+|------|------|
+| `SPRING_DATASOURCE_URL` | 主库 JDBC URL |
+| `SPRING_DATASOURCE_USERNAME` | 主库用户名 |
+| `SPRING_DATASOURCE_PASSWORD` | 主库密码 |
+| `SPRING_FLYWAY_LOCATIONS` | Flyway 迁移目录 |
+| `SPRING_REDIS_HOST` | Redis 主机 |
+| `SPRING_REDIS_PORT` | Redis 端口 |
+| `APP_REDIS_CACHE_ENABLED` | 是否启用缓存 |
+| `APP_CACHE_TTL_SECONDS` | 缓存 TTL |
+
+### 初始化与种子数据
+
+| 变量 | 说明 |
+|------|------|
+| `INIT_ADMIN` | 是否启用初始化管理员 |
+| `INIT_ADMIN_USERNAME` | 管理员用户名 |
+| `INIT_ADMIN_EMAIL` | 管理员邮箱 |
+| `INIT_ADMIN_PASSWORD` | 管理员密码 |
+| `TRAFFIC_ROADS` | 首次初始化道路列表 |
+| `APP_MAAS_DEFAULT_CLIENT_NAME` | 默认 MaaS client 名称 |
+| `APP_MAAS_DEFAULT_API_KEY` | 默认 MaaS API Key |
+
+初始化管理员说明：
+- 只在系统里还没有任何用户时生效
+- 需要同时提供用户名、邮箱、密码
+- 密码必须满足复杂度要求，建议首启完成后关闭
+
+### 双库灰度
+
+| 变量 | 说明 |
+|------|------|
+| `APP_DB_PRIMARY` | 主库类型：`postgres` / `mysql` |
+| `APP_DB_MIRROR_WRITE` | 是否启用镜像双写 |
+| `APP_DB_MIRROR_MYSQL_ENABLED` | 是否启用 MySQL 镜像 |
+| `APP_DB_MIRROR_MYSQL_URL` | MySQL 镜像库 URL |
+| `APP_DB_MIRROR_MYSQL_USERNAME` | MySQL 镜像库用户名 |
+| `APP_DB_MIRROR_MYSQL_PASSWORD` | MySQL 镜像库密码 |
+| `APP_DB_MIRROR_POSTGRES_ENABLED` | 是否启用 PostgreSQL 镜像 |
+| `APP_DB_MIRROR_POSTGRES_URL` | PostgreSQL 镜像库 URL |
+| `APP_DB_MIRROR_POSTGRES_USERNAME` | PostgreSQL 镜像库用户名 |
+| `APP_DB_MIRROR_POSTGRES_PASSWORD` | PostgreSQL 镜像库密码 |
+
+## 生产环境说明
+
+如果你通过仓库根 `docker-compose.yml` 部署 backend：
+- `JWT_SECRET` 和数据库密码可直接走根 `.env`
+- `APP_ENV`、`APP_CORS_ALLOWED_ORIGINS`、`INIT_ADMIN_*` 这类额外变量建议通过 `docker-compose.override.yml` 注入
+
+健康检查可直接使用：
 
 ```bash
-cd backend
-mvn -B test
+curl http://localhost:8000/api/v1/site-settings
 ```
 
----
+## 灰度切换
 
-## 双写灰度
-
-后端支持 PostgreSQL + MySQL 双写灰度切换，用于数据库迁移过渡期。
-
-### 切换主库
+切换主库：
 
 ```bash
-# 切换主库为 PostgreSQL
 ./scripts/db/switch_primary.sh postgres
-
-# 切换主库为 MySQL
 ./scripts/db/switch_primary.sh mysql
 ```
 
-### 一致性校验
+一致性校验：
 
 ```bash
 bash scripts/check_mirror_consistency.sh
+bash scripts/check_mirror_consistency.sh --all
 ```
-
-> 该脚本会对比两个数据库的核心表数据，输出差异报告。
-
----
-
-## 报表导出示例
-
-```bash
-# 导出 XLSX 格式的小时粒度报表
-curl -L -H "Authorization: Bearer <token>" \
-  "http://localhost:8000/api/v1/reports/traffic/export?granularity=hourly&format=xlsx" \
-  -o traffic_report.xlsx
-
-# 导出 JSON 格式的日粒度报表
-curl -H "Authorization: Bearer <token>" \
-  "http://localhost:8000/api/v1/reports/traffic/export?granularity=daily&format=json"
-```
-
----
 
 ## 常见问题
 
 | 问题 | 解决方案 |
 |------|----------|
-| `Unsupported Database: PostgreSQL 16.x` | 确认 `pom.xml` 中包含 `flyway-database-postgresql` 依赖 |
-| 启动后接口返回 401 | 检查 `JWT_SECRET` 是否配置、Token 是否过期、请求头是否携带 `Authorization: Bearer <token>` |
-| Redis 连接失败 | 确认 Redis 服务已启动，检查 `SPRING_REDIS_HOST` 和 `SPRING_REDIS_PORT` 配置 |
-| Flyway 迁移失败 | 检查 `SPRING_FLYWAY_LOCATIONS` 是否指向正确的迁移目录，确保数据库已创建 |
-| WebSocket 连接断开 | 确认 `APP_WS_ALLOW_QUERY_TOKEN` 设置正确，检查 CORS 和代理配置 |
+| backend 启动后连不上数据库 | 检查是否使用了 Compose 对应的数据库名 `transportation_system` 与密码 `odoo` |
+| Redis 连接失败 | 本地使用根 Compose 时端口应为 `6380`，不是 `6379` |
+| 登录成功但 Cookie 不安全 | 生产环境请设置 `APP_ENV=production` |
+| edge 遥测上报失败 | 检查 `X-Edge-Node-Id` 与 `X-Edge-Key`，不是 Bearer Token |
