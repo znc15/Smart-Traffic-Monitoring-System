@@ -1,8 +1,8 @@
 # 生产部署指南
 
 这份文档聚焦两件事：
-- 让当前仓库的配置方式讲清楚
-- 区分“演示 Compose”与“正式生产拓扑”
+- 让当前仓库的主站 Docker 一键启动方式讲清楚
+- 把前后端 IP / 地址统一收口到根 `.env`
 
 ## 1. 推荐拓扑
 
@@ -25,14 +25,15 @@ edge    -> backend (/api/v1/edge/telemetry)
 说明：
 - 根 `docker-compose.yml` 目前把 `backend:8000` 暴露到宿主机，便于演示和联调。
 - 正式生产建议把 backend 只留在内网，或者至少限制为 `127.0.0.1` / 私网访问。
+- 根 Compose 的一键启动范围只包含主站，不包含 edge。
 
 ## 2. 配置入口总览
 
 | 文件 | 用途 |
 |------|------|
-| 根 `.env` | Compose 运行时变量，数据库密码、JWT、MaaS key 等 |
-| `frontend/.env.production` | frontend 构建时的 `VITE_*` 变量 |
-| `docker-compose.override.yml` | 给 backend 注入额外生产变量 |
+| 根 `.env` | 主站 Docker 一键启动主配置，含前后端 IP / 地址 |
+| `frontend/.env.production` | frontend 可选覆盖文件，单独构建时使用 |
+| `docker-compose.override.yml` | 高级覆盖手段，不是常见生产变量必需项 |
 | `backend/.env.example` | backend 完整配置参考 |
 | `edge/.env.example` | edge 运行时配置参考 |
 
@@ -45,6 +46,9 @@ cp .env.example .env
 至少填写：
 
 ```env
+GATEWAY_PUBLIC_BASE=http://localhost:5173
+BACKEND_PUBLIC_HTTP_BASE=http://localhost:8000
+BACKEND_PUBLIC_WS_BASE=ws://localhost:8000
 POSTGRES_PASSWORD=replace-me
 MYSQL_ROOT_PASSWORD=replace-me
 MYSQL_PASSWORD=replace-me
@@ -55,6 +59,11 @@ MAAS_API_KEY=replace-with-your-maas-api-key
 可选但常用：
 
 ```env
+APP_ENV=production
+APP_WS_ALLOW_QUERY_TOKEN=false
+APP_MAAS_DEFAULT_CLIENT_NAME=default-dev-client
+TRAFFIC_ROADS=陈兴道路,陈富路,阮惠路,黎利路,阮廌路
+INIT_ADMIN=false
 APP_DB_PRIMARY=postgres
 APP_DB_MIRROR_WRITE=false
 APP_DB_MIRROR_MYSQL_ENABLED=false
@@ -63,72 +72,58 @@ APP_REDIS_CACHE_ENABLED=true
 APP_CACHE_TTL_SECONDS=10
 ```
 
-## 4. 准备 frontend 构建变量
+## 4. 配置前后端 IP
 
-`frontend` 的 `VITE_*` 是 build-time config。
+前后端分开 IP 的推荐写法：
 
-推荐同源部署：
-
-```bash
-cat > frontend/.env.production <<'EOF'
-VITE_API_HTTP_BASE=
-VITE_API_WS_BASE=
-VITE_AMAP_KEY=your_amap_key
-EOF
+```env
+GATEWAY_PUBLIC_BASE=http://192.168.1.10:5173
+BACKEND_PUBLIC_HTTP_BASE=http://192.168.1.11:8000
+BACKEND_PUBLIC_WS_BASE=ws://192.168.1.11:8000
 ```
 
 说明：
-- 同源部署时把 `VITE_API_HTTP_BASE` / `VITE_API_WS_BASE` 留空即可
-- 浏览器会自动走当前域名下的 `/api/...`
-- 如果你修改了这个文件，必须重新构建 frontend 镜像
+- 浏览器入口使用 `GATEWAY_PUBLIC_BASE`
+- frontend 在 Docker build 时会自动把 `BACKEND_PUBLIC_HTTP_BASE / BACKEND_PUBLIC_WS_BASE` 写进最终构建产物
+- backend 会默认把 `APP_CORS_ALLOWED_ORIGINS` 对齐到 `GATEWAY_PUBLIC_BASE`
+- backend 会默认把 `BASE_URL_API` 对齐到 `BACKEND_PUBLIC_HTTP_BASE`
 
-跨域部署时：
+如果你单独构建 frontend，而不是通过根 Compose，才需要手动维护 `frontend/.env.production`。
 
-```env
-VITE_API_HTTP_BASE=https://api.example.com
-VITE_API_WS_BASE=wss://api.example.com
-VITE_AMAP_KEY=your_amap_key
-```
+## 5. backend 生产变量
 
-## 5. 给 backend 注入额外生产变量
+现在这些常见变量已经可以直接通过根 `.env` 透传：
 
-根 `docker-compose.yml` 目前没有把所有 backend 生产变量都显式透传。
-如果你需要配置 `APP_ENV`、`APP_CORS_ALLOWED_ORIGINS`、初始化管理员等，请创建
-`docker-compose.override.yml`：
-
-```yaml
-services:
-  backend:
-    environment:
-      APP_ENV: production
-      APP_CORS_ALLOWED_ORIGINS: https://traffic.example.com
-      APP_WS_ALLOW_QUERY_TOKEN: "false"
-      BASE_URL_API: https://traffic.example.com
-      TRAFFIC_ROADS: 陈兴道路,陈富路,阮惠路,黎利路,阮廌路
-      INIT_ADMIN: "true"
-      INIT_ADMIN_USERNAME: admin
-      INIT_ADMIN_EMAIL: admin@example.com
-      INIT_ADMIN_PASSWORD: Admin@12345
-```
+- `APP_ENV`
+- `APP_CORS_ALLOWED_ORIGINS`
+- `APP_WS_ALLOW_QUERY_TOKEN`
+- `BASE_URL_API`
+- `TRAFFIC_ROADS`
+- `INIT_ADMIN`
+- `INIT_ADMIN_USERNAME`
+- `INIT_ADMIN_EMAIL`
+- `INIT_ADMIN_PASSWORD`
+- `APP_MAAS_DEFAULT_CLIENT_NAME`
 
 注意：
 - `APP_ENV=production` 很重要，登录 Cookie 才会带 `Secure`
 - `INIT_ADMIN_*` 只在系统里还没有任何用户时生效
 - 初始化完成后，建议把 `INIT_ADMIN` 关闭
+- 如果你需要极少数环境专属覆盖，再使用 `docker-compose.override.yml`
 
 ## 6. 构建与启动
 
 ```bash
-docker compose build
+docker compose build frontend gateway backend
 docker compose up -d
 docker compose ps
 ```
 
-如果只重建前端入口：
+如果只修改了前后端 IP / 地址，也仍然建议至少重建 frontend、gateway、backend：
 
 ```bash
-docker compose build frontend gateway
-docker compose up -d frontend gateway
+docker compose build frontend gateway backend
+docker compose up -d
 ```
 
 ## 7. 上线验收
@@ -195,7 +190,9 @@ docker compose up -d backend
 
 ## 9. Edge 生产配置建议
 
-edge 通常独立部署在边缘设备上，推荐最小配置：
+edge 不在主站一键启动范围内，通常独立部署在边缘设备上。
+
+推荐最小配置：
 
 ```env
 MODE=camera
@@ -203,7 +200,7 @@ CAMERA_URL=rtsp://user:pass@camera/stream
 ROAD_NAME=人民路
 EDGE_NODE_ID=edge-01
 EDGE_API_KEY=replace-me
-BACKEND_TELEMETRY_URL=https://traffic.example.com/api/v1/edge/telemetry
+BACKEND_TELEMETRY_URL=http://192.168.1.11:8000/api/v1/edge/telemetry
 NO_BROWSER=true
 ```
 

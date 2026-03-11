@@ -71,6 +71,7 @@ pnpm dev
 - `VITE_*` 是 build-time config（构建时注入）
 - 修改后必须重新执行 `pnpm build` 或重新构建 Docker 镜像
 - 运行中的 Nginx 容器不会读取 `docker run -e VITE_*`
+- 如果你通过仓库根 `docker-compose.yml` 构建主站，frontend 默认从根 `.env` 的 `BACKEND_PUBLIC_HTTP_BASE / BACKEND_PUBLIC_WS_BASE` 取值
 
 ### 同源部署（推荐）
 
@@ -87,9 +88,24 @@ VITE_AMAP_KEY=your_amap_key
 ### 跨域部署
 
 ```env
-VITE_API_HTTP_BASE=https://api.example.com
-VITE_API_WS_BASE=wss://api.example.com
+VITE_API_HTTP_BASE=http://192.168.1.11:8000
+VITE_API_WS_BASE=ws://192.168.1.11:8000
 VITE_AMAP_KEY=your_amap_key
+```
+
+如果你走主站 Docker 一键启动，优先修改根 `.env`：
+
+```env
+GATEWAY_PUBLIC_BASE=http://192.168.1.10:5173
+BACKEND_PUBLIC_HTTP_BASE=http://192.168.1.11:8000
+BACKEND_PUBLIC_WS_BASE=ws://192.168.1.11:8000
+```
+
+然后执行：
+
+```bash
+docker compose build frontend gateway
+docker compose up -d frontend gateway
 ```
 
 ## 生产构建

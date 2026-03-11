@@ -8,6 +8,16 @@
 - `edge/`：边缘推理节点，默认端口 `8000`
 - `gateway/`：Nginx 统一入口，默认对外端口 `5173`
 
+主站 Docker 一键启动范围只覆盖：
+- `gateway`
+- `frontend`
+- `backend`
+- `database`
+- `mysql`
+- `redis`
+
+`edge` 保持独立部署，不并入根 `docker-compose.yml`。
+
 ## 仓库结构
 
 ```text
@@ -35,9 +45,12 @@ Smart-Traffic-Monitoring-System/
 cp .env.example .env
 ```
 
-2. 至少修改以下敏感变量：
+2. 至少修改以下敏感变量和访问地址：
 
 ```env
+GATEWAY_PUBLIC_BASE=http://localhost:5173
+BACKEND_PUBLIC_HTTP_BASE=http://localhost:8000
+BACKEND_PUBLIC_WS_BASE=ws://localhost:8000
 POSTGRES_PASSWORD=change-me
 MYSQL_ROOT_PASSWORD=change-me
 MYSQL_PASSWORD=change-me
@@ -68,6 +81,7 @@ curl -I http://localhost:8000/api/v1/site-settings
 说明：
 - `frontend` 容器本身不直接暴露宿主机端口，推荐始终通过 `gateway` 访问。
 - `backend:8000` 在当前 Compose 中直接暴露，便于调试与联调；正式生产建议只保留内网访问。
+- 前端构建时会直接读取根 `.env` 中的 `BACKEND_PUBLIC_HTTP_BASE / BACKEND_PUBLIC_WS_BASE`。
 
 ### 方式二：本地分模块开发
 
@@ -122,16 +136,16 @@ python main.py --mode sim --port 8000 --no-browser
 
 | 文件 | 用途 | 何时生效 |
 |:-----|:-----|:---------|
-| `.env` | 根 `docker compose` 运行时变量 | `docker compose up/build` 时 |
+| `.env` | 根 `docker compose` 主配置，含前后端 IP / 地址 | `docker compose up/build` 时 |
 | `backend/.env.example` | 后端完整配置参考 | 本地运行 backend、或扩展 Compose 时 |
-| `frontend/.env.production` | 前端 `VITE_*` 构建变量 | `pnpm build` / Docker build 时 |
+| `frontend/.env.production` | 前端可选覆盖文件 | 单独构建 frontend 时 |
 | `frontend/.env.example` | 前端变量说明 | 仅模板 |
 | `edge/.env.example` | Edge 节点运行时变量参考 | 本地 / Docker / systemd 启动 edge 时 |
 
 重要说明：
 - `frontend` 的 `VITE_*` 是 build-time config（构建时注入），不是 runtime config（运行时注入）。
-- 如果修改了 `frontend/.env.production`，必须重新执行 `pnpm build` 或重新构建前端镜像。
-- 根 `.env` 只会影响 `docker-compose.yml` 里显式引用到的变量；额外 backend 变量需要用 `docker-compose.override.yml` 或自定义 Compose 文件注入。
+- 主站 Docker 一键启动时，frontend 默认从根 `.env` 的 `BACKEND_PUBLIC_HTTP_BASE / BACKEND_PUBLIC_WS_BASE` 取地址。
+- 如果修改了这些地址，必须重新执行 `docker compose build frontend gateway` 或重新构建前端镜像。
 
 ## 生产环境要点
 
@@ -150,17 +164,30 @@ gateway:80
 
 ### 前端推荐配置
 
-同源部署（推荐）：
-- 通过 `gateway` 同时提供前端页面、API 与 WebSocket。
-- `frontend/.env.production` 中把 `VITE_API_HTTP_BASE` 和 `VITE_API_WS_BASE` 留空。
-- 只需设置 `VITE_AMAP_KEY`。
-
-跨域部署：
+主站一键启动默认使用根 `.env` 中的公共地址变量：
 
 ```env
-VITE_API_HTTP_BASE=https://api.example.com
-VITE_API_WS_BASE=wss://api.example.com
-VITE_AMAP_KEY=your_amap_key
+GATEWAY_PUBLIC_BASE=http://192.168.1.10:5173
+BACKEND_PUBLIC_HTTP_BASE=http://192.168.1.11:8000
+BACKEND_PUBLIC_WS_BASE=ws://192.168.1.11:8000
+```
+
+这表示：
+- 浏览器访问入口是 `GATEWAY_PUBLIC_BASE`
+- 前端打包进去的 API / WS 地址分别来自 `BACKEND_PUBLIC_HTTP_BASE / BACKEND_PUBLIC_WS_BASE`
+- backend 会默认把 `APP_CORS_ALLOWED_ORIGINS` 对齐到 `GATEWAY_PUBLIC_BASE`
+- backend 会默认把 `BASE_URL_API` 对齐到 `BACKEND_PUBLIC_HTTP_BASE`
+
+如果你单独构建 frontend，而不是走根 Compose，才需要维护 `frontend/.env.production`。
+
+### IP 部署示例
+
+前后端分开 IP：
+
+```env
+GATEWAY_PUBLIC_BASE=http://192.168.1.10:5173
+BACKEND_PUBLIC_HTTP_BASE=http://192.168.1.11:8000
+BACKEND_PUBLIC_WS_BASE=ws://192.168.1.11:8000
 ```
 
 ### 后端推荐配置
@@ -173,8 +200,11 @@ VITE_AMAP_KEY=your_amap_key
 - `APP_MAAS_DEFAULT_API_KEY`
 
 注意：
-- 这些变量默认并没有全部透传到根 `docker-compose.yml` 的 `backend` 容器。
-- 如果你使用根 Compose 做生产部署，请参考 [`docs/deploy/production.md`](docs/deploy/production.md) 中的 `docker-compose.override.yml` 示例。
+- 这些常见生产变量现在可以直接通过根 `.env` 透传到 `backend` 容器。
+- 如果你不显式设置，Compose 会自动使用：
+  - `APP_CORS_ALLOWED_ORIGINS = GATEWAY_PUBLIC_BASE`
+  - `BASE_URL_API = BACKEND_PUBLIC_HTTP_BASE`
+- 如需更细的环境差异化覆盖，再考虑 `docker-compose.override.yml`。
 
 ### Edge 推荐配置
 
@@ -182,7 +212,7 @@ VITE_AMAP_KEY=your_amap_key
 - `MODE=camera`
 - 显式设置 `CAMERA_URL`
 - 设置 `EDGE_NODE_ID`
-- 配置 `BACKEND_TELEMETRY_URL`
+- 配置 `BACKEND_TELEMETRY_URL=http://<backend-ip>:8000/api/v1/edge/telemetry`
 - 配置 `EDGE_API_KEY`
 - 无头环境设置 `NO_BROWSER=true`
 
@@ -190,6 +220,8 @@ VITE_AMAP_KEY=your_amap_key
 
 ```bash
 docker compose ps
+docker compose build frontend gateway backend
+docker compose up -d
 curl -I http://localhost:5173/
 curl -I http://localhost:5173/react/
 curl http://localhost:8000/api/v1/site-settings
@@ -221,6 +253,24 @@ INIT_ADMIN_PASSWORD=Admin@12345
 注意：
 - 仅在系统内还没有用户时生效。
 - 密码需要满足复杂度要求，建议启动成功后再关闭 `INIT_ADMIN`。
+
+## 修改 IP 后如何重建
+
+当你修改了根 `.env` 中的这些地址：
+- `GATEWAY_PUBLIC_BASE`
+- `BACKEND_PUBLIC_HTTP_BASE`
+- `BACKEND_PUBLIC_WS_BASE`
+
+请执行：
+
+```bash
+docker compose build frontend gateway backend
+docker compose up -d
+```
+
+原因：
+- backend 读取的是 runtime 变量
+- frontend 读取的是 build-time 变量，需要重新 build 才会进入最终 `dist/`
 
 ## 模块文档
 

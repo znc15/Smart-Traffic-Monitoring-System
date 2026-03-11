@@ -13,6 +13,9 @@ cp .env.example .env
 至少设置：
 
 ```env
+GATEWAY_PUBLIC_BASE=http://localhost:5173
+BACKEND_PUBLIC_HTTP_BASE=http://localhost:8000
+BACKEND_PUBLIC_WS_BASE=ws://localhost:8000
 POSTGRES_PASSWORD=change-me
 MYSQL_ROOT_PASSWORD=change-me
 MYSQL_PASSWORD=change-me
@@ -21,8 +24,11 @@ MAAS_API_KEY=replace-with-your-api-key
 ```
 
 说明：
-- 根 `.env` 只影响 Compose 运行时变量。
-- `frontend` 的 `VITE_*` 不走根 `.env`，如需生产构建变量请单独准备 `frontend/.env.production`。
+- 根 `.env` 现在同时影响：
+  - backend 运行时变量
+  - frontend 构建时的 API / WS 地址
+- 主站 Docker 一键启动范围只包含 `gateway/frontend/backend/database/mysql/redis`
+- `edge` 继续独立部署
 
 ## 2. 构建并启动
 
@@ -58,20 +64,27 @@ curl "http://localhost:8000/api/v1/traffic/predictions?road_name=陈兴道路&ho
 
 ## 5. frontend 生产变量说明
 
-如果你需要用 Compose 构建一个更接近生产的 frontend：
-
-1. 在 `frontend/` 目录创建或更新 `.env.production`
-2. 然后重新构建 frontend / gateway
-
-示例：
+如果你需要前后端分开 IP：
 
 ```env
-VITE_API_HTTP_BASE=
-VITE_API_WS_BASE=
-VITE_AMAP_KEY=your_amap_key
+GATEWAY_PUBLIC_BASE=http://192.168.1.10:5173
+BACKEND_PUBLIC_HTTP_BASE=http://192.168.1.11:8000
+BACKEND_PUBLIC_WS_BASE=ws://192.168.1.11:8000
 ```
 
-同源部署时推荐把 `VITE_API_HTTP_BASE` / `VITE_API_WS_BASE` 留空。
+改完地址后执行：
+
+```bash
+docker compose build frontend gateway backend
+docker compose up -d
+```
+
+说明：
+- frontend 会在 Docker build 时把 `BACKEND_PUBLIC_HTTP_BASE / BACKEND_PUBLIC_WS_BASE` 写进最终产物
+- backend 会默认把：
+  - `APP_CORS_ALLOWED_ORIGINS` 对齐到 `GATEWAY_PUBLIC_BASE`
+  - `BASE_URL_API` 对齐到 `BACKEND_PUBLIC_HTTP_BASE`
+- 如需单独构建 frontend，才考虑 `frontend/.env.production`
 
 ## 6. 数据库灰度切换
 

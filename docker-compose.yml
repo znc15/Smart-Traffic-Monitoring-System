@@ -64,14 +64,23 @@ services:
     ports:
       - "8000:8000"
     environment:
+      SERVER_PORT: ${SERVER_PORT:-8000}
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://database:5432/transportation_system}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-${POSTGRES_PASSWORD:-odoo}}
       SPRING_FLYWAY_LOCATIONS: ${SPRING_FLYWAY_LOCATIONS:-classpath:db/migration}
       JWT_SECRET: ${JWT_SECRET:-change-this-dev-secret-change-this-dev-secret}
-      ACCESS_TOKEN_EXPIRE_DAYS: 7
-      BASE_URL_API: http://localhost:8000
-      APP_MAAS_DEFAULT_CLIENT_NAME: default-dev-client
+      ACCESS_TOKEN_EXPIRE_DAYS: ${ACCESS_TOKEN_EXPIRE_DAYS:-7}
+      APP_ENV: ${APP_ENV:-development}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-${GATEWAY_PUBLIC_BASE:-http://localhost:5173}}
+      APP_WS_ALLOW_QUERY_TOKEN: ${APP_WS_ALLOW_QUERY_TOKEN:-true}
+      BASE_URL_API: ${BASE_URL_API:-${BACKEND_PUBLIC_HTTP_BASE:-http://localhost:8000}}
+      TRAFFIC_ROADS: ${TRAFFIC_ROADS:-陈兴道路,陈富路,阮惠路,黎利路,阮廌路}
+      INIT_ADMIN: ${INIT_ADMIN:-false}
+      INIT_ADMIN_USERNAME: ${INIT_ADMIN_USERNAME:-}
+      INIT_ADMIN_EMAIL: ${INIT_ADMIN_EMAIL:-}
+      INIT_ADMIN_PASSWORD: ${INIT_ADMIN_PASSWORD:-}
+      APP_MAAS_DEFAULT_CLIENT_NAME: ${APP_MAAS_DEFAULT_CLIENT_NAME:-default-dev-client}
       APP_MAAS_DEFAULT_API_KEY: ${MAAS_API_KEY:-dev-maas-key-change-me}
       APP_DB_PRIMARY: ${APP_DB_PRIMARY:-postgres}
       APP_DB_MIRROR_WRITE: ${APP_DB_MIRROR_WRITE:-false}
@@ -109,6 +118,9 @@ services:
       args:
         NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-docker.m.daocloud.io/library/node:20.19.0-alpine}
         NGINX_BASE_IMAGE: ${NGINX_BASE_IMAGE:-docker.m.daocloud.io/library/nginx:1.27-alpine}
+        VITE_API_HTTP_BASE: ${BACKEND_PUBLIC_HTTP_BASE:-}
+        VITE_API_WS_BASE: ${BACKEND_PUBLIC_WS_BASE:-}
+        VITE_AMAP_KEY: ${VITE_AMAP_KEY:-}
     container_name: frontend
     depends_on:
       backend:

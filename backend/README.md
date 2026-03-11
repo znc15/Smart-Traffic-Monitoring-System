@@ -170,7 +170,18 @@ docker run -p 8000:8000 smart-traffic-backend
 
 如果你通过仓库根 `docker-compose.yml` 部署 backend：
 - `JWT_SECRET` 和数据库密码可直接走根 `.env`
-- `APP_ENV`、`APP_CORS_ALLOWED_ORIGINS`、`INIT_ADMIN_*` 这类额外变量建议通过 `docker-compose.override.yml` 注入
+- `APP_ENV`、`APP_CORS_ALLOWED_ORIGINS`、`BASE_URL_API`、`INIT_ADMIN_*`、`TRAFFIC_ROADS` 现在也可以直接走根 `.env`
+
+IP 部署示例：
+
+```env
+GATEWAY_PUBLIC_BASE=http://192.168.1.10:5173
+BACKEND_PUBLIC_HTTP_BASE=http://192.168.1.11:8000
+```
+
+默认情况下，根 Compose 会自动使用：
+- `APP_CORS_ALLOWED_ORIGINS = GATEWAY_PUBLIC_BASE`
+- `BASE_URL_API = BACKEND_PUBLIC_HTTP_BASE`
 
 健康检查可直接使用：
 

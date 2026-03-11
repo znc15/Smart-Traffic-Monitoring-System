@@ -27,14 +27,14 @@ docs/
 
 | 文件 | 作用 |
 |------|------|
-| [`../.env.example`](../.env.example) | 根 `docker compose` 运行时变量 |
+| [`../.env.example`](../.env.example) | 主站 Docker 一键启动主配置，含前后端公共地址 |
 | [`../backend/.env.example`](../backend/.env.example) | backend 完整配置参考 |
 | [`../frontend/.env.example`](../frontend/.env.example) | frontend 构建变量说明 |
-| `frontend/.env.production` | frontend 生产构建变量，需自行创建 |
+| `frontend/.env.production` | frontend 可选覆盖文件，单独构建时使用 |
 | [`../edge/.env.example`](../edge/.env.example) | edge 节点运行时变量 |
 
 说明：
-- 根 `.env` 只影响 `docker-compose.yml` 中显式使用的变量。
+- 根 `.env` 现在同时驱动 backend runtime 与 frontend build-time 的公共地址变量。
 - `frontend` 的 `VITE_*` 是 build-time config，修改后必须重新构建。
 
 ## deploy

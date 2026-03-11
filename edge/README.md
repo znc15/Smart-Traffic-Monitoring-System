@@ -58,6 +58,10 @@ python main.py --mode camera --url "rtsp://admin:pass@192.168.1.100/stream" --ro
 docker compose up -d
 ```
 
+说明：
+- `edge` 不在主站根 `docker-compose.yml` 的一键启动范围内
+- 主站和 edge 仍然分开部署
+
 ## 常用接口
 
 | 方法 | 路径 | 说明 |
@@ -202,7 +206,7 @@ CAMERA_URL=rtsp://user:pass@camera/stream
 ROAD_NAME=人民路
 EDGE_NODE_ID=edge-01
 EDGE_API_KEY=replace-me
-BACKEND_TELEMETRY_URL=https://traffic.example.com/api/v1/edge/telemetry
+BACKEND_TELEMETRY_URL=http://192.168.1.11:8000/api/v1/edge/telemetry
 NO_BROWSER=true
 ```
 

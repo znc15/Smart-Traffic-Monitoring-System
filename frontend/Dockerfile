@@ -2,8 +2,19 @@ ARG NODE_VERSION=20.19.0
 ARG PNPM_VERSION=9.14.4
 ARG NODE_BASE_IMAGE=docker.m.daocloud.io/library/node:${NODE_VERSION}-alpine
 ARG NGINX_BASE_IMAGE=docker.m.daocloud.io/library/nginx:1.27-alpine
+ARG VITE_API_HTTP_BASE
+ARG VITE_API_WS_BASE
+ARG VITE_AMAP_KEY
 
 FROM ${NODE_BASE_IMAGE} AS builder
+
+ARG VITE_API_HTTP_BASE
+ARG VITE_API_WS_BASE
+ARG VITE_AMAP_KEY
+
+ENV VITE_API_HTTP_BASE=${VITE_API_HTTP_BASE}
+ENV VITE_API_WS_BASE=${VITE_API_WS_BASE}
+ENV VITE_AMAP_KEY=${VITE_AMAP_KEY}
 
 RUN npm config set registry https://registry.npmmirror.com \
     && npm install -g pnpm@${PNPM_VERSION}
