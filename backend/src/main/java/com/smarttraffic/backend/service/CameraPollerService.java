@@ -1,6 +1,11 @@
 package com.smarttraffic.backend.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarttraffic.backend.model.CameraEntity;
+import com.smarttraffic.backend.model.TrafficEventEntity;
+import com.smarttraffic.backend.repository.TrafficEventRepository;
+import com.smarttraffic.backend.service.analytics.MirrorWriteService;
 import com.smarttraffic.backend.repository.CameraRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +20,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
 import java.net.SocketTimeoutException;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,17 +38,30 @@ public class CameraPollerService {
     private static final String REASON_FRAME_FETCH_FAILED = "frame_fetch_failed";
     private static final String STAGE_TRAFFIC = "traffic";
     private static final String STAGE_FRAME = "frame";
+    private static final String EVENT_NODE_HEALTH_STATUS_CHANGED = "node_health_status_changed";
 
     // 每个摄像头节点的健康状态
     private final ConcurrentHashMap<String, NodeHealth> nodeHealthMap = new ConcurrentHashMap<>();
 
     private final CameraRepository cameraRepository;
     private final TrafficService trafficService;
+    private final TrafficEventRepository trafficEventRepository;
+    private final ObjectMapper objectMapper;
+    private final MirrorWriteService mirrorWriteService;
     private final RestClient restClient;
 
-    public CameraPollerService(CameraRepository cameraRepository, TrafficService trafficService) {
+    public CameraPollerService(
+            CameraRepository cameraRepository,
+            TrafficService trafficService,
+            TrafficEventRepository trafficEventRepository,
+            ObjectMapper objectMapper,
+            MirrorWriteService mirrorWriteService
+    ) {
         this.cameraRepository = cameraRepository;
         this.trafficService = trafficService;
+        this.trafficEventRepository = trafficEventRepository;
+        this.objectMapper = objectMapper;
+        this.mirrorWriteService = mirrorWriteService;
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(2000);
         factory.setReadTimeout(2000);
@@ -64,6 +83,11 @@ public class CameraPollerService {
             health.nodeUrl = trimToNull(nodeUrl);
             health.lastPollTime = Instant.now();
             String previousHealthStatus = health.healthStatus;
+            String previousReasonCode = health.statusReasonCode;
+            String previousReasonMessage = health.statusReasonMessage;
+            String previousLastErrorStage = health.lastErrorStage;
+            String previousLastError = health.lastError;
+            boolean previouslyObserved = health.observed;
 
             long start = System.nanoTime();
             try {
@@ -91,6 +115,16 @@ public class CameraPollerService {
                 }
                 log.debug("轮询摄像头 {} 失败: {}", roadKey, failure.lastError());
             }
+
+            recordHealthStatusTransition(
+                    health,
+                    previouslyObserved,
+                    previousHealthStatus,
+                    previousReasonCode,
+                    previousReasonMessage,
+                    previousLastErrorStage,
+                    previousLastError
+            );
         }
     }
 
@@ -243,6 +277,65 @@ public class CameraPollerService {
         return ex.getClass().getSimpleName();
     }
 
+    private void recordHealthStatusTransition(
+            NodeHealth health,
+            boolean previouslyObserved,
+            String previousHealthStatus,
+            String previousReasonCode,
+            String previousReasonMessage,
+            String previousLastErrorStage,
+            String previousLastError
+    ) {
+        boolean healthChanged = !previousHealthStatus.equals(health.healthStatus);
+        health.observed = true;
+        if (!previouslyObserved || !healthChanged) {
+            return;
+        }
+
+        TrafficEventEntity event = new TrafficEventEntity();
+        event.setNodeId(health.edgeNodeId);
+        event.setRoadName(health.roadName);
+        event.setEventType(EVENT_NODE_HEALTH_STATUS_CHANGED);
+        event.setLevel(mapHealthStatusLevel(health.healthStatus));
+        event.setStartAt(LocalDateTime.now());
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("from_health_status", previousHealthStatus);
+        payload.put("to_health_status", health.healthStatus);
+        payload.put("online", health.online);
+        payload.put("previous_reason_code", previousReasonCode);
+        payload.put("previous_reason_message", previousReasonMessage);
+        payload.put("previous_last_error_stage", previousLastErrorStage);
+        payload.put("previous_last_error", previousLastError);
+        payload.put("reason_code", health.statusReasonCode);
+        payload.put("reason_message", health.statusReasonMessage);
+        payload.put("last_error_stage", health.lastErrorStage);
+        payload.put("last_error", health.lastError);
+        event.setPayloadJson(toJson(payload));
+
+        try {
+            trafficEventRepository.save(event);
+            mirrorWriteService.mirrorTrafficEvent(event);
+        } catch (Exception ex) {
+            log.warn("节点状态变化事件写入失败: {}", ex.getMessage());
+        }
+    }
+
+    private static String mapHealthStatusLevel(String healthStatus) {
+        return switch (healthStatus) {
+            case HEALTH_OFFLINE -> "error";
+            case HEALTH_DEGRADED -> "warning";
+            default -> "info";
+        };
+    }
+
+    private String toJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException ex) {
+            return "{}";
+        }
+    }
+
     // 获取所有摄像头节点的健康状态
     public Map<String, Map<String, Object>> getNodeHealthMap() {
         Map<String, Map<String, Object>> result = new LinkedHashMap<>();
@@ -291,6 +384,7 @@ public class CameraPollerService {
         volatile String edgeNodeId;
         volatile String nodeUrl;
         volatile boolean online;
+        volatile boolean observed;
         volatile String healthStatus = HEALTH_OFFLINE;
         volatile String statusReasonCode;
         volatile String statusReasonMessage;

@@ -6,6 +6,21 @@ const pick = <T>(obj: Record<string, unknown>, snake: string, camel: string, fal
   return fallback
 }
 
+function parseRecordPayload(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object') {
+    return value as Record<string, unknown>
+  }
+  if (typeof value === 'string' && value.trim()) {
+    try {
+      const parsed = JSON.parse(value)
+      return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {}
+    } catch {
+      return {}
+    }
+  }
+  return {}
+}
+
 export type TrafficInfo = {
   count_car: number
   count_motor: number
@@ -347,9 +362,13 @@ export function normalizeTrafficEvent(raw: unknown): TrafficEventItem {
     start_at: pick(obj, 'start_at', 'startAt', null) as string | null,
     end_at: pick(obj, 'end_at', 'endAt', null) as string | null,
     created_at: pick(obj, 'created_at', 'createdAt', null) as string | null,
-    payload:
-      obj.payload && typeof obj.payload === 'object'
-        ? (obj.payload as Record<string, unknown>)
-        : {},
+    payload: parseRecordPayload(
+      pick(
+        obj,
+        'payload_json',
+        'payloadJson',
+        obj.payload,
+      ),
+    ),
   }
 }

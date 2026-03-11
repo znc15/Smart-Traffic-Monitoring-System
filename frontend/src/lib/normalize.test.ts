@@ -3,6 +3,7 @@ import {
   normalizeAdminNodeHealth,
   normalizeMapOverviewPoint,
   normalizeNodeRuntimeConfig,
+  normalizeTrafficEvent,
   normalizeTrafficInfo,
 } from './normalize'
 
@@ -125,6 +126,27 @@ describe('lib/normalize', () => {
       consecutive_failures: 2,
       last_error: 'Read timed out',
       edge_metrics: { fps: 24.5 },
+    })
+  })
+
+  it('should parse traffic event payload_json for node health transitions', () => {
+    const event = normalizeTrafficEvent({
+      road_name: '人民路',
+      event_type: 'node_health_status_changed',
+      level: 'warning',
+      start_at: '2026-03-11T14:00:00',
+      payload_json: JSON.stringify({
+        from_health_status: 'offline',
+        to_health_status: 'degraded',
+        reason_code: 'frame_fetch_failed',
+      }),
+    })
+
+    expect(event.event_type).toBe('node_health_status_changed')
+    expect(event.payload).toEqual({
+      from_health_status: 'offline',
+      to_health_status: 'degraded',
+      reason_code: 'frame_fetch_failed',
     })
   })
 })

@@ -82,9 +82,54 @@
             </NGrid>
 
             <NCard title="节点状态" size="small" :bordered="false" style="margin-top: 16px">
+              <div class="node-toolbar">
+                <div class="node-toolbar__filters">
+                  <NButton
+                    size="small"
+                    :type="nodeHealthFilter === 'all' ? 'primary' : 'default'"
+                    @click="nodeHealthFilter = 'all'"
+                  >
+                    全部 {{ nodeHealthCounts.all }}
+                  </NButton>
+                  <NButton
+                    size="small"
+                    :type="nodeHealthFilter === 'issues' ? 'primary' : 'default'"
+                    @click="nodeHealthFilter = 'issues'"
+                  >
+                    异常 {{ nodeHealthCounts.issues }}
+                  </NButton>
+                  <NButton
+                    size="small"
+                    :type="nodeHealthFilter === 'degraded' ? 'warning' : 'default'"
+                    @click="nodeHealthFilter = 'degraded'"
+                  >
+                    降级 {{ nodeHealthCounts.degraded }}
+                  </NButton>
+                  <NButton
+                    size="small"
+                    :type="nodeHealthFilter === 'offline' ? 'error' : 'default'"
+                    @click="nodeHealthFilter = 'offline'"
+                  >
+                    离线 {{ nodeHealthCounts.offline }}
+                  </NButton>
+                  <NButton
+                    size="small"
+                    :type="nodeHealthFilter === 'online' ? 'success' : 'default'"
+                    @click="nodeHealthFilter = 'online'"
+                  >
+                    在线 {{ nodeHealthCounts.online }}
+                  </NButton>
+                </div>
+                <NSelect
+                  v-model:value="nodeSortKey"
+                  size="small"
+                  :options="nodeSortOptions"
+                  style="width: 200px"
+                />
+              </div>
               <NDataTable
                 :columns="nodeColumns"
-                :data="nodeList"
+                :data="displayedNodeList"
                 :bordered="false"
                 :single-line="false"
                 size="small"
@@ -188,6 +233,7 @@ import {
   NModal,
   NPopconfirm,
   NResult,
+  NSelect,
   NSpin,
   NStatistic,
   NSwitch,
@@ -205,20 +251,13 @@ import {
   normalizeAdminNodeHealth,
   normalizeCamera,
   normalizeSiteSettings,
+  normalizeTrafficEvent,
   type AdminNodeHealth,
   type AdminUser,
   type CameraItem,
   type SiteSettings,
+  type TrafficEventItem,
 } from '../lib/normalize'
-
-type AdminEventItem = {
-  id: number
-  road_name: string
-  event_type: string
-  level: string
-  start_at: string
-  payload: Record<string, unknown>
-}
 
 const message = useMessage()
 
@@ -231,9 +270,11 @@ const camerasLoading = ref(false)
 const settingsSaving = ref(false)
 const resources = ref<Record<string, unknown>>({})
 const nodes = ref<Record<string, unknown>>({})
-const eventLogs = ref<AdminEventItem[]>([])
+const eventLogs = ref<TrafficEventItem[]>([])
 const eventsLoading = ref(false)
 let monitorTimer: number | null = null
+const nodeHealthFilter = ref<'all' | 'issues' | 'degraded' | 'offline' | 'online'>('all')
+const nodeSortKey = ref<'severity' | 'last_success_desc' | 'latency_desc' | 'name'>('severity')
 
 const settings = reactive<SiteSettings>({
   site_name: '',
@@ -276,18 +317,58 @@ const ensureAdmin = async () => {
   if (role !== 0) throw new Error('仅管理员可访问')
 }
 
-const normalizeEvent = (raw: Record<string, unknown>): AdminEventItem => ({
-  id: Number(raw.id || 0),
-  road_name: String(raw.road_name || raw.roadName || ''),
-  event_type: String(raw.event_type || raw.eventType || ''),
-  level: String(raw.level || ''),
-  start_at: String(raw.start_at || raw.startAt || ''),
-  payload: (raw.payload && typeof raw.payload === 'object' ? raw.payload : {}) as Record<string, unknown>,
-})
-
 const formatDateTime = (value: string | null | undefined) => {
   if (!value) return '—'
   return new Date(value).toLocaleString('zh-CN')
+}
+
+const nodeSeverityRank: Record<AdminNodeHealth['health_status'], number> = {
+  offline: 0,
+  degraded: 1,
+  online: 2,
+}
+
+const healthLabelMap: Record<AdminNodeHealth['health_status'], string> = {
+  online: '在线',
+  degraded: '降级',
+  offline: '离线',
+}
+
+const nodeSortOptions = [
+  { label: '按严重度', value: 'severity' },
+  { label: '按最近成功时间', value: 'last_success_desc' },
+  { label: '按延迟高到低', value: 'latency_desc' },
+  { label: '按节点名称', value: 'name' },
+]
+
+const toTimestamp = (value: string | null | undefined) => {
+  if (!value) return 0
+  const timestamp = new Date(value).getTime()
+  return Number.isNaN(timestamp) ? 0 : timestamp
+}
+
+const summarizeNodeTransitionEvent = (event: TrafficEventItem) => {
+  const fromStatus = String(event.payload.from_health_status || '')
+  const toStatus = String(event.payload.to_health_status || '')
+  const reasonMessage = String(event.payload.reason_message || event.payload.status_reason_message || '')
+  const reasonCode = String(event.payload.reason_code || event.payload.status_reason_code || '')
+  const fromLabel =
+    fromStatus === 'online' || fromStatus === 'degraded' || fromStatus === 'offline'
+      ? healthLabelMap[fromStatus]
+      : fromStatus || '未知'
+  const toLabel =
+    toStatus === 'online' || toStatus === 'degraded' || toStatus === 'offline'
+      ? healthLabelMap[toStatus]
+      : toStatus || '未知'
+  const mappedReason =
+    reasonCode === 'auth_failed' ||
+    reasonCode === 'timeout' ||
+    reasonCode === 'traffic_fetch_failed' ||
+    reasonCode === 'frame_fetch_failed'
+      ? nodeReasonLabelMap[reasonCode]
+      : ''
+  const reasonLabel = reasonMessage || mappedReason
+  return `${fromLabel} -> ${toLabel}${reasonLabel ? ` · ${reasonLabel}` : ''}`
 }
 
 const fetchUsers = async () => {
@@ -334,7 +415,7 @@ const fetchEvents = async () => {
     const res = await authFetch(`${endpoints.adminEvents}?size=50`)
     if (!res.ok) throw new Error('获取事件日志失败')
     const data = await res.json()
-    eventLogs.value = (Array.isArray(data) ? data : data?.content ?? []).map(normalizeEvent)
+    eventLogs.value = (Array.isArray(data) ? data : data?.content ?? []).map(normalizeTrafficEvent)
   } finally {
     eventsLoading.value = false
   }
@@ -536,6 +617,60 @@ const nodeList = computed<AdminNodeHealth[]>(() => {
   )
 })
 
+const nodeHealthCounts = computed(() => {
+  const counts = {
+    all: nodeList.value.length,
+    issues: 0,
+    degraded: 0,
+    offline: 0,
+    online: 0,
+  }
+  nodeList.value.forEach((node) => {
+    counts[node.health_status] += 1
+    if (node.health_status !== 'online') {
+      counts.issues += 1
+    }
+  })
+  return counts
+})
+
+const displayedNodeList = computed<AdminNodeHealth[]>(() => {
+  const filtered = nodeList.value.filter((node) => {
+    if (nodeHealthFilter.value === 'all') return true
+    if (nodeHealthFilter.value === 'issues') return node.health_status !== 'online'
+    return node.health_status === nodeHealthFilter.value
+  })
+
+  const sorted = [...filtered]
+  sorted.sort((left, right) => {
+    if (nodeSortKey.value === 'name') {
+      return left.name.localeCompare(right.name, 'zh-CN')
+    }
+    if (nodeSortKey.value === 'latency_desc') {
+      return (right.latency_ms ?? -1) - (left.latency_ms ?? -1)
+    }
+    if (nodeSortKey.value === 'last_success_desc') {
+      return toTimestamp(right.last_success_time) - toTimestamp(left.last_success_time)
+    }
+
+    const severityDiff = nodeSeverityRank[left.health_status] - nodeSeverityRank[right.health_status]
+    if (severityDiff !== 0) {
+      return severityDiff
+    }
+    const failureDiff = right.consecutive_failures - left.consecutive_failures
+    if (failureDiff !== 0) {
+      return failureDiff
+    }
+    const latencyDiff = (right.latency_ms ?? -1) - (left.latency_ms ?? -1)
+    if (latencyDiff !== 0) {
+      return latencyDiff
+    }
+    return left.name.localeCompare(right.name, 'zh-CN')
+  })
+
+  return sorted
+})
+
 const nodeHealthLabelMap: Record<AdminNodeHealth['health_status'], string> = {
   online: '在线',
   degraded: '降级',
@@ -677,12 +812,27 @@ const nodeColumns: DataTableColumns<AdminNodeHealth> = [
   },
 ]
 
-const eventColumns: DataTableColumns<AdminEventItem> = [
+const eventColumns: DataTableColumns<TrafficEventItem> = [
   { title: '道路', key: 'road_name' },
   {
     title: '事件',
     key: 'event_type',
-    render: (row) => h(NTag, { type: row.event_type === 'wrong_way_suspected' ? 'error' : row.event_type === 'illegal_parking_suspected' ? 'warning' : 'info' }, { default: () => row.event_type }),
+    render: (row) => {
+      const isNodeHealthChange = row.event_type === 'node_health_status_changed'
+      const tagType = isNodeHealthChange
+        ? row.payload.to_health_status === 'offline'
+          ? 'error'
+          : row.payload.to_health_status === 'degraded'
+            ? 'warning'
+            : 'success'
+        : row.event_type === 'wrong_way_suspected'
+          ? 'error'
+          : row.event_type === 'illegal_parking_suspected'
+            ? 'warning'
+            : 'info'
+      const label = isNodeHealthChange ? '节点状态变更' : row.event_type
+      return h(NTag, { type: tagType }, { default: () => label })
+    },
   },
   { title: '级别', key: 'level' },
   {
@@ -694,6 +844,9 @@ const eventColumns: DataTableColumns<AdminEventItem> = [
     title: '摘要',
     key: 'payload',
     render: (row) => {
+      if (row.event_type === 'node_health_status_changed') {
+        return summarizeNodeTransitionEvent(row)
+      }
       const trackId = row.payload.track_id != null ? `track=${row.payload.track_id}` : ''
       const speed = row.payload.speed_kmh != null ? ` speed=${row.payload.speed_kmh}` : ''
       return `${trackId}${speed}`.trim() || '—'
@@ -732,6 +885,21 @@ onUnmounted(() => {
 
 .toolbar {
   margin-bottom: 12px;
+}
+
+.node-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.node-toolbar__filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .node-reason {
