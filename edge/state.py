@@ -34,6 +34,7 @@ class EdgeState:
 
         # 重启回调，由 main.py 在 lifespan 中注册，供 routes.py 调用
         self.restart_callback: Optional[Callable] = None
+        self.loop_state: str = "stopped"
 
     def stop(self) -> None:
         """设置停止事件，通知检测循环退出"""
@@ -127,6 +128,14 @@ class EdgeState:
             metrics["gpu_memory_percent"] = None
 
         return metrics
+
+    def set_loop_state(self, value: str) -> None:
+        with self._lock:
+            self.loop_state = value
+
+    def get_loop_state(self) -> str:
+        with self._lock:
+            return self.loop_state
 
 
 # 全局单例

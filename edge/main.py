@@ -16,6 +16,7 @@ import argparse
 import threading
 import webbrowser
 from contextlib import asynccontextmanager
+from typing import Callable
 
 import psutil
 from fastapi import FastAPI
@@ -25,11 +26,16 @@ import config
 from routes import router
 from loops import camera_loop, sim_loop
 from state import state
-from detector import reset_model
 from camera_discovery import interactive_select
 from resource_manager import init_resource_manager
 from telemetry_reporter import start_reporter_thread
 from tracking_engine import print_tracker_runtime_info
+
+try:
+    from detector import reset_model
+except Exception:  # pragma: no cover - 测试环境可用替身
+    def reset_model() -> None:
+        raise LoopRestartError("检测模块不可用，无法重置模型缓存")
 
 # ---------------------------------------------------------------------------
 # 模块级变量：当前检测循环线程引用，供 restart_loop 访问
@@ -38,6 +44,54 @@ _loop_thread: threading.Thread | None = None
 _reporter_thread: threading.Thread | None = None
 # 重启锁，防止并发重启导致竞态
 _restart_lock = threading.Lock()
+_RESTART_TIMEOUT_SEC = 5.0
+
+
+class LoopRestartError(RuntimeError):
+    """检测循环热重启失败。"""
+
+
+def _build_loop_target() -> tuple[Callable[[], None], str]:
+    if config.MODE == "camera":
+        return camera_loop, f"摄像头模式，视频源: {config.camera_source}，模型: {config.MODEL_NAME}"
+    return sim_loop, f"模拟模式，路段: {config.ROAD_NAME}"
+
+
+def _run_loop(loop_target) -> None:
+    current_thread = threading.current_thread()
+    state.set_loop_state("running")
+    try:
+        loop_target()
+    finally:
+        with _restart_lock:
+            global _loop_thread
+            if _loop_thread is current_thread:
+                _loop_thread = None
+            state.set_loop_state("stopped")
+
+
+def _create_loop_thread() -> threading.Thread:
+    loop_target, description = _build_loop_target()
+    print(f"[INFO] {description}")
+    return threading.Thread(
+        target=_run_loop,
+        args=(loop_target,),
+        daemon=True,
+        name=f"edge-loop-{config.MODE}",
+    )
+
+
+def _start_loop_locked(model_changed: bool = False) -> None:
+    global _loop_thread
+
+    if model_changed:
+        reset_model()
+
+    state.reset_stop()
+    state.clear_frame()
+    state.set_loop_state("starting")
+    _loop_thread = _create_loop_thread()
+    _loop_thread.start()
 
 
 # ---------------------------------------------------------------------------
@@ -50,37 +104,32 @@ def restart_loop(model_changed: bool = False) -> None:
     2. 如果模型变更，清除 detector 缓存
     3. 根据当前 config.MODE 启动新线程
     """
-    global _loop_thread
+    with _restart_lock:
+        current_thread = _loop_thread
+        if current_thread is None or not current_thread.is_alive():
+            print("[INFO] 未发现活动检测线程，直接启动新循环")
+            state.set_loop_state("stopped")
+            _start_loop_locked(model_changed=model_changed)
+            print("[INFO] 检测循环已启动")
+            return
+
+        print("[INFO] 正在重启检测循环...")
+        state.set_loop_state("stopping")
+        state.stop()
+
+    current_thread.join(timeout=_RESTART_TIMEOUT_SEC)
 
     with _restart_lock:
-        print("[INFO] 正在重启检测循环...")
+        if current_thread.is_alive():
+            # 保持原线程引用，不启动新线程；恢复 stop 标志，尽量保留旧循环继续运行。
+            state.reset_stop()
+            state.set_loop_state("running")
+            raise LoopRestartError(
+                f"旧检测线程未在 {_RESTART_TIMEOUT_SEC:.0f} 秒内退出，已取消本次重启"
+            )
 
-        # 1. 停止旧线程
-        state.stop()
-        if _loop_thread is not None and _loop_thread.is_alive():
-            _loop_thread.join(timeout=5.0)
-            if _loop_thread.is_alive():
-                print("[WARN] 旧检测线程未在 5 秒内退出，将强制启动新线程")
-
-        # 2. 清除停止事件，为新循环做准备
-        state.reset_stop()
-
-        # 2.5 清空旧帧缓存，避免模式切换时花屏
-        state.clear_frame()
-
-        # 3. 模型变更时清除缓存，强制重新加载
-        if model_changed:
-            reset_model()
-
-        # 4. 根据当前模式启动新线程
-        if config.MODE == "camera":
-            print(f"[INFO] 重启: 摄像头模式，视频源: {config.camera_source}，模型: {config.MODEL_NAME}")
-            _loop_thread = threading.Thread(target=camera_loop, daemon=True)
-        else:
-            print(f"[INFO] 重启: 模拟模式，路段: {config.ROAD_NAME}")
-            _loop_thread = threading.Thread(target=sim_loop, daemon=True)
-
-        _loop_thread.start()
+        state.set_loop_state("stopped")
+        _start_loop_locked(model_changed=model_changed)
         print("[INFO] 检测循环已重启")
 
 
@@ -133,13 +182,8 @@ async def lifespan(application: FastAPI):
     print(f"[INFO] Resource level: {level}")
     print_tracker_runtime_info()
 
-    if config.MODE == "camera":
-        print(f"[INFO] 摄像头模式，视频源: {config.camera_source}，模型: {config.MODEL_NAME}")
-        _loop_thread = threading.Thread(target=camera_loop, daemon=True)
-    else:
-        print(f"[INFO] 模拟模式，路段: {config.ROAD_NAME}")
-        _loop_thread = threading.Thread(target=sim_loop, daemon=True)
-    _loop_thread.start()
+    with _restart_lock:
+        _start_loop_locked()
     _reporter_thread = start_reporter_thread()
 
     # 注册重启回调到 state，供 routes.py 调用（避免循环导入）
@@ -162,10 +206,12 @@ async def lifespan(application: FastAPI):
 
     # 应用关闭时，停止检测循环
     state.stop()
+    state.set_loop_state("stopping")
     if _loop_thread is not None and _loop_thread.is_alive():
-        _loop_thread.join(timeout=5.0)
+        _loop_thread.join(timeout=_RESTART_TIMEOUT_SEC)
     if _reporter_thread is not None and _reporter_thread.is_alive():
         _reporter_thread.join(timeout=2.0)
+    state.set_loop_state("stopped")
     print("[INFO] 应用关闭，检测循环已停止")
 
 

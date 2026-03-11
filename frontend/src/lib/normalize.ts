@@ -234,6 +234,96 @@ export function normalizeNodeRuntimeConfig(raw: unknown): NodeRuntimeConfig {
   }
 }
 
+export type NodeHealthStatus = 'online' | 'degraded' | 'offline'
+export type NodeStatusReasonCode =
+  | 'auth_failed'
+  | 'timeout'
+  | 'traffic_fetch_failed'
+  | 'frame_fetch_failed'
+  | null
+export type NodeErrorStage = 'traffic' | 'frame' | null
+
+export type AdminNodeHealth = {
+  camera_id: number
+  name: string
+  road_name: string
+  edge_node_id: string
+  node_url: string
+  online: boolean
+  health_status: NodeHealthStatus
+  status_reason_code: NodeStatusReasonCode
+  status_reason_message: string | null
+  last_error_stage: NodeErrorStage
+  last_success_time: string | null
+  last_poll_time: string | null
+  latency_ms: number | null
+  error_count: number
+  consecutive_failures: number
+  last_error: string | null
+  edge_metrics: Record<string, unknown> | null
+}
+
+export function normalizeAdminNodeHealth(raw: unknown): AdminNodeHealth {
+  const obj = (raw || {}) as Record<string, unknown>
+  const healthStatusRaw = String(
+    pick(obj, 'health_status', 'healthStatus', String(obj.online ? 'online' : 'offline')),
+  )
+  const normalizedHealthStatus: NodeHealthStatus =
+    healthStatusRaw === 'degraded' || healthStatusRaw === 'offline' ? healthStatusRaw : 'online'
+  const reasonCodeRaw = pick(
+    obj,
+    'status_reason_code',
+    'statusReasonCode',
+    null as unknown,
+  )
+  const normalizedReasonCode: NodeStatusReasonCode =
+    reasonCodeRaw === 'auth_failed' ||
+    reasonCodeRaw === 'timeout' ||
+    reasonCodeRaw === 'traffic_fetch_failed' ||
+    reasonCodeRaw === 'frame_fetch_failed'
+      ? reasonCodeRaw
+      : null
+  const errorStageRaw = pick(obj, 'last_error_stage', 'lastErrorStage', null as unknown)
+  const normalizedErrorStage: NodeErrorStage =
+    errorStageRaw === 'traffic' || errorStageRaw === 'frame' ? errorStageRaw : null
+
+  return {
+    camera_id: Number(pick(obj, 'camera_id', 'cameraId', 0)),
+    name: String(obj.name || ''),
+    road_name: String(pick(obj, 'road_name', 'roadName', '')),
+    edge_node_id: String(pick(obj, 'edge_node_id', 'edgeNodeId', '')),
+    node_url: String(pick(obj, 'node_url', 'nodeUrl', '')),
+    online: Boolean(obj.online),
+    health_status: normalizedHealthStatus,
+    status_reason_code: normalizedReasonCode,
+    status_reason_message:
+      pick(obj, 'status_reason_message', 'statusReasonMessage', null) == null
+        ? null
+        : String(pick(obj, 'status_reason_message', 'statusReasonMessage', '')),
+    last_error_stage: normalizedErrorStage,
+    last_success_time: pick(obj, 'last_success_time', 'lastSuccessTime', null) as string | null,
+    last_poll_time: pick(obj, 'last_poll_time', 'lastPollTime', null) as string | null,
+    latency_ms:
+      pick(obj, 'latency_ms', 'latencyMs', null) == null
+        ? null
+        : Number(pick(obj, 'latency_ms', 'latencyMs', 0)),
+    error_count: Number(pick(obj, 'error_count', 'errorCount', 0)),
+    consecutive_failures: Number(
+      pick(obj, 'consecutive_failures', 'consecutiveFailures', 0),
+    ),
+    last_error:
+      pick(obj, 'last_error', 'lastError', null) == null
+        ? null
+        : String(pick(obj, 'last_error', 'lastError', '')),
+    edge_metrics:
+      obj.edge_metrics && typeof obj.edge_metrics === 'object'
+        ? (obj.edge_metrics as Record<string, unknown>)
+        : obj.edgeMetrics && typeof obj.edgeMetrics === 'object'
+          ? (obj.edgeMetrics as Record<string, unknown>)
+          : null,
+  }
+}
+
 export type TrafficEventItem = {
   id: number
   road_name: string

@@ -483,6 +483,28 @@
           </div>
         </div>
 
+        <div class="settings-card">
+          <h4>节点访问鉴权</h4>
+          <div>
+            <label class="form-label">X-Edge-Key</label>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <input
+                type="password"
+                id="edgeAccessKey"
+                class="form-input"
+                placeholder="留空表示节点未启用访问密钥"
+                style="flex:1; min-width:240px;"
+                autocomplete="off"
+              >
+              <button type="button" class="btn-test" onclick="saveEdgeAccessKey()">保存</button>
+              <button type="button" class="btn-test" onclick="clearEdgeAccessKey()">清空</button>
+            </div>
+            <div id="edgeAccessHint" class="text-xs text-slate-400 mt-2">
+              仅保存在当前浏览器 localStorage，用于为受保护接口自动附加 `X-Edge-Key`。
+            </div>
+          </div>
+        </div>
+
         <!-- Performance Tuning card -->
         <div class="settings-card">
           <h4>性能调优 (Performance Tuning)</h4>
@@ -715,6 +737,9 @@
   let chartCarData = [];
   let chartMotorData = [];
   let trendChart = null;
+  const EDGE_KEY_STORAGE_KEY = 'edge_access_key';
+  let edgeAccessKey = '';
+  let edgeAuthWarningShown = false;
 
   // Resource mode state
   let currentResourceLevel = 'medium';
@@ -754,6 +779,118 @@
       clearTimeout(timer);
       timer = setTimeout(() => fn.apply(this, args), wait);
     };
+  }
+
+  /** 读取当前浏览器保存的 Edge Access Key */
+  function getEdgeAccessKey() {
+    return (edgeAccessKey || '').trim();
+  }
+
+  /** 根据当前 key / 节点状态刷新提示文案 */
+  function updateEdgeAccessHint(edgeKeyConfigured) {
+    const hint = $('edgeAccessHint');
+    if (!hint) return;
+    const localKey = getEdgeAccessKey();
+    if (edgeKeyConfigured === true) {
+      hint.textContent = localKey
+        ? '节点已启用访问密钥，当前浏览器会自动附加 X-Edge-Key。'
+        : '节点已启用访问密钥，请输入后保存，否则配置与监控接口会返回 401。';
+      return;
+    }
+    if (localKey) {
+      hint.textContent = '当前浏览器已保存 X-Edge-Key；如果节点未启用密钥，可直接清空。';
+      return;
+    }
+    hint.textContent = '仅保存在当前浏览器 localStorage，用于为受保护接口自动附加 X-Edge-Key。';
+  }
+
+  /** 将内存中的 key 同步到输入框 */
+  function syncEdgeAccessKeyUi() {
+    const input = $('edgeAccessKey');
+    if (input) input.value = getEdgeAccessKey();
+    updateEdgeAccessHint(currentConfig ? !!currentConfig.edge_api_key_configured : null);
+  }
+
+  /** 设置并可选持久化 Edge Access Key */
+  function setEdgeAccessKey(value, options) {
+    const opts = options || {};
+    edgeAccessKey = String(value || '').trim();
+    edgeAuthWarningShown = false;
+    if (opts.persist !== false) {
+      if (edgeAccessKey) {
+        localStorage.setItem(EDGE_KEY_STORAGE_KEY, edgeAccessKey);
+      } else {
+        localStorage.removeItem(EDGE_KEY_STORAGE_KEY);
+      }
+    }
+    syncEdgeAccessKeyUi();
+    if (opts.notify) {
+      showToast(edgeAccessKey ? 'X-Edge-Key 已保存' : 'X-Edge-Key 已清空', 'success');
+    }
+  }
+
+  /** 从 localStorage 读取 key */
+  function loadEdgeAccessKey() {
+    setEdgeAccessKey(localStorage.getItem(EDGE_KEY_STORAGE_KEY) || '', { persist: false });
+  }
+
+  /** 手动保存设置页中的 key */
+  function saveEdgeAccessKey() {
+    const input = $('edgeAccessKey');
+    setEdgeAccessKey(input ? input.value : '', { notify: true });
+    if (currentTab === 'settings') {
+      settingsLoaded = false;
+      loadSettingsData();
+    }
+  }
+
+  /** 清空当前浏览器保存的 key */
+  function clearEdgeAccessKey() {
+    setEdgeAccessKey('', { notify: true });
+  }
+
+  /** 构建自动附带 X-Edge-Key 的请求头 */
+  function withEdgeKeyHeaders(headers) {
+    const merged = new Headers(headers || {});
+    const key = getEdgeAccessKey();
+    if (key && !merged.has('X-Edge-Key')) {
+      merged.set('X-Edge-Key', key);
+    }
+    return merged;
+  }
+
+  /** 统一 API 请求封装：自动附带 X-Edge-Key 并处理 401 提示 */
+  async function apiFetch(url, init) {
+    const options = Object.assign({}, init || {});
+    options.headers = withEdgeKeyHeaders(options.headers);
+    const resp = await fetch(url, options);
+    if (resp.status === 401 && !edgeAuthWarningShown) {
+      edgeAuthWarningShown = true;
+      showToast(
+        getEdgeAccessKey()
+          ? 'X-Edge-Key 无效或已变更，请在设置页更新后重试'
+          : '节点已启用访问密钥，请在设置页填写 X-Edge-Key',
+        'error'
+      );
+    }
+    return resp;
+  }
+
+  /** 为 <img>/<video>/<a> 等不能带自定义 header 的请求补充 query 鉴权参数 */
+  function appendEdgeAccessParams(url) {
+    if (!url) return '';
+    const target = new URL(url, window.location.origin);
+    const key = getEdgeAccessKey();
+    if (key) {
+      target.searchParams.set('edge_key', key);
+    }
+    const nodeId = currentConfig && currentConfig.edge_node_id
+      ? String(currentConfig.edge_node_id).trim()
+      : '';
+    if (nodeId) {
+      target.searchParams.set('edge_node_id', nodeId);
+    }
+    return target.toString();
   }
 
   /** 更新进度条 */
@@ -835,7 +972,7 @@
         // MJPEG 回退：用 <img> 标签显示（浏览器原生支持 MJPEG）
         this.video.style.display = 'none';
         this.fallbackImg.style.display = 'block';
-        this.fallbackImg.src = '/api/stream?t=' + Date.now();
+        this.fallbackImg.src = appendEdgeAccessParams('/api/stream?t=' + Date.now());
         $('streamPlaceholder').style.display = 'none';
 
         this.fallbackImg.onload = () => { this.failCount = 0; };
@@ -848,7 +985,7 @@
       this.video.style.display = 'block';
       $('streamPlaceholder').style.display = 'none';
 
-      this.video.src = '/api/video?t=' + Date.now();
+      this.video.src = appendEdgeAccessParams('/api/video?t=' + Date.now());
 
       this.video.onloadeddata = () => {
         this.failCount = 0;
@@ -974,7 +1111,7 @@
   // ========== 数据轮询 ==========
   async function fetchTrafficData() {
     try {
-      const resp = await fetch('/api/traffic');
+      const resp = await apiFetch('/api/traffic');
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const data = await resp.json();
       const m = data.edge_metrics || {};
@@ -1058,9 +1195,9 @@
   async function loadSettingsData() {
     try {
       const [configResp, modelsResp, resResp] = await Promise.all([
-        fetch('/api/config'),
-        fetch('/api/models'),
-        fetch('/api/resource-mode')
+        apiFetch('/api/config'),
+        apiFetch('/api/models'),
+        apiFetch('/api/resource-mode')
       ]);
       if (!configResp.ok) throw new Error('获取配置失败');
       if (!modelsResp.ok) throw new Error('获取模型列表失败');
@@ -1070,6 +1207,7 @@
 
       currentConfig = config;
       settingsLoaded = true;
+      updateEdgeAccessHint(!!config.edge_api_key_configured);
 
       // 填充模型下拉框
       populateModels(modelsData.models || [], modelsData.current || config.model);
@@ -1199,7 +1337,7 @@
     }
 
     try {
-      const resp = await fetch('/api/config', {
+      const resp = await apiFetch('/api/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -1290,7 +1428,7 @@
     btn.innerHTML = '<span class="spinner"></span> 切换中...';
 
     try {
-      const resp = await fetch('/api/config', {
+      const resp = await apiFetch('/api/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -1415,7 +1553,7 @@
     btn.innerHTML = '<span class="spinner" style="width:12px;height:12px;border-width:1.5px;"></span> 扫描中...';
 
     try {
-      const resp = await fetch('/api/cameras');
+      const resp = await apiFetch('/api/cameras');
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const data = await resp.json();
       const cameras = data.cameras || [];
@@ -1494,7 +1632,7 @@
     resultEl.style.display = 'none';
 
     try {
-      const resp = await fetch('/api/cameras/probe', {
+      const resp = await apiFetch('/api/cameras/probe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: url })
@@ -1536,7 +1674,7 @@
     resultEl.style.display = 'none';
 
     try {
-      const resp = await fetch('/api/cameras/preview?source=' + encodeURIComponent(source));
+      const resp = await apiFetch('/api/cameras/preview?source=' + encodeURIComponent(source));
       if (!resp.ok) {
         const err = await resp.json();
         throw new Error(err.detail || 'HTTP ' + resp.status);
@@ -1629,7 +1767,7 @@
       const formData = new FormData();
       formData.append('file', file);
 
-      const resp = await fetch('/api/detect/image', { method: 'POST', body: formData });
+      const resp = await apiFetch('/api/detect/image', { method: 'POST', body: formData });
       if (!resp.ok) {
         const errData = await resp.json().catch(() => ({}));
         throw new Error(errData.detail || errData.error || 'HTTP ' + resp.status);
@@ -1709,7 +1847,7 @@
       const formData = new FormData();
       formData.append('file', file);
 
-      const resp = await fetch('/api/detect/video', { method: 'POST', body: formData });
+      const resp = await apiFetch('/api/detect/video', { method: 'POST', body: formData });
       if (!resp.ok) {
         const errData = await resp.json().catch(() => ({}));
         throw new Error(errData.detail || errData.error || 'HTTP ' + resp.status);
@@ -1731,7 +1869,7 @@
       $('testDuration').textContent = (s.duration_s || 0).toFixed(1);
 
       // 设置视频播放器和下载链接
-      const videoUrl = data.video_url || '';
+      const videoUrl = appendEdgeAccessParams(data.video_url || '');
       $('testVideoPlayer').src = videoUrl;
       $('testVideoDownload').href = videoUrl;
 
@@ -1891,7 +2029,7 @@
       $('testAvgInference').textContent = (s.avg_inference_ms || 0).toFixed(1);
       $('testDuration').textContent = (s.duration_s || 0).toFixed(1);
 
-      const videoUrl = r.data.video_url || '';
+      const videoUrl = appendEdgeAccessParams(r.data.video_url || '');
       $('testVideoPlayer').src = videoUrl;
       $('testVideoDownload').href = videoUrl;
     }
@@ -1905,7 +2043,7 @@
   /** Fetch /api/resource-mode and update all resource-related UI elements */
   async function fetchResourceMode() {
     try {
-      const resp = await fetch('/api/resource-mode');
+      const resp = await apiFetch('/api/resource-mode');
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const data = await resp.json();
       resourceParams = data;
@@ -1989,7 +2127,7 @@
     const payload = {};
     payload[key] = value;
     try {
-      const resp = await fetch('/api/config', {
+      const resp = await apiFetch('/api/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -2057,6 +2195,7 @@
 
   // ========== 启动 ==========
   document.addEventListener('DOMContentLoaded', function() {
+    loadEdgeAccessKey();
     initChart();
     fetchTrafficData();
     setInterval(fetchTrafficData, POLL_INTERVAL);
@@ -2072,6 +2211,15 @@
       }
     });
     initPerfTuningListeners();
+    const keyInput = $('edgeAccessKey');
+    if (keyInput) {
+      keyInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          saveEdgeAccessKey();
+        }
+      });
+    }
 
     // ===== 测试面板：拖拽和文件选择事件绑定 =====
     test_initDropZone();

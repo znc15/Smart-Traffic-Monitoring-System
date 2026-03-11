@@ -30,7 +30,7 @@
 
 ### 1. local-gate.sh — 本地门禁
 
-一键执行构建、单元测试、端到端联调检查，确保提交前代码质量达标。
+一键执行后端测试、Edge 测试、前端测试与前端构建，确保提交前代码质量达标。
 
 ```bash
 ./scripts/local-gate.sh
@@ -39,6 +39,11 @@
 适用于：
 - 提交代码前的自检
 - CI 本地预演，提前发现问题
+
+当前门禁顺序：
+1. `backend` — `mvn -B test`
+2. `edge` — `python3 -m py_compile *.py` + `pytest -q tests`
+3. `frontend` — `pnpm test` + `pnpm build`
 
 ---
 

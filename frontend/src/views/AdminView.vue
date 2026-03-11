@@ -202,8 +202,10 @@ import {
 import { authFetch, endpoints } from '../lib/api'
 import {
   normalizeAdminUser,
+  normalizeAdminNodeHealth,
   normalizeCamera,
   normalizeSiteSettings,
+  type AdminNodeHealth,
   type AdminUser,
   type CameraItem,
   type SiteSettings,
@@ -524,13 +526,46 @@ const resourceMetrics = computed(() => {
   }
 })
 
-const nodeList = computed(() => {
+const nodeList = computed<AdminNodeHealth[]>(() => {
   const nodeMap = ((nodes.value.nodes ?? nodes.value) || {}) as Record<string, unknown>
-  return Object.entries(nodeMap).map(([name, info]) => ({
-    name,
-    ...(typeof info === 'object' && info !== null ? (info as Record<string, unknown>) : {}),
-  }))
+  return Object.entries(nodeMap).map(([name, info]) =>
+    normalizeAdminNodeHealth({
+      name,
+      ...(typeof info === 'object' && info !== null ? (info as Record<string, unknown>) : {}),
+    }),
+  )
 })
+
+const nodeHealthLabelMap: Record<AdminNodeHealth['health_status'], string> = {
+  online: '在线',
+  degraded: '降级',
+  offline: '离线',
+}
+
+const nodeHealthTagTypeMap: Record<AdminNodeHealth['health_status'], 'success' | 'warning' | 'error'> = {
+  online: 'success',
+  degraded: 'warning',
+  offline: 'error',
+}
+
+const nodeReasonLabelMap: Record<Exclude<AdminNodeHealth['status_reason_code'], null>, string> = {
+  auth_failed: '鉴权失败',
+  timeout: '请求超时',
+  traffic_fetch_failed: '交通拉取失败',
+  frame_fetch_failed: '拉帧失败',
+}
+
+const nodeReasonTagTypeMap: Record<Exclude<AdminNodeHealth['status_reason_code'], null>, 'error' | 'warning'> = {
+  auth_failed: 'error',
+  timeout: 'warning',
+  traffic_fetch_failed: 'error',
+  frame_fetch_failed: 'warning',
+}
+
+const nodeStageLabelMap: Record<Exclude<AdminNodeHealth['last_error_stage'], null>, string> = {
+  traffic: 'traffic',
+  frame: 'frame',
+}
 
 const userColumns: DataTableColumns<AdminUser> = [
   { title: '用户名', key: 'username' },
@@ -586,29 +621,59 @@ const cameraColumns: DataTableColumns<CameraItem> = [
   },
 ]
 
-const nodeColumns: DataTableColumns = [
+const nodeColumns: DataTableColumns<AdminNodeHealth> = [
   { title: '节点', key: 'name' },
   { title: '道路', key: 'road_name' },
   { title: '节点 ID', key: 'edge_node_id' },
   {
-    title: '在线',
-    key: 'online',
-    render: (row: Record<string, unknown>) => h(NTag, { type: row.online ? 'success' : 'error' }, { default: () => (row.online ? '在线' : '离线') }),
+    title: '健康状态',
+    key: 'health_status',
+    render: (row) =>
+      h(
+        NTag,
+        { type: nodeHealthTagTypeMap[row.health_status] },
+        { default: () => nodeHealthLabelMap[row.health_status] },
+      ),
+  },
+  {
+    title: '原因',
+    key: 'status_reason_code',
+    width: 280,
+    render: (row) => {
+      if (!row.status_reason_code) {
+        return '—'
+      }
+      const label = nodeReasonLabelMap[row.status_reason_code]
+      const stageLabel = row.last_error_stage ? ` · ${nodeStageLabelMap[row.last_error_stage]}` : ''
+      const detail = row.last_error ? `${row.status_reason_message || label}\n${row.last_error}` : (row.status_reason_message || label)
+      return h('div', { class: 'node-reason', title: detail }, [
+        h(
+          NTag,
+          { size: 'small', type: nodeReasonTagTypeMap[row.status_reason_code] },
+          { default: () => `${label}${stageLabel}` },
+        ),
+        h('div', { class: 'node-reason__message' }, row.status_reason_message || label),
+        row.last_error
+          ? h('div', { class: 'node-reason__raw' }, row.last_error)
+          : null,
+      ])
+    },
   },
   {
     title: '延迟',
     key: 'latency_ms',
-    render: (row: Record<string, unknown>) => `${row.latency_ms ?? '—'} ms`,
+    render: (row) =>
+      row.health_status === 'offline' || row.latency_ms == null ? '—' : `${row.latency_ms} ms`,
   },
   {
     title: '最近成功',
     key: 'last_success_time',
-    render: (row: Record<string, unknown>) => formatDateTime(String(row.last_success_time || '')),
+    render: (row) => formatDateTime(row.last_success_time),
   },
   {
     title: '操作',
     key: 'actions',
-    render: (row: Record<string, unknown>) => h(NButton, { size: 'small', secondary: true, onClick: () => openNodeConfigModal(row) }, { default: () => '查看配置' }),
+    render: (row) => h(NButton, { size: 'small', secondary: true, onClick: () => openNodeConfigModal(row) }, { default: () => '查看配置' }),
   },
 ]
 
@@ -667,5 +732,27 @@ onUnmounted(() => {
 
 .toolbar {
   margin-bottom: 12px;
+}
+
+.node-reason {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.4;
+}
+
+.node-reason__message {
+  color: #334155;
+  font-size: 13px;
+}
+
+.node-reason__raw {
+  color: #64748b;
+  font-size: 12px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
 }
 </style>

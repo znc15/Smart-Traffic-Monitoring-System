@@ -112,6 +112,29 @@ edge/
 | `GET` | `/api/config` | 获取当前运行配置 |
 | `PUT` | `/api/config` | 更新配置（热更新，无需重启） |
 | `GET` | `/api/models` | 列出可用模型文件 |
+| `POST` | `/api/cameras/probe` | 测试 RTSP/视频流地址连通性（需要 Edge Key） |
+| `POST` | `/api/detect/image` | 上传图片检测（需要 Edge Key） |
+| `POST` | `/api/detect/video` | 上传视频检测（需要 Edge Key） |
+| `GET` | `/api/detect/video/result/{id}` | 下载标注视频（需要 Edge Key） |
+
+### 鉴权范围
+
+当 `EDGE_API_KEY` 已配置时，以下接口会统一要求携带 `X-Edge-Key`：
+
+- `/api/traffic`
+- `/api/frame`
+- `/api/stream`
+- `/api/video`
+- `/api/metrics`
+- `/api/config`
+- `/api/cameras/probe`
+- `/api/detect/image`
+- `/api/detect/video`
+- `/api/detect/video/result/{id}`
+
+说明：
+- `X-Edge-Node-Id` 可选；当节点配置了 `EDGE_NODE_ID` 时会一起校验。
+- `edge_key` / `edge_node_id` query 参数仅作为 `<img>`、`<video>`、下载链接等无法自定义 header 场景的兜底。
 
 **示例请求**：
 
@@ -124,11 +147,12 @@ curl http://localhost:9000/api/traffic
 
 # 热更新检测置信度
 curl -X PUT http://localhost:9000/api/config \
+  -H "X-Edge-Key: edge-secret" \
   -H "Content-Type: application/json" \
-  -d '{"conf": 0.4}'
+  -d '{"confidence": 0.4}'
 
 # 浏览器打开视频流
-open http://localhost:9000/api/stream
+open "http://localhost:9000/api/stream?edge_key=edge-secret"
 ```
 
 ---
@@ -165,6 +189,9 @@ source .venv/bin/activate    # Windows: .venv\Scripts\activate
 
 # 安装依赖
 pip install -r requirements.txt
+
+# 测试依赖（推荐本地开发使用）
+pip install -r requirements-dev.txt
 ```
 
 > 如需 OpenVINO 加速，确保已安装 `openvino >= 2024.0`，并设置 `OPENVINO=true`。
@@ -222,9 +249,18 @@ TRACKER_BACKEND=bytetrack TRACKER_STRICT=true python main.py --mode camera --url
 ## 测试
 
 ```bash
-# 语法检查
-python3 -m py_compile main.py
+# 安装测试依赖
+python3 -m pip install -r requirements-dev.txt
 
-# 运行测试用例
+# 运行 Edge 测试
 pytest -q tests/
 ```
+
+如果只需要跑接口 / 状态机相关测试，`requirements-dev.txt` 已刻意避免引入 `torch` / `ultralytics` / `openvino`；
+上传检测等接口在缺少完整推理依赖时会返回 `503`，但不会阻塞鉴权与配置测试。
+
+## 热更新说明
+
+- `frame_skip`、`jpeg_quality`、`telemetry_interval_sec`、交通规则参数会动态生效，不强制重启。
+- `mode`、`camera_source`、模型/推理后端相关参数会触发检测循环热重启。
+- 若旧检测线程在 5 秒内未退出，本次更新会返回失败并回滚配置，不会强行启动第二个检测线程。

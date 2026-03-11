@@ -34,10 +34,10 @@ def test_count_person_counts_person_class_only():
 
 def test_build_lane_stats_counts_only_roi_objects():
     objects = [
-        {"class": "car", "bbox": [70, 80, 90, 100]},     # outside ROI
-        {"class": "car", "bbox": [120, 80, 150, 110]},   # L1
+        {"class": "car", "bbox": [30, 80, 70, 100]},     # outside ROI
+        {"class": "car", "bbox": [90, 80, 120, 110]},    # L1
         {"class": "car", "bbox": [170, 90, 210, 120]},   # L2
-        {"class": "motor", "bbox": [250, 100, 290, 140]},  # L3
+        {"class": "motor", "bbox": [220, 100, 240, 140]},  # L3
     ]
     stats = build_lane_stats(objects, frame_width=300, frame_height=200)
     assert [s["lane_id"] for s in stats] == ["L1", "L2", "L3"]

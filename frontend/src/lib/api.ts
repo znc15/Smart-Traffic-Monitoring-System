@@ -1,12 +1,21 @@
 export const TOKEN_KEY = 'access_token'
-export const AMAP_KEY = String(import.meta.env.VITE_AMAP_KEY || '')
+
+type EnvLike = Record<string, string | undefined>
+
+function readEnv(): EnvLike {
+  return (((import.meta as ImportMeta & { env?: EnvLike }).env) || {}) as EnvLike
+}
+
+const env = readEnv()
+
+export const AMAP_KEY = String(env.VITE_AMAP_KEY || '')
 
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '')
 }
 
 function resolveHttpBaseRoot(): string {
-  const configured = trimTrailingSlash(String(import.meta.env.VITE_API_HTTP_BASE || ''))
+  const configured = trimTrailingSlash(String(env.VITE_API_HTTP_BASE || ''))
   if (configured) return configured
   if (typeof window !== 'undefined') {
     return trimTrailingSlash(window.location.origin)
@@ -15,7 +24,7 @@ function resolveHttpBaseRoot(): string {
 }
 
 function resolveWsBaseRoot(): string {
-  const configured = trimTrailingSlash(String(import.meta.env.VITE_API_WS_BASE || ''))
+  const configured = trimTrailingSlash(String(env.VITE_API_WS_BASE || ''))
   if (configured) return configured
   if (typeof window !== 'undefined') {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'

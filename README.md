@@ -185,6 +185,17 @@ cd frontend && pnpm install && pnpm dev --port 5174
 cd edge && python main.py --mode sim --host 0.0.0.0 --public-host 127.0.0.1 --port 9000 --no-browser
 ```
 
+### 本地门禁
+
+```bash
+./scripts/local-gate.sh
+```
+
+门禁顺序：
+- `backend`: `mvn -B test`
+- `edge`: `pytest -q tests`
+- `frontend`: `pnpm test` + `pnpm build`
+
 ---
 
 ## 默认账号
@@ -258,6 +269,15 @@ INIT_ADMIN_PASSWORD=Admin@12345
 | `CAMERA_SOURCE` | 摄像头地址（设备索引或 RTSP URL） | `0` |
 
 ---
+
+### Edge 鉴权说明
+
+当边缘节点配置了 `EDGE_API_KEY` 后，`/api/traffic`、`/api/frame`、`/api/stream`、`/api/config`、
+`/api/cameras/probe`、`/api/detect/image`、`/api/detect/video`、
+`/api/detect/video/result/{id}` 都需要携带 `X-Edge-Key`。
+
+对于浏览器 `<img>` / `<video>` / 下载链接 等无法自定义 header 的场景，可改用
+`edge_key` / `edge_node_id` query 参数兜底。
 
 ## Docker 服务清单
 

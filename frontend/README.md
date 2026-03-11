@@ -104,6 +104,18 @@ cd frontend
 pnpm build
 ```
 
+## 测试
+
+```bash
+cd frontend
+pnpm test
+```
+
+当前测试优先覆盖：
+- `src/lib/api.ts`
+- `src/lib/normalize.ts`
+- `src/store/traffic.ts`
+
 产物输出至 `dist/`，可直接挂载到 Nginx 或通过 Docker 镜像部署：
 
 ```bash

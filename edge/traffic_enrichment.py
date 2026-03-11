@@ -161,7 +161,9 @@ def filter_objects_in_roi(
         bbox = obj.get("bbox") or [0, 0, 0, 0]
         cx = (bbox[0] + bbox[2]) / 2
         cy = (bbox[1] + bbox[3]) / 2
-        if x1 <= cx <= x2 and y1 <= cy <= y2:
+        # 左/上边界采用开区间，避免恰好卡在 ROI 起点的目标被重复计入；
+        # 右/下边界保留闭区间，便于纳入最外侧车道的边缘目标。
+        if x1 < cx <= x2 and y1 < cy <= y2:
             filtered.append(obj)
     return filtered
 

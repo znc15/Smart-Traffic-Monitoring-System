@@ -22,10 +22,14 @@ from pydantic import BaseModel, Field, field_validator
 
 import camera_discovery
 import config
-from detector import detect_vehicles_detailed
 from state import state
 from resource_manager import get_resource_level, get_resource_params
 from validators import validate_probe_source, has_openvino_cache
+
+try:
+    from detector import detect_vehicles_detailed
+except Exception:  # pragma: no cover - 测试环境可用 monkeypatch 注入替身
+    detect_vehicles_detailed = None
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +154,59 @@ def _current_config() -> dict:
         "parking_stationary_seconds": config.PARKING_STATIONARY_SECONDS,
         "wrong_way_min_track_points": config.WRONG_WAY_MIN_TRACK_POINTS,
         "telemetry_interval_sec": config.TELEMETRY_INTERVAL_SEC,
+        "loop_state": state.get_loop_state(),
     }
+
+
+def _config_snapshot() -> dict:
+    return {
+        "mode": config.MODE,
+        "camera_source": config.camera_source,
+        "model_name": config.MODEL_NAME,
+        "confidence": config.CONF_THRESHOLD,
+        "road_name": config.ROAD_NAME,
+        "use_openvino": config.USE_OPENVINO,
+        "frame_skip": config.FRAME_SKIP,
+        "imgsz": config.IMGSZ,
+        "jpeg_quality": config.JPEG_QUALITY,
+        "quantize": config.QUANTIZE,
+        "tracker_backend": config.TRACKER_BACKEND,
+        "tracker_strict": config.TRACKER_STRICT,
+        "tracker_cfg": config.TRACKER_CFG,
+        "analysis_roi": list(config.ANALYSIS_ROI),
+        "lane_split_ratios": list(config.LANE_SPLIT_RATIOS),
+        "speed_meters_per_pixel": config.SPEED_METERS_PER_PIXEL,
+        "parking_stationary_seconds": config.PARKING_STATIONARY_SECONDS,
+        "wrong_way_min_track_points": config.WRONG_WAY_MIN_TRACK_POINTS,
+        "telemetry_interval_sec": config.TELEMETRY_INTERVAL_SEC,
+    }
+
+
+def _restore_config(snapshot: dict) -> None:
+    config.MODE = snapshot["mode"]
+    config.camera_source = snapshot["camera_source"]
+    config.MODEL_NAME = snapshot["model_name"]
+    config.CONF_THRESHOLD = snapshot["confidence"]
+    config.ROAD_NAME = snapshot["road_name"]
+    config.USE_OPENVINO = snapshot["use_openvino"]
+    config.FRAME_SKIP = snapshot["frame_skip"]
+    config.IMGSZ = snapshot["imgsz"]
+    config.JPEG_QUALITY = snapshot["jpeg_quality"]
+    config.QUANTIZE = snapshot["quantize"]
+    config.TRACKER_BACKEND = snapshot["tracker_backend"]
+    config.TRACKER_STRICT = snapshot["tracker_strict"]
+    config.TRACKER_CFG = snapshot["tracker_cfg"]
+    config.ANALYSIS_ROI = list(snapshot["analysis_roi"])
+    config.LANE_SPLIT_RATIOS = list(snapshot["lane_split_ratios"])
+    config.SPEED_METERS_PER_PIXEL = snapshot["speed_meters_per_pixel"]
+    config.PARKING_STATIONARY_SECONDS = snapshot["parking_stationary_seconds"]
+    config.WRONG_WAY_MIN_TRACK_POINTS = snapshot["wrong_way_min_track_points"]
+    config.TELEMETRY_INTERVAL_SEC = snapshot["telemetry_interval_sec"]
+
+
+def _require_detector() -> None:
+    if detect_vehicles_detailed is None:
+        raise HTTPException(status_code=503, detail="检测模块不可用，请检查 edge 运行依赖")
 
 
 def _require_edge_access(x_edge_key: str | None, x_edge_node_id: str | None = None) -> None:
@@ -162,6 +218,19 @@ def _require_edge_access(x_edge_key: str | None, x_edge_node_id: str | None = No
     expected_node_id = config.EDGE_NODE_ID.strip()
     if expected_node_id and x_edge_node_id is not None and x_edge_node_id.strip() not in {"", expected_node_id}:
         raise HTTPException(status_code=401, detail="Invalid edge node id")
+
+
+def _resolve_edge_access(
+    x_edge_key: str | None = None,
+    x_edge_node_id: str | None = None,
+    edge_key: str | None = None,
+    edge_node_id: str | None = None,
+) -> tuple[str | None, str | None]:
+    """
+    统一解析边缘节点鉴权信息。
+    Header 优先，query 兜底，便于 <img>/<video> 这类无法自定义 header 的请求。
+    """
+    return (x_edge_key or edge_key, x_edge_node_id or edge_node_id)
 
 # ---------------------------------------------------------------------------
 # 预计算占位 JPEG（1x1 灰色图），避免每次循环重复编码
@@ -181,17 +250,37 @@ _stream_count = 0
 def get_traffic(
     x_edge_key: str | None = Header(default=None),
     x_edge_node_id: str | None = Header(default=None),
+    edge_key: str | None = Query(default=None),
+    edge_node_id: str | None = Query(default=None),
 ) -> JSONResponse:
     """交通数据 + 边缘节点性能指标（后端每 3 秒轮询此接口）"""
-    _require_edge_access(x_edge_key, x_edge_node_id)
+    resolved_key, resolved_node_id = _resolve_edge_access(
+        x_edge_key=x_edge_key,
+        x_edge_node_id=x_edge_node_id,
+        edge_key=edge_key,
+        edge_node_id=edge_node_id,
+    )
+    _require_edge_access(resolved_key, resolved_node_id)
     data = state.get_traffic()
     data["edge_metrics"] = state.get_edge_metrics()
     return JSONResponse(content=data)
 
 
 @router.get("/api/frame", response_model=None)
-def get_frame() -> Response:
+def get_frame(
+    x_edge_key: str | None = Header(default=None),
+    x_edge_node_id: str | None = Header(default=None),
+    edge_key: str | None = Query(default=None),
+    edge_node_id: str | None = Query(default=None),
+) -> Response:
     """最新 JPEG 检测帧"""
+    resolved_key, resolved_node_id = _resolve_edge_access(
+        x_edge_key=x_edge_key,
+        x_edge_node_id=x_edge_node_id,
+        edge_key=edge_key,
+        edge_node_id=edge_node_id,
+    )
+    _require_edge_access(resolved_key, resolved_node_id)
     frame = state.get_frame()
     if not frame:
         # 尚未生成帧时返回预计算的 1x1 灰色占位图
@@ -203,9 +292,17 @@ def get_frame() -> Response:
 def get_metrics(
     x_edge_key: str | None = Header(default=None),
     x_edge_node_id: str | None = Header(default=None),
+    edge_key: str | None = Query(default=None),
+    edge_node_id: str | None = Query(default=None),
 ) -> JSONResponse:
     """详细性能指标（独立端点）"""
-    _require_edge_access(x_edge_key, x_edge_node_id)
+    resolved_key, resolved_node_id = _resolve_edge_access(
+        x_edge_key=x_edge_key,
+        x_edge_node_id=x_edge_node_id,
+        edge_key=edge_key,
+        edge_node_id=edge_node_id,
+    )
+    _require_edge_access(resolved_key, resolved_node_id)
     return JSONResponse(content=state.get_edge_metrics())
 
 
@@ -256,8 +353,20 @@ async def _mjpeg_generator() -> AsyncGenerator[bytes, None]:
 
 
 @router.get("/api/stream", response_model=None)
-async def stream_mjpeg() -> StreamingResponse | JSONResponse:
+async def stream_mjpeg(
+    x_edge_key: str | None = Header(default=None),
+    x_edge_node_id: str | None = Header(default=None),
+    edge_key: str | None = Query(default=None),
+    edge_node_id: str | None = Query(default=None),
+) -> StreamingResponse | JSONResponse:
     """MJPEG 视频流端点，持续推送检测帧（并发数由 resource_manager 动态控制）"""
+    resolved_key, resolved_node_id = _resolve_edge_access(
+        x_edge_key=x_edge_key,
+        x_edge_node_id=x_edge_node_id,
+        edge_key=edge_key,
+        edge_node_id=edge_node_id,
+    )
+    _require_edge_access(resolved_key, resolved_node_id)
     global _stream_count
     async with _stream_lock:
         if _stream_count >= config.MAX_MJPEG_CLIENTS:
@@ -378,8 +487,20 @@ async def _video_generator() -> AsyncGenerator[bytes, None]:
 
 
 @router.get("/api/video", response_model=None)
-async def video_stream() -> StreamingResponse | JSONResponse:
+async def video_stream(
+    x_edge_key: str | None = Header(default=None),
+    x_edge_node_id: str | None = Header(default=None),
+    edge_key: str | None = Query(default=None),
+    edge_node_id: str | None = Query(default=None),
+) -> StreamingResponse | JSONResponse:
     """真正的视频流（WebM/VP8 编码），需要 FFmpeg"""
+    resolved_key, resolved_node_id = _resolve_edge_access(
+        x_edge_key=x_edge_key,
+        x_edge_node_id=x_edge_node_id,
+        edge_key=edge_key,
+        edge_node_id=edge_node_id,
+    )
+    _require_edge_access(resolved_key, resolved_node_id)
     if not _ffmpeg_available():
         return JSONResponse(
             status_code=503,
@@ -398,9 +519,17 @@ async def video_stream() -> StreamingResponse | JSONResponse:
 def get_config(
     x_edge_key: str | None = Header(default=None),
     x_edge_node_id: str | None = Header(default=None),
+    edge_key: str | None = Query(default=None),
+    edge_node_id: str | None = Query(default=None),
 ) -> JSONResponse:
     """返回当前运行配置"""
-    _require_edge_access(x_edge_key, x_edge_node_id)
+    resolved_key, resolved_node_id = _resolve_edge_access(
+        x_edge_key=x_edge_key,
+        x_edge_node_id=x_edge_node_id,
+        edge_key=edge_key,
+        edge_node_id=edge_node_id,
+    )
+    _require_edge_access(resolved_key, resolved_node_id)
     return JSONResponse(content=_current_config())
 
 
@@ -438,25 +567,20 @@ def update_config(
     body: ConfigUpdateRequest,
     x_edge_key: str | None = Header(default=None),
     x_edge_node_id: str | None = Header(default=None),
+    edge_key: str | None = Query(default=None),
+    edge_node_id: str | None = Query(default=None),
 ) -> JSONResponse:
     """更新运行配置（仅更新传入的字段，未传入的保持不变），并触发检测循环热重启"""
-    _require_edge_access(x_edge_key, x_edge_node_id)
-    # Snapshot current values before mutation, used to detect what changed
-    old_model = config.MODEL_NAME
-    old_openvino = config.USE_OPENVINO
-    old_imgsz = config.IMGSZ
-    old_quantize = config.QUANTIZE
-    old_mode = config.MODE
-    old_road_name = config.ROAD_NAME
-    old_tracker_backend = config.TRACKER_BACKEND
-    old_tracker_strict = config.TRACKER_STRICT
-    old_tracker_cfg = config.TRACKER_CFG
-    old_analysis_roi = list(config.ANALYSIS_ROI)
-    old_lane_split_ratios = list(config.LANE_SPLIT_RATIOS)
-    old_speed_meters_per_pixel = config.SPEED_METERS_PER_PIXEL
-    old_parking_stationary_seconds = config.PARKING_STATIONARY_SECONDS
-    old_wrong_way_min_track_points = config.WRONG_WAY_MIN_TRACK_POINTS
-    old_telemetry_interval_sec = config.TELEMETRY_INTERVAL_SEC
+    resolved_key, resolved_node_id = _resolve_edge_access(
+        x_edge_key=x_edge_key,
+        x_edge_node_id=x_edge_node_id,
+        edge_key=edge_key,
+        edge_node_id=edge_node_id,
+    )
+    _require_edge_access(resolved_key, resolved_node_id)
+    snapshot = _config_snapshot()
+    old_mode = snapshot["mode"]
+    old_road_name = snapshot["road_name"]
 
     # 逐字段检查并更新 config 模块变量
     if body.mode is not None:
@@ -478,7 +602,7 @@ def update_config(
                 detail=f"模型文件不存在: {body.model}",
             )
         config.MODEL_NAME = body.model
-        logger.info("模型切换请求: %s -> %s", old_model, config.MODEL_NAME)
+        logger.info("模型切换请求: %s -> %s", snapshot["model_name"], config.MODEL_NAME)
 
     if body.confidence is not None:
         config.CONF_THRESHOLD = body.confidence
@@ -521,38 +645,37 @@ def update_config(
     if body.telemetry_interval_sec is not None:
         config.TELEMETRY_INTERVAL_SEC = float(body.telemetry_interval_sec)
 
-    # Determine whether a full restart is needed.
-    # frame_skip, jpeg_quality are read dynamically in the loop — no restart required.
-    # model, openvino, quantize, and imgsz (when OpenVINO is active) need a restart
-    # because OpenVINO IR models have a fixed input size baked in at export time.
-    imgsz_changed = body.imgsz is not None and body.imgsz != old_imgsz
-    model_changed = (
-        config.MODEL_NAME != old_model
-        or config.USE_OPENVINO != old_openvino
-        or (body.quantize is not None and config.QUANTIZE != old_quantize)
+    # 动态生效：frame_skip / jpeg_quality / telemetry_interval / traffic_enrichment 规则参数 / road_name
+    # 需重启：mode / camera_source / detector + tracker 初始化相关参数
+    imgsz_changed = config.IMGSZ != snapshot["imgsz"]
+    detector_reload_required = (
+        config.MODEL_NAME != snapshot["model_name"]
+        or config.USE_OPENVINO != snapshot["use_openvino"]
+        or config.QUANTIZE != snapshot["quantize"]
         or (imgsz_changed and config.USE_OPENVINO)
-        or config.TRACKER_BACKEND != old_tracker_backend
-        or config.TRACKER_STRICT != old_tracker_strict
-        or config.TRACKER_CFG != old_tracker_cfg
-        or config.ANALYSIS_ROI != old_analysis_roi
-        or config.LANE_SPLIT_RATIOS != old_lane_split_ratios
-        or config.SPEED_METERS_PER_PIXEL != old_speed_meters_per_pixel
-        or config.PARKING_STATIONARY_SECONDS != old_parking_stationary_seconds
-        or config.WRONG_WAY_MIN_TRACK_POINTS != old_wrong_way_min_track_points
     )
-    telemetry_changed = config.TELEMETRY_INTERVAL_SEC != old_telemetry_interval_sec
-    needs_restart = model_changed or body.mode is not None
+    restart_required = (
+        config.MODE != snapshot["mode"]
+        or config.camera_source != snapshot["camera_source"]
+        or detector_reload_required
+        or config.TRACKER_BACKEND != snapshot["tracker_backend"]
+        or config.TRACKER_STRICT != snapshot["tracker_strict"]
+        or config.TRACKER_CFG != snapshot["tracker_cfg"]
+    )
+    telemetry_changed = config.TELEMETRY_INTERVAL_SEC != snapshot["telemetry_interval_sec"]
 
     restarted = False
-    if needs_restart and state.restart_callback is not None:
+    if restart_required and state.restart_callback is not None:
         try:
-            state.restart_callback(model_changed=model_changed)
+            state.restart_callback(model_changed=detector_reload_required)
             restarted = True
             logger.info(
-                "检测循环热重启完成: mode=%s->%s, model_changed=%s, openvino=%s, quantize=%s, imgsz=%s, tracker=%s, strict=%s, tracker_cfg=%s",
+                "检测循环热重启完成: mode=%s->%s, detector_reload=%s, camera_source=%s->%s, openvino=%s, quantize=%s, imgsz=%s, tracker=%s, strict=%s, tracker_cfg=%s",
                 old_mode,
                 config.MODE,
-                model_changed,
+                detector_reload_required,
+                snapshot["camera_source"],
+                config.camera_source,
                 config.USE_OPENVINO,
                 config.QUANTIZE,
                 config.IMGSZ,
@@ -560,8 +683,18 @@ def update_config(
                 config.TRACKER_STRICT,
                 config.TRACKER_CFG,
             )
-        except Exception as e:
-            logger.error(f"重启检测循环失败: {e}")
+        except Exception as ex:
+            _restore_config(snapshot)
+            logger.error("重启检测循环失败，配置已回滚: %s", ex)
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "detail": str(ex),
+                    "restarted": False,
+                    "rolled_back": True,
+                    "loop_state": state.get_loop_state(),
+                },
+            )
 
     result = _current_config()
     result["restarted"] = restarted
@@ -581,8 +714,21 @@ async def get_cameras() -> JSONResponse:
 
 
 @router.post("/api/cameras/probe", response_model=None)
-async def probe_camera(body: ProbeRequest) -> JSONResponse:
+async def probe_camera(
+    body: ProbeRequest,
+    x_edge_key: str | None = Header(default=None),
+    x_edge_node_id: str | None = Header(default=None),
+    edge_key: str | None = Query(default=None),
+    edge_node_id: str | None = Query(default=None),
+) -> JSONResponse:
     """测试 RTSP/视频流地址的连通性"""
+    resolved_key, resolved_node_id = _resolve_edge_access(
+        x_edge_key=x_edge_key,
+        x_edge_node_id=x_edge_node_id,
+        edge_key=edge_key,
+        edge_node_id=edge_node_id,
+    )
+    _require_edge_access(resolved_key, resolved_node_id)
     loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(None, camera_discovery.probe_rtsp, body.url)
     if result is not None:
@@ -603,6 +749,7 @@ async def probe_camera(body: ProbeRequest) -> JSONResponse:
 # ---------------------------------------------------------------------------
 def _capture_and_detect(source: str) -> dict | None:
     """同步函数：打开摄像头，抓帧，检测，返回结果"""
+    _require_detector()
     # 尝试解析为整数（设备索引）
     try:
         src = int(source)
@@ -694,11 +841,26 @@ def _get_file_extension(filename: str) -> str:
 # POST /api/detect/image - 图片上传检测
 # ---------------------------------------------------------------------------
 @router.post("/api/detect/image", response_model=None)
-async def detect_image(file: UploadFile = File(...)) -> JSONResponse:
+async def detect_image(
+    file: UploadFile = File(...),
+    x_edge_key: str | None = Header(default=None),
+    x_edge_node_id: str | None = Header(default=None),
+    edge_key: str | None = Query(default=None),
+    edge_node_id: str | None = Query(default=None),
+) -> JSONResponse:
     """
     接收上传图片，使用 YOLOv8 检测车辆，
     返回 base64 标注图片和检测结果 JSON
     """
+    resolved_key, resolved_node_id = _resolve_edge_access(
+        x_edge_key=x_edge_key,
+        x_edge_node_id=x_edge_node_id,
+        edge_key=edge_key,
+        edge_node_id=edge_node_id,
+    )
+    _require_edge_access(resolved_key, resolved_node_id)
+    _require_detector()
+
     # 验证文件类型
     ext = _get_file_extension(file.filename or "")
     if ext not in _IMAGE_EXTENSIONS:
@@ -814,10 +976,25 @@ def _process_video(input_path: Path, output_path: Path) -> dict:
 
 
 @router.post("/api/detect/video", response_model=None)
-async def detect_video(file: UploadFile = File(...)) -> JSONResponse:
+async def detect_video(
+    file: UploadFile = File(...),
+    x_edge_key: str | None = Header(default=None),
+    x_edge_node_id: str | None = Header(default=None),
+    edge_key: str | None = Query(default=None),
+    edge_node_id: str | None = Query(default=None),
+) -> JSONResponse:
     """
     接收上传视频，逐帧检测车辆，生成标注视频并返回下载链接和摘要
     """
+    resolved_key, resolved_node_id = _resolve_edge_access(
+        x_edge_key=x_edge_key,
+        x_edge_node_id=x_edge_node_id,
+        edge_key=edge_key,
+        edge_node_id=edge_node_id,
+    )
+    _require_edge_access(resolved_key, resolved_node_id)
+    _require_detector()
+
     # 验证文件类型
     ext = _get_file_extension(file.filename or "")
     if ext not in _VIDEO_EXTENSIONS:
@@ -868,8 +1045,21 @@ async def detect_video(file: UploadFile = File(...)) -> JSONResponse:
 # GET /api/detect/video/result/{result_id} - 下载标注后的视频
 # ---------------------------------------------------------------------------
 @router.get("/api/detect/video/result/{result_id}", response_model=None)
-async def get_video_result(result_id: str) -> FileResponse:
+async def get_video_result(
+    result_id: str,
+    x_edge_key: str | None = Header(default=None),
+    x_edge_node_id: str | None = Header(default=None),
+    edge_key: str | None = Query(default=None),
+    edge_node_id: str | None = Query(default=None),
+) -> FileResponse:
     """返回标注后的视频文件供下载"""
+    resolved_key, resolved_node_id = _resolve_edge_access(
+        x_edge_key=x_edge_key,
+        x_edge_node_id=x_edge_node_id,
+        edge_key=edge_key,
+        edge_node_id=edge_node_id,
+    )
+    _require_edge_access(resolved_key, resolved_node_id)
     # 校验 result_id 格式，防止路径遍历
     if not result_id.isalnum() or len(result_id) != 12:
         raise HTTPException(status_code=400, detail="无效的结果 ID")
