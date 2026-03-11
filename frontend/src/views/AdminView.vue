@@ -245,7 +245,7 @@ import {
   type FormRules,
   useMessage,
 } from 'naive-ui'
-import { authFetch, endpoints } from '../lib/api'
+import { authFetch, endpoints, ensureOk } from '../lib/api'
 import {
   normalizeAdminUser,
   normalizeAdminNodeHealth,
@@ -498,44 +498,64 @@ const handleCameraSubmit = async () => {
 }
 
 const toggleUserStatus = async (user: AdminUser) => {
-  await authFetch(`${endpoints.adminUsers}/${user.id}/status`, { method: 'PUT' })
-  await fetchUsers()
-  message.success('用户状态已更新')
+  try {
+    const res = await authFetch(`${endpoints.adminUsers}/${user.id}/status`, { method: 'PUT' })
+    await ensureOk(res, '更新用户状态失败')
+    await fetchUsers()
+    message.success('用户状态已更新')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '更新用户状态失败')
+  }
 }
 
 const toggleUserRole = async (user: AdminUser) => {
-  await authFetch(`${endpoints.adminUsers}/${user.id}/role`, {
-    method: 'PUT',
-    body: JSON.stringify({ role_id: user.role_id === 0 ? 1 : 0 }),
-  })
-  await fetchUsers()
-  message.success('用户角色已更新')
+  try {
+    const res = await authFetch(`${endpoints.adminUsers}/${user.id}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role_id: user.role_id === 0 ? 1 : 0 }),
+    })
+    await ensureOk(res, '更新用户角色失败')
+    await fetchUsers()
+    message.success('用户角色已更新')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '更新用户角色失败')
+  }
 }
 
 const toggleCamera = async (camera: CameraItem) => {
-  await authFetch(`${endpoints.adminCameras}/${camera.id}`, {
-    method: 'PUT',
-    body: JSON.stringify({
-      name: camera.name,
-      road_name: camera.road_name || null,
-      location: camera.location || null,
-      stream_url: camera.stream_url || null,
-      node_url: camera.node_url || null,
-      edge_node_id: camera.edge_node_id || null,
-      node_api_key: camera.node_api_key || null,
-      latitude: camera.latitude,
-      longitude: camera.longitude,
-      enabled: !camera.enabled,
-    }),
-  })
-  await fetchCameras()
-  message.success(camera.enabled ? '摄像头已禁用' : '摄像头已启用')
+  try {
+    const res = await authFetch(`${endpoints.adminCameras}/${camera.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: camera.name,
+        road_name: camera.road_name || null,
+        location: camera.location || null,
+        stream_url: camera.stream_url || null,
+        node_url: camera.node_url || null,
+        edge_node_id: camera.edge_node_id || null,
+        node_api_key: camera.node_api_key || null,
+        latitude: camera.latitude,
+        longitude: camera.longitude,
+        enabled: !camera.enabled,
+      }),
+    })
+    await ensureOk(res, camera.enabled ? '禁用摄像头失败' : '启用摄像头失败')
+    await fetchCameras()
+    message.success(camera.enabled ? '摄像头已禁用' : '摄像头已启用')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '更新摄像头状态失败')
+  }
 }
 
 const deleteCamera = async (cameraId: number) => {
-  await authFetch(`${endpoints.adminCameras}/${cameraId}`, { method: 'DELETE' })
-  await fetchCameras()
-  message.success('摄像头已删除')
+  try {
+    const res = await authFetch(`${endpoints.adminCameras}/${cameraId}`, { method: 'DELETE' })
+    await ensureOk(res, '删除摄像头失败')
+    await fetchCameras()
+    message.success('摄像头已删除')
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '删除摄像头失败')
+  }
 }
 
 const saveSettings = async () => {

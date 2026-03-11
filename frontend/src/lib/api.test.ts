@@ -78,9 +78,50 @@ describe('lib/api', () => {
     const headers = new Headers(init.headers)
 
     expect(headers.get('Authorization')).toBe('Bearer jwt-token')
-    expect(headers.get('Content-Type')).toBe('application/json')
+    expect(headers.get('Content-Type')).toBeNull()
     expect(init.credentials).toBe('include')
     expect(localStorage.getItem(api.TOKEN_KEY)).toBeNull()
     expect(replace).toHaveBeenCalledWith('/login')
+  })
+
+  it('should omit default json content type for bodyless requests', async () => {
+    const localStorage = createLocalStorage()
+    const fetchMock = vi.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+    })
+
+    vi.stubGlobal('localStorage', localStorage)
+    vi.stubGlobal('window', {
+      location: {
+        origin: 'http://localhost:5174',
+        protocol: 'http:',
+        host: 'localhost:5174',
+        pathname: '/admin',
+        replace: vi.fn(),
+      },
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const api = await import('./api')
+    api.setToken('jwt-token')
+
+    await api.authFetch('/api/v1/admin/cameras/12', { method: 'DELETE' })
+
+    const [, init] = fetchMock.mock.calls[0]
+    const headers = new Headers(init.headers)
+
+    expect(headers.get('Authorization')).toBe('Bearer jwt-token')
+    expect(headers.get('Content-Type')).toBeNull()
+  })
+
+  it('should surface backend detail from failed responses', async () => {
+    const api = await import('./api')
+    const response = new Response(JSON.stringify({ detail: 'Admin access required' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    })
+
+    await expect(api.ensureOk(response, '删除摄像头失败')).rejects.toThrow('Admin access required')
   })
 })

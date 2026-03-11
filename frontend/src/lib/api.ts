@@ -71,6 +71,38 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY)
 }
 
+export async function getErrorDetail(response: Response, fallback = 'Request failed'): Promise<string> {
+  const contentType = response.headers.get('Content-Type') || ''
+
+  try {
+    if (contentType.includes('application/json')) {
+      const payload = await response.clone().json()
+      if (typeof payload?.detail === 'string' && payload.detail.trim()) {
+        return payload.detail.trim()
+      }
+      if (typeof payload?.message === 'string' && payload.message.trim()) {
+        return payload.message.trim()
+      }
+    }
+
+    const text = (await response.clone().text()).trim()
+    if (text) {
+      return text
+    }
+  } catch {
+    // Ignore parse failures and fall back to the caller-provided message.
+  }
+
+  return fallback
+}
+
+export async function ensureOk(response: Response, fallback = 'Request failed'): Promise<Response> {
+  if (response.ok) {
+    return response
+  }
+  throw new Error(await getErrorDetail(response, fallback))
+}
+
 export async function authFetch(
   url: string,
   init: RequestInit = {},
@@ -78,7 +110,7 @@ export async function authFetch(
 ) {
   const token = getToken()
   const headers = new Headers(init.headers || {})
-  if (!headers.has('Content-Type') && !(init.body instanceof FormData)) {
+  if (!headers.has('Content-Type') && init.body != null && !(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
   }
   if (token) {
