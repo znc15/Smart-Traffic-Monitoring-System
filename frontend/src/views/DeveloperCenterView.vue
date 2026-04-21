@@ -34,8 +34,8 @@
                   <TableCell>{{ client.description || '-' }}</TableCell>
                   <TableCell>
                     <div class="flex flex-wrap gap-1">
-                      <Badge variant="outline" v-for="ep in client.allowed_endpoints" :key="ep">{{ ep }}</Badge>
-                      <span v-if="!client.allowed_endpoints || client.allowed_endpoints.length === 0">-</span>
+                      <Badge variant="outline" v-for="ep in (client.allowed_endpoints || [])" :key="ep">{{ ep }}</Badge>
+                      <span v-if="!client.allowed_endpoints || client.allowed_endpoints.length === 0">所有端点</span>
                     </div>
                   </TableCell>
                   <TableCell>{{ client.rate_limit }} 次/日</TableCell>
@@ -284,7 +284,7 @@ async function loadClients() {
 
 async function loadApiDocs() {
   try {
-    const res = await fetch(endpoints.apiDocs)
+    const res = await authFetch(endpoints.apiDocs)
     if (res.ok) {
       apiDocs.value = await res.json()
     }
