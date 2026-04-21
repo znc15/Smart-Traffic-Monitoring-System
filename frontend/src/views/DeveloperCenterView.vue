@@ -155,8 +155,33 @@
             <Input id="clientDesc" v-model="clientForm.description" />
           </div>
           <div class="space-y-2">
-            <Label for="clientEndpoints">允许的端点 (逗号分隔，留空表示全部)</Label>
-            <Input id="clientEndpoints" v-model="clientForm.allowedEndpoints" placeholder="/api/v1/maas/*" />
+            <div class="flex items-center justify-between">
+              <Label>允许的端点</Label>
+              <Button type="button" variant="ghost" size="sm" @click="toggleAllEndpoints">
+                {{ isAllEndpointsSelected ? '取消全选' : '全选' }}
+              </Button>
+            </div>
+            <div class="border rounded-md p-4 max-h-60 overflow-y-auto space-y-3 bg-muted/20">
+              <div v-if="availableEndpoints.length === 0" class="text-sm text-muted-foreground text-center py-2">
+                暂无可用的端点
+              </div>
+              <div v-for="ep in availableEndpoints" :key="ep" class="flex items-center space-x-2">
+                <Checkbox 
+                  :id="`ep-${ep}`" 
+                  :value="ep"
+                  :checked="clientForm.allowedEndpoints.includes(ep)"
+                  @update:checked="(checked) => {
+                    if (checked) {
+                      clientForm.allowedEndpoints.push(ep)
+                    } else {
+                      clientForm.allowedEndpoints = clientForm.allowedEndpoints.filter(e => e !== ep)
+                    }
+                  }"
+                />
+                <Label :for="`ep-${ep}`" class="text-sm font-mono cursor-pointer font-normal">{{ ep }}</Label>
+              </div>
+            </div>
+            <p class="text-xs text-muted-foreground">留空表示不允许访问任何端点。如需允许所有，请全选。</p>
           </div>
           <div class="space-y-2">
             <Label for="clientRateLimit">速率限制 (次/日)</Label>
@@ -201,6 +226,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 
 const clients = ref<any[]>([])
@@ -209,7 +235,7 @@ const editingClientId = ref<number | null>(null)
 const clientForm = ref({
   name: '',
   description: '',
-  allowedEndpoints: '',
+  allowedEndpoints: [] as string[],
   rateLimit: 1000
 })
 
@@ -218,6 +244,28 @@ const generatedKey = ref('')
 
 const apiDocs = ref<any>(null)
 const expandedEndpoints = ref<Record<string, boolean>>({})
+
+const availableEndpoints = computed(() => {
+  if (!apiDocs.value || !apiDocs.value.endpoints) return []
+  const paths = new Set<string>()
+  apiDocs.value.endpoints.forEach((ep: any) => {
+    if (ep.path) paths.add(ep.path)
+  })
+  return Array.from(paths).sort()
+})
+
+const isAllEndpointsSelected = computed(() => {
+  return availableEndpoints.value.length > 0 && 
+         clientForm.value.allowedEndpoints.length === availableEndpoints.value.length
+})
+
+function toggleAllEndpoints() {
+  if (isAllEndpointsSelected.value) {
+    clientForm.value.allowedEndpoints = []
+  } else {
+    clientForm.value.allowedEndpoints = [...availableEndpoints.value]
+  }
+}
 
 onMounted(() => {
   loadClients()
@@ -245,7 +293,7 @@ async function loadApiDocs() {
 
 function openAddClientDialog() {
   editingClientId.value = null
-  clientForm.value = { name: '', description: '', allowedEndpoints: '', rateLimit: 1000 }
+  clientForm.value = { name: '', description: '', allowedEndpoints: [], rateLimit: 1000 }
   showClientDialog.value = true
 }
 
@@ -254,7 +302,7 @@ function editClient(client: any) {
   clientForm.value = {
     name: client.name,
     description: client.description || '',
-    allowedEndpoints: (client.allowed_endpoints || []).join(','),
+    allowedEndpoints: client.allowed_endpoints ? [...client.allowed_endpoints] : [],
     rateLimit: client.rate_limit || 1000
   }
   showClientDialog.value = true
@@ -265,7 +313,7 @@ async function saveClient() {
     const payload = {
       name: clientForm.value.name,
       description: clientForm.value.description,
-      allowedEndpoints: clientForm.value.allowedEndpoints.split(',').map(s => s.trim()).filter(Boolean),
+      allowedEndpoints: clientForm.value.allowedEndpoints,
       rateLimit: Number(clientForm.value.rateLimit)
     }
 
