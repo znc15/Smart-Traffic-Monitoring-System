@@ -216,7 +216,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { toast } from 'vue-sonner'
 import { authFetch, endpoints } from '../lib/api'
 import { Card, CardContent } from '@/components/ui/card'
