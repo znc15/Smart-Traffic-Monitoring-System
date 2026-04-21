@@ -46,7 +46,8 @@ class TelemetryIngestionServiceTest {
                 trafficService,
                 new ObjectMapper(),
                 mirrorWriteService,
-                redisCacheService
+                redisCacheService,
+                null // AlertService
         );
 
         LocalDateTime now = LocalDateTime.of(2026, 3, 11, 10, 30, 0);
@@ -133,7 +134,8 @@ class TelemetryIngestionServiceTest {
                 trafficService,
                 new ObjectMapper(),
                 mirrorWriteService,
-                redisCacheService
+                redisCacheService,
+                null // AlertService
         );
 
         EdgeTelemetryRequest request = new EdgeTelemetryRequest();

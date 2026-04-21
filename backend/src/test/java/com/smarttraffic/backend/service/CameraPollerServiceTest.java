@@ -250,7 +250,8 @@ class CameraPollerServiceTest {
                 trafficService,
                 trafficEventRepository,
                 new ObjectMapper(),
-                mirrorWriteService
+                mirrorWriteService,
+                null // AlertService
         );
         ReflectionTestUtils.setField(service, "restClient", restClient);
         return service;
