@@ -8,7 +8,13 @@ function readEnv(): EnvLike {
 
 const env = readEnv()
 
-export const AMAP_KEY = String(env.VITE_AMAP_KEY || '')
+function readOptionalEnv(name: string): string {
+  return String(env[name] || '').trim()
+}
+
+export const AMAP_KEY = readOptionalEnv('VITE_AMAP_KEY')
+export const AMAP_SECURITY_JS_CODE = readOptionalEnv('VITE_AMAP_SECURITY_JS_CODE')
+export const AMAP_SERVICE_HOST = readOptionalEnv('VITE_AMAP_SERVICE_HOST')
 
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '')
@@ -57,6 +63,7 @@ export const endpoints = {
   adminEvents: `${API_HTTP_BASE}/admin/events`,
   adminNodeConfig: (cameraId: number) => `${API_HTTP_BASE}/admin/nodes/${cameraId}/config`,
   adminApiClients: `${API_HTTP_BASE}/admin/api-clients`,
+  apiDocs: `${API_HTTP_BASE}/api-docs`,
 }
 
 export function getToken(): string | null {

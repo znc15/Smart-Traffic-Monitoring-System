@@ -1,80 +1,99 @@
 <template>
-  <n-layout has-sider position="absolute" class="app-layout">
-    <n-layout-sider
-      bordered
-      collapse-mode="width"
-      :collapsed-width="64"
-      :width="240"
-      :collapsed="collapsed"
-      show-trigger
-      @collapse="collapsed = true"
-      @expand="collapsed = false"
-      :native-scrollbar="false"
-      class="app-sider"
+  <div class="flex h-screen w-full bg-background text-foreground overflow-hidden">
+    <!-- Sidebar -->
+    <aside
+      class="border-r border-border bg-card transition-all duration-300 ease-in-out flex flex-col"
+      :class="collapsed ? 'w-16' : 'w-64'"
     >
-      <div class="sider-header" :class="{ 'sider-header--collapsed': collapsed }">
-        <n-icon size="28" color="#2080f0">
-          <CarOutline />
-        </n-icon>
-        <transition name="fade">
-          <span v-if="!collapsed" class="sider-title">{{ siteName }}</span>
-        </transition>
+      <div class="h-16 flex items-center justify-center border-b border-border">
+        <Car class="h-6 w-6 text-primary" />
+        <span v-if="!collapsed" class="ml-3 font-bold text-lg whitespace-nowrap overflow-hidden">{{ siteName }}</span>
       </div>
 
-      <n-menu
-        :collapsed="collapsed"
-        :collapsed-width="64"
-        :collapsed-icon-size="22"
-        :options="menuOptions"
-        :value="activeKey"
-        @update:value="handleMenuUpdate"
-      />
+      <nav class="flex-1 py-4 space-y-1 overflow-y-auto overflow-x-hidden px-2">
+        <RouterLink
+          v-for="item in menuOptions"
+          :key="item.key"
+          :to="item.key"
+          class="flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+          :class="[route.path === item.key ? 'bg-accent text-accent-foreground' : 'text-muted-foreground']"
+          :title="collapsed ? item.label : ''"
+        >
+          <component :is="item.icon" class="h-5 w-5 shrink-0" />
+          <span v-if="!collapsed" class="ml-3 whitespace-nowrap">{{ item.label }}</span>
+        </RouterLink>
+      </nav>
 
-      <div class="sider-footer" v-if="!collapsed">
-        <n-text depth="3" style="font-size: 12px">{{ footerText || 'v1.0.0' }}</n-text>
+      <div class="p-4 border-t border-border flex items-center justify-center">
+        <Button variant="ghost" size="icon" @click="collapsed = !collapsed" class="w-full">
+          <Menu class="h-5 w-5" v-if="collapsed" />
+          <ChevronLeft class="h-5 w-5" v-else />
+        </Button>
       </div>
-    </n-layout-sider>
+    </aside>
 
-    <n-layout class="app-inner-layout">
-      <n-layout-header bordered class="app-header">
-        <div class="header-left">
-          <n-text strong style="font-size: 16px">{{ pageTitle }}</n-text>
-        </div>
-        <div class="header-right">
-          <n-dropdown :options="userDropdownOptions" @select="handleUserAction">
-            <n-button quaternary>
-              <template #icon>
-                <n-icon><PersonOutline /></n-icon>
-              </template>
-              {{ username }}
-            </n-button>
-          </n-dropdown>
-        </div>
-      </n-layout-header>
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col min-w-0 overflow-hidden bg-background">
+      <!-- Header -->
+      <header class="h-16 border-b border-border bg-card/50 backdrop-blur flex items-center justify-between px-6 shrink-0 z-10">
+        <h2 class="text-lg font-semibold">{{ pageTitle }}</h2>
+        <div class="flex items-center space-x-4">
+          <Button variant="ghost" size="icon" @click="toggleDark()">
+            <Sun v-if="isDark" class="h-5 w-5" />
+            <Moon v-else class="h-5 w-5" />
+          </Button>
 
-      <n-layout-content class="app-content" :native-scrollbar="false">
+          <Popover>
+            <PopoverTrigger as-child>
+              <Button variant="ghost" class="flex items-center space-x-2">
+                <User class="h-4 w-4" />
+                <span class="text-sm">{{ username }}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent class="w-40 p-1" align="end">
+              <Button variant="ghost" class="w-full justify-start text-destructive hover:text-destructive" @click="handleLogout">
+                <LogOut class="h-4 w-4 mr-2" />
+                退出登录
+              </Button>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </header>
+
+      <!-- Page Content -->
+      <div class="flex-1 overflow-auto p-6 relative">
         <slot />
-      </n-layout-content>
-    </n-layout>
-  </n-layout>
+      </div>
+    </main>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, h, onMounted, onUnmounted, type Component } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NIcon } from 'naive-ui'
+import { useDark, useToggle } from '@vueuse/core'
 import {
-  SpeedometerOutline,
-  MapOutline,
-  BarChartOutline,
-  SettingsOutline,
-  CarOutline,
-  PersonOutline,
-  LogOutOutline,
-} from '@vicons/ionicons5'
+  LayoutDashboard,
+  Map,
+  BarChart,
+  Settings,
+  Car,
+  User,
+  LogOut,
+  Menu,
+  ChevronLeft,
+  Sun,
+  Moon,
+  Code
+} from 'lucide-vue-next'
 import { clearToken, endpoints, authFetch } from '../lib/api'
 import { normalizeSiteSettings } from '../lib/normalize'
 import { closeTrafficStore } from '../store/traffic'
+import { Button } from '@/components/ui/button'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
+
+const isDark = useDark()
+const toggleDark = useToggle(isDark)
 
 const route = useRoute()
 const router = useRouter()
@@ -84,7 +103,6 @@ const username = ref('用户')
 const siteName = ref('智慧交通监控')
 const footerText = ref('')
 
-// Responsive: auto-collapse on mobile
 const MOBILE_BREAKPOINT = 768
 
 function checkMobile() {
@@ -108,9 +126,7 @@ async function fetchUserInfo() {
     if (!res.ok) return
     const data = await res.json()
     username.value = data.username || '用户'
-  } catch {
-    // silently ignore - non-critical UI enrichment
-  }
+  } catch {}
 }
 
 async function fetchSiteSettings() {
@@ -121,151 +137,32 @@ async function fetchSiteSettings() {
     const settings = normalizeSiteSettings(body)
     siteName.value = settings.site_name || '智慧交通监控'
     footerText.value = settings.footer_text
-  } catch {
-    // silently ignore - non-critical UI enrichment
-  }
-}
-
-// Menu rendering helper
-function renderIcon(icon: Component) {
-  return () => h(NIcon, null, { default: () => h(icon) })
+  } catch {}
 }
 
 const menuOptions = [
-  {
-    label: '仪表盘',
-    key: '/dashboard',
-    icon: renderIcon(SpeedometerOutline),
-  },
-  {
-    label: 'GIS 地图',
-    key: '/map',
-    icon: renderIcon(MapOutline),
-  },
-  {
-    label: '数据分析',
-    key: '/analytics',
-    icon: renderIcon(BarChartOutline),
-  },
-  {
-    label: '系统管理',
-    key: '/admin',
-    icon: renderIcon(SettingsOutline),
-  },
+  { label: '仪表盘', key: '/dashboard', icon: LayoutDashboard },
+  { label: 'GIS 地图', key: '/map', icon: Map },
+  { label: '数据分析', key: '/analytics', icon: BarChart },
+  { label: '系统管理', key: '/admin', icon: Settings },
+  { label: '开发者中心', key: '/developer', icon: Code },
 ]
-
-const activeKey = computed(() => route.path)
 
 const pageTitleMap: Record<string, string> = {
   '/dashboard': '仪表盘',
   '/map': 'GIS 地图',
   '/analytics': '数据分析',
   '/admin': '系统管理',
+  '/developer': '开发者中心',
 }
 
 const pageTitle = computed(() => {
   return (route.meta?.title as string) || pageTitleMap[route.path] || '智慧交通监控'
 })
 
-function handleMenuUpdate(key: string) {
-  router.push(key)
-}
-
-// User dropdown
-const userDropdownOptions = [
-  {
-    label: '退出登录',
-    key: 'logout',
-    icon: renderIcon(LogOutOutline),
-  },
-]
-
-function handleUserAction(key: string) {
-  if (key === 'logout') {
-    clearToken()
-    closeTrafficStore()
-    router.replace('/login')
-  }
+function handleLogout() {
+  clearToken()
+  closeTrafficStore()
+  router.replace('/login')
 }
 </script>
-
-<style scoped>
-.app-layout {
-  height: 100vh;
-}
-
-.app-sider {
-  background: #fff;
-}
-
-.sider-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 20px 24px;
-  border-bottom: 1px solid #f0f0f0;
-  min-height: 64px;
-  transition: padding 0.3s ease;
-}
-
-.sider-header--collapsed {
-  padding: 20px 18px;
-  justify-content: center;
-}
-
-.sider-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #1f2937;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.sider-footer {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 12px 24px;
-  border-top: 1px solid #f0f0f0;
-  text-align: center;
-}
-
-.app-inner-layout {
-  background: #f8fafc;
-}
-
-.app-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  height: 64px;
-  background: #fff;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-}
-
-.app-content {
-  padding: 24px;
-  background: #f8fafc;
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-</style>
