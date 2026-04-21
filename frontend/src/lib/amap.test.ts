@@ -8,6 +8,14 @@ type MockScript = {
   onerror: null | (() => void)
 }
 
+type MockWindow = Window & {
+  AMap?: { version: string }
+  _AMapSecurityConfig?: {
+    securityJsCode?: string
+    serviceHost?: string
+  }
+}
+
 describe('lib/amap', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -19,20 +27,21 @@ describe('lib/amap', () => {
     stubBrowser((script) => {
       scripts.push(script)
       queueMicrotask(() => {
-        const windowMock = globalThis.window as Window & { AMap?: { version: string } }
+        const windowMock = globalThis.window as MockWindow
         windowMock.AMap = { version: '2.0' }
         script.onload?.()
       })
     })
 
-    const first = ensureAmap('demo key')
-    const second = ensureAmap('demo key')
+    const first = ensureAmap({ key: 'demo key', securityJsCode: 'secure-code' })
+    const second = ensureAmap({ key: 'demo key', securityJsCode: 'secure-code' })
     const [firstResult, secondResult] = await Promise.all([first, second])
 
     expect(firstResult).toEqual({ version: '2.0' })
     expect(secondResult).toBe(firstResult)
     expect(scripts).toHaveLength(1)
     expect(scripts[0]?.src).toContain('key=demo%20key')
+    expect(scripts[0]?.src).not.toContain('plugin=')
   })
 
   it('should allow retrying the same key after a failed script load', async () => {
@@ -45,16 +54,16 @@ describe('lib/amap', () => {
           script.onerror?.()
           return
         }
-        const windowMock = globalThis.window as Window & { AMap?: { version: string } }
+        const windowMock = globalThis.window as MockWindow
         windowMock.AMap = { version: '2.0' }
         script.onload?.()
       })
     })
 
-    await expect(ensureAmap('retry-key')).rejects.toThrow('高德地图脚本加载失败')
+    await expect(ensureAmap({ key: 'retry-key' })).rejects.toThrow('高德地图脚本加载失败')
 
     shouldFail = false
-    const result = await ensureAmap('retry-key')
+    const result = await ensureAmap({ key: 'retry-key' })
 
     expect(result).toEqual({ version: '2.0' })
     expect(scripts).toHaveLength(2)
@@ -69,13 +78,78 @@ describe('lib/amap', () => {
       head: { appendChild },
     })
 
-    await expect(ensureAmap('   ')).rejects.toThrow('缺少 VITE_AMAP_KEY')
+    await expect(ensureAmap({ key: '   ' })).rejects.toThrow('缺少 VITE_AMAP_KEY')
     expect(appendChild).not.toHaveBeenCalled()
+  })
+
+  it('should isolate pending loaders by effective security config', async () => {
+    const scripts: MockScript[] = []
+    const appliedConfigs: Array<MockWindow['_AMapSecurityConfig'] | undefined> = []
+
+    stubBrowser((script) => {
+      scripts.push(script)
+      const windowMock = globalThis.window as MockWindow
+      appliedConfigs.push(windowMock._AMapSecurityConfig ? { ...windowMock._AMapSecurityConfig } : undefined)
+      queueMicrotask(() => {
+        windowMock.AMap = { version: '2.0' }
+        script.onload?.()
+      })
+    })
+
+    const first = ensureAmap({ key: 'shared-key', securityJsCode: 'code-a' })
+    const second = ensureAmap({ key: 'shared-key', securityJsCode: 'code-b' })
+    await Promise.all([first, second])
+
+    expect(scripts).toHaveLength(2)
+    expect(appliedConfigs).toEqual([{ securityJsCode: 'code-a' }, { securityJsCode: 'code-b' }])
+  })
+
+  it('should apply securityJsCode before appending the script', async () => {
+    const appliedConfigs: Array<MockWindow['_AMapSecurityConfig'] | undefined> = []
+    const scripts: MockScript[] = []
+
+    stubBrowser((script) => {
+      scripts.push(script)
+      const windowMock = globalThis.window as MockWindow
+      appliedConfigs.push(windowMock._AMapSecurityConfig ? { ...windowMock._AMapSecurityConfig } : undefined)
+      queueMicrotask(() => {
+        windowMock.AMap = { version: '2.0' }
+        script.onload?.()
+      })
+    })
+
+    await ensureAmap({ key: 'secure-key', securityJsCode: 'security-code' })
+
+    expect(appliedConfigs).toEqual([{ securityJsCode: 'security-code' }])
+    expect(scripts[0]?.src).toContain('key=secure-key')
+    expect(scripts[0]?.src).not.toContain('plugin=')
+  })
+
+  it('should prefer serviceHost over securityJsCode when both are provided', async () => {
+    const appliedConfigs: Array<MockWindow['_AMapSecurityConfig'] | undefined> = []
+
+    stubBrowser((script) => {
+      const windowMock = globalThis.window as MockWindow
+      appliedConfigs.push(windowMock._AMapSecurityConfig ? { ...windowMock._AMapSecurityConfig } : undefined)
+      queueMicrotask(() => {
+        windowMock.AMap = { version: '2.0' }
+        script.onload?.()
+      })
+    })
+
+    await ensureAmap({
+      key: 'proxy-key',
+      securityJsCode: 'ignored-security-code',
+      serviceHost: '/_AMapService',
+    })
+
+    expect(appliedConfigs).toEqual([{ serviceHost: '/_AMapService' }])
   })
 })
 
 function stubBrowser(onAppend: (script: MockScript) => void) {
-  vi.stubGlobal('window', {})
+  const windowMock = {} as MockWindow
+  vi.stubGlobal('window', windowMock)
   vi.stubGlobal('document', {
     createElement: vi.fn((): MockScript => ({
       src: '',
@@ -90,4 +164,6 @@ function stubBrowser(onAppend: (script: MockScript) => void) {
       }),
     },
   })
+
+  return windowMock
 }

@@ -27,6 +27,17 @@ public class UpdateSiteSettingsRequest {
     @Size(max = 255, message = "高德地图 Key 不能超过255个字符")
     private String amapKey;
 
+    @JsonAlias("amap_security_js_code")
+    @Size(max = 255, message = "高德地图 Security JS Code 不能超过255个字符")
+    private String amapSecurityJsCode;
+
+    @JsonAlias("amap_service_host")
+    @Size(max = 255, message = "高德地图 Service Host 不能超过255个字符")
+    private String amapServiceHost;
+
+    @JsonAlias("congestion_threshold")
+    private Double congestionThreshold;
+
     @JsonIgnore
     private final Set<String> setFields = new HashSet<>();
 
@@ -49,4 +60,13 @@ public class UpdateSiteSettingsRequest {
 
     public String getAmapKey() { return amapKey; }
     public void setAmapKey(String amapKey) { this.amapKey = amapKey; setFields.add("amapKey"); }
+
+    public String getAmapSecurityJsCode() { return amapSecurityJsCode; }
+    public void setAmapSecurityJsCode(String amapSecurityJsCode) { this.amapSecurityJsCode = amapSecurityJsCode; setFields.add("amapSecurityJsCode"); }
+
+    public String getAmapServiceHost() { return amapServiceHost; }
+    public void setAmapServiceHost(String amapServiceHost) { this.amapServiceHost = amapServiceHost; setFields.add("amapServiceHost"); }
+
+    public Double getCongestionThreshold() { return congestionThreshold; }
+    public void setCongestionThreshold(Double congestionThreshold) { this.congestionThreshold = congestionThreshold; setFields.add("congestionThreshold"); }
 }

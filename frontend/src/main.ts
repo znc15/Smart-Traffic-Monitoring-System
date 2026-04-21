@@ -1,6 +1,5 @@
 import { createApp } from 'vue'
-import 'vfonts/Lato.css'
-import 'vfonts/FiraCode.css'
+import './assets/index.css'
 import App from './App.vue'
 import router from './router.ts'
 

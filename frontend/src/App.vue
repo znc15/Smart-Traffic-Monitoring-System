@@ -1,21 +1,22 @@
 <template>
-  <n-config-provider :theme-overrides="themeOverrides">
-    <n-message-provider>
-      <n-dialog-provider>
-        <RouterView v-if="isNoLayoutPage" />
-        <AppLayout v-else>
-          <RouterView />
-        </AppLayout>
-      </n-dialog-provider>
-    </n-message-provider>
-  </n-config-provider>
+  <div class="min-h-screen bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground">
+    <RouterView v-if="isNoLayoutPage" />
+    <AppLayout v-else>
+      <RouterView />
+    </AppLayout>
+    <Toaster />
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watchEffect } from 'vue'
 import { useRoute } from 'vue-router'
-import { themeOverrides } from './theme'
+import { useDark } from '@vueuse/core'
+import { Toaster } from '@/components/ui/sonner'
 import AppLayout from './components/AppLayout.vue'
+
+// Initialize dark mode
+useDark()
 
 const route = useRoute()
 const isNoLayoutPage = computed(() => route.path === '/login' || route.meta.noLayout === true)

@@ -104,6 +104,8 @@ export type SiteSettings = {
   logo_url: string
   footer_text: string
   amap_key: string
+  amap_security_js_code: string
+  amap_service_host: string
 }
 
 export function normalizeSiteSettings(raw: unknown): SiteSettings {
@@ -114,6 +116,8 @@ export function normalizeSiteSettings(raw: unknown): SiteSettings {
     logo_url: String(pick(obj, 'logo_url', 'logoUrl', '')),
     footer_text: String(pick(obj, 'footer_text', 'footerText', '')),
     amap_key: String(pick(obj, 'amap_key', 'amapKey', '')),
+    amap_security_js_code: String(pick(obj, 'amap_security_js_code', 'amapSecurityJsCode', '')),
+    amap_service_host: String(pick(obj, 'amap_service_host', 'amapServiceHost', '')),
   }
 }
 

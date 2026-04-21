@@ -47,6 +47,9 @@ public class SiteSettingsController {
         if (body.hasField("logoUrl")) settings.setLogoUrl(body.getLogoUrl());
         if (body.hasField("footerText")) settings.setFooterText(body.getFooterText());
         if (body.hasField("amapKey")) settings.setAmapKey(normalizeOptionalText(body.getAmapKey()));
+        if (body.hasField("amapSecurityJsCode")) settings.setAmapSecurityJsCode(normalizeOptionalText(body.getAmapSecurityJsCode()));
+        if (body.hasField("amapServiceHost")) settings.setAmapServiceHost(normalizeOptionalText(body.getAmapServiceHost()));
+        if (body.hasField("congestionThreshold")) settings.setCongestionThreshold(body.getCongestionThreshold());
         return repo.save(settings);
     }
 

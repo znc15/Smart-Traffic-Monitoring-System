@@ -12,6 +12,11 @@ Thumbs.db
 .claude/
 CLAUDE.md
 flow.js
+AGENTS.md
+.cursor/
+.trae/
+.venv-edge-test/
+docs/
 
 # === Environment ===
 .env

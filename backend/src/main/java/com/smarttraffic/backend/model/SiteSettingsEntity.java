@@ -26,6 +26,15 @@ public class SiteSettingsEntity {
     @Column(name = "amap_key")
     private String amapKey;
 
+    @Column(name = "amap_security_js_code")
+    private String amapSecurityJsCode;
+
+    @Column(name = "amap_service_host")
+    private String amapServiceHost;
+
+    @Column(name = "congestion_threshold")
+    private Double congestionThreshold = 0.8;
+
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
@@ -47,6 +56,12 @@ public class SiteSettingsEntity {
     public void setFooterText(String footerText) { this.footerText = footerText; }
     public String getAmapKey() { return amapKey; }
     public void setAmapKey(String amapKey) { this.amapKey = amapKey; }
+    public String getAmapSecurityJsCode() { return amapSecurityJsCode; }
+    public void setAmapSecurityJsCode(String amapSecurityJsCode) { this.amapSecurityJsCode = amapSecurityJsCode; }
+    public String getAmapServiceHost() { return amapServiceHost; }
+    public void setAmapServiceHost(String amapServiceHost) { this.amapServiceHost = amapServiceHost; }
+    public Double getCongestionThreshold() { return congestionThreshold; }
+    public void setCongestionThreshold(Double congestionThreshold) { this.congestionThreshold = congestionThreshold; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

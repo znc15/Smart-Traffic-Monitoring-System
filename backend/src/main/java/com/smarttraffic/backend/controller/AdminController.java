@@ -127,6 +127,50 @@ public class AdminController {
         return userRepository.findAll(pageable).map(AdminUserResponse::fromEntity);
     }
 
+    @PutMapping("/users/{id}")
+    public AdminUserResponse updateUser(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        requireAdmin();
+        UserEntity user = userRepository.findById(id)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
+        if (body.containsKey("username")) {
+            user.setUsername((String) body.get("username"));
+        }
+        if (body.containsKey("email")) {
+            user.setEmail((String) body.get("email"));
+        }
+        if (body.containsKey("phoneNumber")) {
+            user.setPhoneNumber((String) body.get("phoneNumber"));
+        }
+        if (body.containsKey("is_superuser") || body.containsKey("role_id")) {
+            CurrentUser current = SecurityUtils.requireCurrentUser();
+            if (current.id().equals(id)) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "Cannot modify your own role");
+            }
+            if (body.containsKey("is_superuser")) {
+                boolean isSuper = (Boolean) body.get("is_superuser");
+                user.setRoleId(isSuper ? 1 : 0);
+            } else {
+                user.setRoleId(parseRoleId(body.get("role_id")));
+            }
+        }
+        UserEntity saved = userRepository.save(user);
+        return AdminUserResponse.fromEntity(saved);
+    }
+
+    @DeleteMapping("/users/{id}")
+    public Map<String, String> deleteUser(@PathVariable Long id) {
+        requireAdmin();
+        CurrentUser current = SecurityUtils.requireCurrentUser();
+        if (current.id().equals(id)) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Cannot delete your own account");
+        }
+        if (!userRepository.existsById(id)) {
+            throw new AppException(HttpStatus.NOT_FOUND, "User not found");
+        }
+        userRepository.deleteById(id);
+        return Map.of("detail", "Deleted");
+    }
+
     @PutMapping("/users/{id}/role")
     public Map<String, String> updateUserRole(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         requireAdmin();

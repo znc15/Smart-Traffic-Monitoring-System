@@ -8,6 +8,7 @@ import com.smarttraffic.backend.model.TrafficSampleEntity;
 import com.smarttraffic.backend.repository.TrafficEventRepository;
 import com.smarttraffic.backend.repository.TrafficSampleRepository;
 import com.smarttraffic.backend.service.TrafficService;
+import com.smarttraffic.backend.service.AlertService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +26,7 @@ public class TelemetryIngestionService {
     private final ObjectMapper objectMapper;
     private final MirrorWriteService mirrorWriteService;
     private final RedisCacheService redisCacheService;
+    private final AlertService alertService;
 
     public TelemetryIngestionService(
             TrafficSampleRepository trafficSampleRepository,
@@ -32,7 +34,8 @@ public class TelemetryIngestionService {
             TrafficService trafficService,
             ObjectMapper objectMapper,
             MirrorWriteService mirrorWriteService,
-            RedisCacheService redisCacheService
+            RedisCacheService redisCacheService,
+            AlertService alertService
     ) {
         this.trafficSampleRepository = trafficSampleRepository;
         this.trafficEventRepository = trafficEventRepository;
@@ -40,6 +43,7 @@ public class TelemetryIngestionService {
         this.objectMapper = objectMapper;
         this.mirrorWriteService = mirrorWriteService;
         this.redisCacheService = redisCacheService;
+        this.alertService = alertService;
     }
 
     @Transactional
@@ -74,6 +78,12 @@ public class TelemetryIngestionService {
         sample.setSource("edge");
         trafficSampleRepository.save(sample);
         mirrorWriteService.mirrorTrafficSample(sample);
+
+        try {
+            alertService.checkAndCreateCongestionAlert(request.getRoadName().trim(), trimToNull(request.getNodeId()), congestionIndex);
+        } catch (Exception ex) {
+            // Ignore alert error
+        }
 
         List<EdgeTelemetryRequest.EventPayload> events = request.getEvents() == null ? List.of() : request.getEvents();
         for (EdgeTelemetryRequest.EventPayload item : events) {

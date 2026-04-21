@@ -37,7 +37,7 @@ services:
     networks:
       - mynet
   redis:
-    image: redis:7-alpine
+    image: redis:alpine
     container_name: redis
     ports:
       - "127.0.0.1:6380:6379"
@@ -121,6 +121,8 @@ services:
         VITE_API_HTTP_BASE: ${BACKEND_PUBLIC_HTTP_BASE:-}
         VITE_API_WS_BASE: ${BACKEND_PUBLIC_WS_BASE:-}
         VITE_AMAP_KEY: ${VITE_AMAP_KEY:-}
+        VITE_AMAP_SECURITY_JS_CODE: ${VITE_AMAP_SECURITY_JS_CODE:-}
+        VITE_AMAP_SERVICE_HOST: ${VITE_AMAP_SERVICE_HOST:-}
     container_name: frontend
     depends_on:
       backend:

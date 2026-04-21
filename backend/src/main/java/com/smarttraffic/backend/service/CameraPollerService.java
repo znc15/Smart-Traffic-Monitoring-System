@@ -48,6 +48,7 @@ public class CameraPollerService {
     private final TrafficEventRepository trafficEventRepository;
     private final ObjectMapper objectMapper;
     private final MirrorWriteService mirrorWriteService;
+    private final AlertService alertService;
     private final RestClient restClient;
 
     public CameraPollerService(
@@ -55,13 +56,15 @@ public class CameraPollerService {
             TrafficService trafficService,
             TrafficEventRepository trafficEventRepository,
             ObjectMapper objectMapper,
-            MirrorWriteService mirrorWriteService
+            MirrorWriteService mirrorWriteService,
+            AlertService alertService
     ) {
         this.cameraRepository = cameraRepository;
         this.trafficService = trafficService;
         this.trafficEventRepository = trafficEventRepository;
         this.objectMapper = objectMapper;
         this.mirrorWriteService = mirrorWriteService;
+        this.alertService = alertService;
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(2000);
         factory.setReadTimeout(2000);
@@ -195,6 +198,17 @@ public class CameraPollerService {
             }
         }
 
+        if (data != null && data.containsKey("congestion_index")) {
+            try {
+                Object ci = data.get("congestion_index");
+                if (ci instanceof Number number) {
+                    alertService.checkAndCreateCongestionAlert(roadKey, edgeNodeId, number.doubleValue());
+                }
+            } catch (Exception ex) {
+                log.warn("检查拥堵告警失败: {}", ex.getMessage());
+            }
+        }
+
         return new PollOutcome(frameFailure);
     }
 
@@ -317,6 +331,14 @@ public class CameraPollerService {
             mirrorWriteService.mirrorTrafficEvent(event);
         } catch (Exception ex) {
             log.warn("节点状态变化事件写入失败: {}", ex.getMessage());
+        }
+
+        if (HEALTH_OFFLINE.equals(health.healthStatus) && (REASON_TIMEOUT.equals(health.statusReasonCode) || REASON_TRAFFIC_FETCH_FAILED.equals(health.statusReasonCode))) {
+            try {
+                alertService.createHeartbeatTimeoutAlert(health.roadName, health.edgeNodeId);
+            } catch (Exception ex) {
+                log.warn("告警生成失败: {}", ex.getMessage());
+            }
         }
     }
 

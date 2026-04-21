@@ -2,7 +2,17 @@ declare global {
   interface Window {
     AMap?: any
     __amapLoaderPromises__?: Partial<Record<string, Promise<any>>>
+    _AMapSecurityConfig?: {
+      securityJsCode?: string
+      serviceHost?: string
+    }
   }
+}
+
+export type EnsureAmapOptions = {
+  key: string
+  securityJsCode?: string | null
+  serviceHost?: string | null
 }
 
 const getLoaderMap = () => {
@@ -12,31 +22,71 @@ const getLoaderMap = () => {
   return window.__amapLoaderPromises__
 }
 
-export async function ensureAmap(key: string) {
-  const normalizedKey = String(key || '').trim()
+function normalizeText(value: string | null | undefined): string {
+  return String(value || '').trim()
+}
+
+function resolveSecurityConfig(options: EnsureAmapOptions) {
+  const serviceHost = normalizeText(options.serviceHost)
+  if (serviceHost) {
+    return { serviceHost }
+  }
+
+  const securityJsCode = normalizeText(options.securityJsCode)
+  if (securityJsCode) {
+    return { securityJsCode }
+  }
+
+  return null
+}
+
+function getLoaderCacheKey(key: string, securityConfig: ReturnType<typeof resolveSecurityConfig>) {
+  return JSON.stringify({
+    key,
+    serviceHost: securityConfig?.serviceHost || '',
+    securityJsCode: securityConfig?.securityJsCode || '',
+  })
+}
+
+function applySecurityConfig(securityConfig: ReturnType<typeof resolveSecurityConfig>) {
+  if (securityConfig) {
+    window._AMapSecurityConfig = { ...securityConfig }
+    return
+  }
+
+  delete window._AMapSecurityConfig
+}
+
+export async function ensureAmap(options: EnsureAmapOptions) {
+  const normalizedKey = normalizeText(options.key)
   if (!normalizedKey) {
     throw new Error('缺少 VITE_AMAP_KEY')
   }
   if (window.AMap) {
     return window.AMap
   }
+
+  const securityConfig = resolveSecurityConfig(options)
   const loaderMap = getLoaderMap()
-  if (loaderMap[normalizedKey]) {
-    return loaderMap[normalizedKey]
+  const cacheKey = getLoaderCacheKey(normalizedKey, securityConfig)
+
+  if (loaderMap[cacheKey]) {
+    return loaderMap[cacheKey]
   }
+
   const promise = new Promise<any>((resolve, reject) => {
     const script = document.createElement('script')
-    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(
-      normalizedKey,
-    )}&plugin=AMap.HeatMap,AMap.Scale,AMap.ToolBar`
+    applySecurityConfig(securityConfig)
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(normalizedKey)}`
     script.async = true
     script.onload = () => resolve(window.AMap)
     script.onerror = () => {
-      delete loaderMap[normalizedKey]
+      delete loaderMap[cacheKey]
       reject(new Error('高德地图脚本加载失败'))
     }
     document.head.appendChild(script)
   })
-  loaderMap[normalizedKey] = promise
+
+  loaderMap[cacheKey] = promise
   return promise
 }

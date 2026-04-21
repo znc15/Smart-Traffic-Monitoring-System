@@ -1,180 +1,105 @@
 <template>
-  <section class="login-wrap">
-    <div class="login-card-container">
-      <n-card class="login-card" :bordered="false">
-        <div class="logo-section">
-          <div class="logo-icon">
-            <n-icon size="40" color="#2080f0">
-              <SpeedometerOutline />
-            </n-icon>
+  <section class="min-h-screen flex items-center justify-center bg-background p-4 sm:p-8">
+    <div class="w-full max-w-md space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
+      <div class="text-center space-y-2">
+        <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-6">
+          <Activity class="h-8 w-8" />
+        </div>
+        <h1 class="text-2xl font-semibold tracking-tight text-foreground">智慧交通监控系统</h1>
+        <p class="text-sm text-muted-foreground">Smart Traffic Monitoring</p>
+      </div>
+
+      <Card class="border-muted/50 shadow-xl shadow-primary/5 bg-card/50 backdrop-blur-sm">
+        <CardHeader class="space-y-1">
+          <div class="flex p-1 bg-muted rounded-md mb-4">
+            <button
+              :class="['flex-1 rounded-sm py-1.5 text-sm font-medium transition-all', mode === 'login' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted-foreground/10']"
+              @click="switchMode('login')"
+            >
+              登录
+            </button>
+            <button
+              :class="['flex-1 rounded-sm py-1.5 text-sm font-medium transition-all', mode === 'register' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted-foreground/10']"
+              @click="switchMode('register')"
+            >
+              注册
+            </button>
           </div>
-          <h1 class="system-title">智慧交通监控系统</h1>
-          <p class="system-subtitle">Smart Traffic Monitoring</p>
-        </div>
+          <CardDescription class="text-center">
+            {{ mode === 'login' ? '使用邮箱和密码登录系统' : '首次使用可直接注册，首个用户默认为管理员' }}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form v-if="mode === 'login'" @submit.prevent="handleLogin" class="space-y-4">
+            <div class="space-y-2">
+              <Label for="email">邮箱</Label>
+              <div class="relative">
+                <User class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input id="email" type="email" placeholder="name@example.com" class="pl-9" v-model="loginForm.email" required />
+              </div>
+            </div>
+            <div class="space-y-2">
+              <Label for="password">密码</Label>
+              <div class="relative">
+                <Lock class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input id="password" type="password" placeholder="••••••••" class="pl-9" v-model="loginForm.password" required minlength="8" />
+              </div>
+            </div>
+            <Button type="submit" class="w-full mt-2" :disabled="submitting">
+              {{ submitting ? '登录中...' : '登 录' }}
+            </Button>
+          </form>
 
-        <div class="mode-switch">
-          <n-button
-            :type="mode === 'login' ? 'primary' : 'default'"
-            secondary
-            block
-            @click="switchMode('login')"
-          >
-            登录
-          </n-button>
-          <n-button
-            :type="mode === 'register' ? 'primary' : 'default'"
-            secondary
-            block
-            @click="switchMode('register')"
-          >
-            注册
-          </n-button>
-        </div>
+          <form v-else @submit.prevent="handleRegister" class="space-y-4">
+            <div class="space-y-2">
+              <Label for="reg-username">用户名</Label>
+              <div class="relative">
+                <User class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input id="reg-username" type="text" placeholder="John Doe" class="pl-9" v-model="registerForm.username" required minlength="2" />
+              </div>
+            </div>
+            <div class="space-y-2">
+              <Label for="reg-email">邮箱</Label>
+              <div class="relative">
+                <Mail class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input id="reg-email" type="email" placeholder="name@example.com" class="pl-9" v-model="registerForm.email" required />
+              </div>
+            </div>
+            <div class="space-y-2">
+              <Label for="reg-phone">手机号</Label>
+              <div class="relative">
+                <Phone class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input id="reg-phone" type="tel" placeholder="13800000000" class="pl-9" v-model="registerForm.phoneNumber" required minlength="6" />
+              </div>
+            </div>
+            <div class="space-y-2">
+              <Label for="reg-password">密码</Label>
+              <div class="relative">
+                <Lock class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input id="reg-password" type="password" placeholder="至少 8 位" class="pl-9" v-model="registerForm.password" required minlength="8" />
+              </div>
+            </div>
+            <div class="space-y-2">
+              <Label for="reg-confirm">确认密码</Label>
+              <div class="relative">
+                <ShieldCheck class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input id="reg-confirm" type="password" placeholder="再次输入密码" class="pl-9" v-model="registerForm.confirmPassword" required minlength="8" />
+              </div>
+            </div>
+            <Button type="submit" class="w-full mt-2" :disabled="submitting">
+              {{ submitting ? '注册中...' : '注 册' }}
+            </Button>
+          </form>
 
-        <p class="mode-description">
-          {{ mode === 'login' ? '使用邮箱和密码登录系统' : '首次使用可直接注册，首个用户默认为管理员' }}
-        </p>
+          <div class="mt-6 text-center">
+            <Button variant="link" class="text-xs text-muted-foreground hover:text-primary" @click="switchMode(mode === 'login' ? 'register' : 'login')">
+              {{ mode === 'login' ? '没有账号？立即注册' : '已有账号？返回登录' }}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
-        <n-form
-          v-if="mode === 'login'"
-          ref="loginFormRef"
-          :model="loginForm"
-          :rules="loginRules"
-          label-placement="left"
-          :show-label="false"
-          size="large"
-        >
-          <n-form-item path="email">
-            <n-input
-              v-model:value="loginForm.email"
-              placeholder="请输入邮箱"
-              @keydown.enter="handleLogin"
-            >
-              <template #prefix>
-                <n-icon :component="PersonOutline" />
-              </template>
-            </n-input>
-          </n-form-item>
-
-          <n-form-item path="password">
-            <n-input
-              v-model:value="loginForm.password"
-              type="password"
-              show-password-on="click"
-              placeholder="请输入密码"
-              @keydown.enter="handleLogin"
-            >
-              <template #prefix>
-                <n-icon :component="LockClosedOutline" />
-              </template>
-            </n-input>
-          </n-form-item>
-
-          <n-button
-            type="primary"
-            block
-            strong
-            :loading="submitting"
-            :disabled="submitting"
-            @click="handleLogin"
-          >
-            {{ submitting ? '登录中...' : '登 录' }}
-          </n-button>
-        </n-form>
-
-        <n-form
-          v-else
-          ref="registerFormRef"
-          :model="registerForm"
-          :rules="registerRules"
-          label-placement="left"
-          :show-label="false"
-          size="large"
-        >
-          <n-form-item path="username">
-            <n-input
-              v-model:value="registerForm.username"
-              placeholder="请输入用户名"
-              @keydown.enter="handleRegister"
-            >
-              <template #prefix>
-                <n-icon :component="PersonOutline" />
-              </template>
-            </n-input>
-          </n-form-item>
-
-          <n-form-item path="email">
-            <n-input
-              v-model:value="registerForm.email"
-              placeholder="请输入邮箱"
-              @keydown.enter="handleRegister"
-            >
-              <template #prefix>
-                <n-icon :component="MailOutline" />
-              </template>
-            </n-input>
-          </n-form-item>
-
-          <n-form-item path="phoneNumber">
-            <n-input
-              v-model:value="registerForm.phoneNumber"
-              placeholder="请输入手机号"
-              @keydown.enter="handleRegister"
-            >
-              <template #prefix>
-                <n-icon :component="CallOutline" />
-              </template>
-            </n-input>
-          </n-form-item>
-
-          <n-form-item path="password">
-            <n-input
-              v-model:value="registerForm.password"
-              type="password"
-              show-password-on="click"
-              placeholder="请输入密码（至少 8 位）"
-              @keydown.enter="handleRegister"
-            >
-              <template #prefix>
-                <n-icon :component="LockClosedOutline" />
-              </template>
-            </n-input>
-          </n-form-item>
-
-          <n-form-item path="confirmPassword">
-            <n-input
-              v-model:value="registerForm.confirmPassword"
-              type="password"
-              show-password-on="click"
-              placeholder="请再次输入密码"
-              @keydown.enter="handleRegister"
-            >
-              <template #prefix>
-                <n-icon :component="ShieldCheckmarkOutline" />
-              </template>
-            </n-input>
-          </n-form-item>
-
-          <n-button
-            type="primary"
-            block
-            strong
-            :loading="submitting"
-            :disabled="submitting"
-            @click="handleRegister"
-          >
-            {{ submitting ? '注册中...' : '注 册' }}
-          </n-button>
-        </n-form>
-
-        <div class="switch-hint">
-          <n-button text type="primary" @click="switchMode(mode === 'login' ? 'register' : 'login')">
-            {{ mode === 'login' ? '没有账号？立即注册' : '已有账号？返回登录' }}
-          </n-button>
-        </div>
-      </n-card>
-
-      <p class="copyright">
+      <p class="text-center text-xs text-muted-foreground">
         &copy; {{ new Date().getFullYear() }} Smart Traffic Monitoring System
       </p>
     </div>
@@ -184,22 +109,16 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { useMessage, type FormInst, type FormRules } from 'naive-ui'
-import {
-  SpeedometerOutline,
-  PersonOutline,
-  LockClosedOutline,
-  MailOutline,
-  CallOutline,
-  ShieldCheckmarkOutline,
-} from '@vicons/ionicons5'
+import { toast } from 'vue-sonner'
+import { Activity, User, Lock, Mail, Phone, ShieldCheck } from 'lucide-vue-next'
+import { Card, CardHeader, CardContent, CardDescription } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
 import { endpoints, setToken } from '../lib/api'
 
 const router = useRouter()
-const message = useMessage()
 const mode = ref<'login' | 'register'>('login')
-const loginFormRef = ref<FormInst | null>(null)
-const registerFormRef = ref<FormInst | null>(null)
 const submitting = ref(false)
 
 const loginForm = reactive({
@@ -215,46 +134,6 @@ const registerForm = reactive({
   confirmPassword: '',
 })
 
-const loginRules: FormRules = {
-  email: [
-    { required: true, message: '请输入邮箱', trigger: ['input', 'blur'] },
-    { type: 'email', message: '请输入有效的邮箱地址', trigger: ['blur'] },
-  ],
-  password: [
-    { required: true, message: '请输入密码', trigger: ['input', 'blur'] },
-    { min: 8, message: '密码至少 8 位', trigger: ['blur'] },
-  ],
-}
-
-const registerRules: FormRules = {
-  username: [
-    { required: true, message: '请输入用户名', trigger: ['input', 'blur'] },
-    { min: 2, max: 50, message: '用户名长度需在 2-50 位之间', trigger: ['blur'] },
-  ],
-  email: [
-    { required: true, message: '请输入邮箱', trigger: ['input', 'blur'] },
-    { type: 'email', message: '请输入有效的邮箱地址', trigger: ['blur'] },
-  ],
-  phoneNumber: [
-    { required: true, message: '请输入手机号', trigger: ['input', 'blur'] },
-    { min: 6, max: 20, message: '手机号长度需在 6-20 位之间', trigger: ['blur'] },
-  ],
-  password: [
-    { required: true, message: '请输入密码', trigger: ['input', 'blur'] },
-    { min: 8, message: '密码至少 8 位', trigger: ['blur'] },
-  ],
-  confirmPassword: [
-    { required: true, message: '请再次输入密码', trigger: ['input', 'blur'] },
-    {
-      validator: () =>
-        registerForm.confirmPassword === registerForm.password
-          ? true
-          : new Error('两次输入的密码不一致'),
-      trigger: ['input', 'blur'],
-    },
-  ],
-}
-
 function resetRegisterForm() {
   registerForm.username = ''
   registerForm.email = ''
@@ -268,12 +147,6 @@ function switchMode(nextMode: 'login' | 'register') {
 }
 
 const handleLogin = async () => {
-  try {
-    await loginFormRef.value?.validate()
-  } catch {
-    return
-  }
-
   submitting.value = true
 
   try {
@@ -290,7 +163,7 @@ const handleLogin = async () => {
 
     if (!res.ok) {
       const err = await res.json().catch(() => null)
-      message.error(err?.detail || '登录失败')
+      toast.error(err?.detail || '登录失败')
       return
     }
 
@@ -299,17 +172,17 @@ const handleLogin = async () => {
       setToken(payload.access_token)
     }
     await router.replace('/dashboard')
+    toast.success('登录成功')
   } catch {
-    message.error('网络异常，请稍后再试')
+    toast.error('网络异常，请稍后再试')
   } finally {
     submitting.value = false
   }
 }
 
 const handleRegister = async () => {
-  try {
-    await registerFormRef.value?.validate()
-  } catch {
+  if (registerForm.password !== registerForm.confirmPassword) {
+    toast.error('两次输入的密码不一致')
     return
   }
 
@@ -330,109 +203,19 @@ const handleRegister = async () => {
 
     if (!res.ok) {
       const err = await res.json().catch(() => null)
-      message.error(err?.detail || err?.message || '注册失败')
+      toast.error(err?.detail || err?.message || '注册失败')
       return
     }
 
-    message.success('注册成功，请使用邮箱和密码登录')
+    toast.success('注册成功，请使用邮箱和密码登录')
     loginForm.email = registerForm.email
     loginForm.password = ''
     resetRegisterForm()
     switchMode('login')
   } catch {
-    message.error('网络异常，请稍后再试')
+    toast.error('网络异常，请稍后再试')
   } finally {
     submitting.value = false
   }
 }
 </script>
-
-<style scoped>
-.login-wrap {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #e8f4fd 0%, #f0f7ff 50%, #e1ecf7 100%);
-  padding: 20px;
-}
-
-.login-card-container {
-  animation: fadeInUp 0.6s ease-out both;
-}
-
-.login-card {
-  width: min(400px, 92vw);
-  border-radius: 12px;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
-}
-
-.mode-switch {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.mode-description {
-  margin: 0 0 20px;
-  text-align: center;
-  font-size: 13px;
-  color: #64748b;
-}
-
-.logo-section {
-  text-align: center;
-  margin-bottom: 32px;
-}
-
-.logo-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 72px;
-  height: 72px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #eef4ff 0%, #dbeafe 100%);
-  margin-bottom: 16px;
-}
-
-.system-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #1f2937;
-  margin: 0 0 4px 0;
-  letter-spacing: 1px;
-}
-
-.system-subtitle {
-  font-size: 13px;
-  color: #9ca3af;
-  margin: 0;
-  letter-spacing: 0.5px;
-}
-
-.copyright {
-  text-align: center;
-  font-size: 12px;
-  color: #b0bec5;
-  margin-top: 24px;
-}
-
-.switch-hint {
-  margin-top: 16px;
-  display: flex;
-  justify-content: center;
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(24px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-</style>

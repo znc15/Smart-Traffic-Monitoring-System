@@ -1,117 +1,134 @@
 <template>
-  <section class="dashboard">
+  <div class="space-y-6">
     <!-- 顶部公告栏 -->
-    <n-alert v-if="announcement" type="info" closable>
-      {{ announcement }}
-    </n-alert>
+    <Alert v-if="announcement" variant="default" class="bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
+      <Info class="h-4 w-4 text-blue-600 dark:text-blue-400" />
+      <AlertDescription class="text-blue-800 dark:text-blue-300 ml-2">
+        {{ announcement }}
+      </AlertDescription>
+    </Alert>
 
     <!-- 加载骨架屏 -->
     <template v-if="!state.initialized">
-      <n-grid :cols="24" :x-gap="16" :y-gap="16" responsive="screen" item-responsive>
-        <n-grid-item span="24 m:16">
-          <n-card title="实时监控" size="small">
-            <n-skeleton height="360px" />
-            <n-skeleton text style="margin-top: 12px; width: 40%" />
-          </n-card>
-        </n-grid-item>
-        <n-grid-item span="24 m:8">
-          <n-card title="道路状态" size="small">
-            <n-skeleton text :repeat="8" />
-          </n-card>
-        </n-grid-item>
-      </n-grid>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>实时监控</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Skeleton class="w-full aspect-video rounded-xl" />
+              <Skeleton class="h-4 w-1/3 mt-4" />
+            </CardContent>
+          </Card>
+        </div>
+        <div>
+          <Card>
+            <CardHeader>
+              <CardTitle>道路状态</CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-4">
+              <Skeleton class="h-20 w-full" v-for="i in 4" :key="i" />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </template>
 
     <!-- 主体内容 -->
-    <n-grid v-else :cols="24" :x-gap="16" :y-gap="16" responsive="screen" item-responsive>
+    <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- 左侧：视频流区域 -->
-      <n-grid-item span="24 m:16">
-        <n-card title="实时监控" size="small" :segmented="{ content: true }">
-          <div class="video-box">
-            <img
-              v-if="selectedRoad"
-              :src="frameUrl(selectedRoad)"
-              :alt="selectedRoad"
-            />
-            <n-empty v-else description="暂无路段" class="video-empty" />
-          </div>
-          <n-text v-if="selectedRoad" depth="3" style="margin-top: 10px; display: block">
-            当前路段：{{ selectedRoad }}
-          </n-text>
-        </n-card>
-      </n-grid-item>
+      <div class="lg:col-span-2 space-y-6">
+        <Card class="overflow-hidden">
+          <CardHeader class="border-b bg-muted/30">
+            <CardTitle>实时监控</CardTitle>
+          </CardHeader>
+          <CardContent class="p-6">
+            <div class="aspect-video bg-black rounded-xl overflow-hidden shadow-inner relative flex items-center justify-center">
+              <img
+                v-if="selectedRoad"
+                :src="frameUrl(selectedRoad)"
+                :alt="selectedRoad"
+                class="w-full h-full object-cover"
+              />
+              <div v-else class="text-muted-foreground flex flex-col items-center">
+                <VideoOff class="h-10 w-10 mb-2 opacity-50" />
+                <span>暂无路段</span>
+              </div>
+            </div>
+            <p v-if="selectedRoad" class="text-sm text-muted-foreground mt-4 flex items-center">
+              <MapPin class="h-4 w-4 mr-1.5" />
+              当前路段：<span class="font-medium text-foreground">{{ selectedRoad }}</span>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       <!-- 右侧：道路状态列表 -->
-      <n-grid-item span="24 m:8">
-        <n-card title="道路状态" size="small" :segmented="{ content: true }">
-          <n-empty v-if="!state.roads.length" description="暂无道路数据" />
-          <div v-else class="road-list">
-            <n-card
-              v-for="road in state.roads"
-              :key="road"
-              size="small"
-              hoverable
-              class="road-item"
-              :class="{ 'road-item--active': road === selectedRoad }"
-              @click="selectedRoad = road"
-            >
-              <div class="road-header">
-                <n-text strong>{{ road }}</n-text>
-                <n-tag
-                  :type="tagType(state.trafficData[road]?.density_status)"
-                  size="small"
-                  round
-                >
-                  {{ statusLabel(state.trafficData[road]?.density_status) }}
-                </n-tag>
+      <div class="space-y-6">
+        <Card class="h-full flex flex-col">
+          <CardHeader class="border-b bg-muted/30 shrink-0">
+            <CardTitle>道路状态</CardTitle>
+          </CardHeader>
+          <CardContent class="p-4 flex-1 overflow-y-auto">
+            <div v-if="!state.roads.length" class="h-40 flex items-center justify-center text-muted-foreground">
+              暂无道路数据
+            </div>
+            <div v-else class="space-y-3">
+              <div
+                v-for="road in state.roads"
+                :key="road"
+                class="group p-4 rounded-xl border transition-all cursor-pointer hover:border-primary/50 hover:shadow-md"
+                :class="road === selectedRoad ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'bg-card'"
+                @click="selectedRoad = road"
+              >
+                <div class="flex items-center justify-between mb-3">
+                  <h4 class="font-semibold text-base">{{ road }}</h4>
+                  <Badge :variant="tagVariant(state.trafficData[road]?.density_status)">
+                    {{ statusLabel(state.trafficData[road]?.density_status) }}
+                  </Badge>
+                </div>
+                
+                <div class="grid grid-cols-3 gap-2 mb-3">
+                  <div class="flex flex-col">
+                    <span class="text-xs text-muted-foreground mb-1">汽车</span>
+                    <span class="text-lg font-bold font-mono">{{ state.trafficData[road]?.count_car ?? 0 }}</span>
+                  </div>
+                  <div class="flex flex-col">
+                    <span class="text-xs text-muted-foreground mb-1">非机动车</span>
+                    <span class="text-lg font-bold font-mono">{{ state.trafficData[road]?.count_motor ?? 0 }}</span>
+                  </div>
+                  <div class="flex flex-col">
+                    <span class="text-xs text-muted-foreground mb-1">行人</span>
+                    <span class="text-lg font-bold font-mono">{{ state.trafficData[road]?.count_person ?? 0 }}</span>
+                  </div>
+                </div>
+
+                <div class="flex gap-4 text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
+                  <span class="flex items-center"><Gauge class="h-3 w-3 mr-1" />车速 {{ state.trafficData[road]?.speed_car ?? 0 }} km/h</span>
+                  <span class="flex items-center"><Gauge class="h-3 w-3 mr-1" />摩托 {{ state.trafficData[road]?.speed_motor ?? 0 }} km/h</span>
+                </div>
               </div>
-              <div class="road-stats">
-                <n-statistic label="汽车" tabular-nums>
-                  <n-number-animation
-                    :from="0"
-                    :to="state.trafficData[road]?.count_car ?? 0"
-                    :duration="600"
-                  />
-                </n-statistic>
-                <n-statistic label="非机动车" tabular-nums>
-                  <n-number-animation
-                    :from="0"
-                    :to="state.trafficData[road]?.count_motor ?? 0"
-                    :duration="600"
-                  />
-                </n-statistic>
-                <n-statistic label="行人" tabular-nums>
-                  <n-number-animation
-                    :from="0"
-                    :to="state.trafficData[road]?.count_person ?? 0"
-                    :duration="600"
-                  />
-                </n-statistic>
-              </div>
-              <div class="road-speed">
-                <n-text depth="3">
-                  车速 {{ state.trafficData[road]?.speed_car ?? 0 }} km/h
-                </n-text>
-                <n-text depth="3">
-                  摩托 {{ state.trafficData[road]?.speed_motor ?? 0 }} km/h
-                </n-text>
-              </div>
-            </n-card>
-          </div>
-        </n-card>
-      </n-grid-item>
-    </n-grid>
-  </section>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
-import { useMessage } from 'naive-ui'
+import { toast } from 'vue-sonner'
+import { Info, VideoOff, MapPin, Gauge } from 'lucide-vue-next'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Skeleton } from '@/components/ui/skeleton'
 import { endpoints } from '../lib/api'
 import { normalizeSiteSettings } from '../lib/normalize'
 import { initializeTrafficStore, refreshRoads, useTrafficStoreState } from '../store/traffic'
 
-const message = useMessage()
 const state = useTrafficStoreState()
 const selectedRoad = ref<string | null>(null)
 const announcement = ref('')
@@ -128,11 +145,11 @@ const statusLabel = (status?: string) => {
   return '未知'
 }
 
-const tagType = (status?: string): 'error' | 'warning' | 'success' | 'default' => {
-  if (status === 'congested') return 'error'
+const tagVariant = (status?: string): 'destructive' | 'warning' | 'default' | 'secondary' => {
+  if (status === 'congested') return 'destructive'
   if (status === 'busy') return 'warning'
-  if (status === 'clear') return 'success'
-  return 'default'
+  if (status === 'clear') return 'default'
+  return 'secondary'
 }
 
 async function doRefreshRoads() {
@@ -142,7 +159,7 @@ async function doRefreshRoads() {
       selectedRoad.value = latestRoads[0] || null
     }
   } catch {
-    message.warning('刷新道路列表失败')
+    toast.warning('刷新道路列表失败')
   }
 }
 
@@ -156,7 +173,6 @@ onMounted(async () => {
   await initializeTrafficStore()
   selectedRoad.value = state.roads[0] || null
 
-  // Refresh road list to pick up any new cameras added since last load
   await doRefreshRoads()
 
   try {
@@ -166,7 +182,7 @@ onMounted(async () => {
       announcement.value = normalizeSiteSettings(payload).announcement
     }
   } catch {
-    message.warning('获取站点公告失败')
+    toast.warning('获取站点公告失败')
   }
 
   document.addEventListener('visibilitychange', handleVisibilityChange)
@@ -183,74 +199,3 @@ onUnmounted(() => {
   }
 })
 </script>
-
-<style scoped>
-.dashboard {
-  display: grid;
-  gap: 16px;
-}
-
-.video-box {
-  aspect-ratio: 16 / 9;
-  border-radius: 8px;
-  background: #111827;
-  overflow: hidden;
-}
-
-.video-box img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.video-empty {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.road-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.road-item {
-  cursor: pointer;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.road-item--active {
-  border-color: #2080f0;
-  box-shadow: 0 0 0 2px rgba(32, 128, 240, 0.15);
-}
-
-.road-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.road-stats {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.road-stats :deep(.n-statistic .n-statistic-value) {
-  font-size: 20px;
-}
-
-.road-stats :deep(.n-statistic .n-statistic__label) {
-  font-size: 12px;
-}
-
-.road-speed {
-  margin-top: 8px;
-  display: flex;
-  gap: 16px;
-  font-size: 13px;
-}
-</style>

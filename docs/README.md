@@ -68,6 +68,7 @@ docs/
 |------|------|
 | [gap-baseline.md](reports/gap-baseline.md) | 差距基线分析 |
 | [perf-evidence-template.md](reports/perf-evidence-template.md) | 性能证据模板 |
+| [cloud-data-management-module-diagram.md](reports/cloud-data-management-module-diagram.md) | 云端数据管理模块图（遥测接入、校验、入库、心跳、事件） |
 
 ## 使用建议
 

@@ -1,102 +1,64 @@
 <template>
-  <section class="map-page">
-    <n-card size="small" class="map-toolbar">
-      <n-space justify="space-between" align="center" :wrap="true">
+  <div class="h-full min-h-[calc(100vh-120px)] relative rounded-2xl overflow-hidden shadow-lg border border-border">
+    <div ref="mapContainerRef" class="absolute inset-0 bg-muted/20" />
+
+    <div class="absolute left-6 right-6 top-6 flex flex-col gap-4 pointer-events-none z-10">
+      <div class="p-5 rounded-2xl bg-background/85 backdrop-blur-xl border border-border/50 shadow-xl pointer-events-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <div class="toolbar-title">城市路网 GIS 总览</div>
-          <div class="toolbar-subtitle">
-            展示监测点位、拥堵热力、实时流量与最近快照
-          </div>
+          <h1 class="text-xl font-bold text-foreground">城市路网 GIS 地图</h1>
+          <p class="text-sm text-muted-foreground mt-1">
+            当前页面仅显示地图，点位详情请直接点击地图标记查看
+          </p>
         </div>
-        <n-space>
-          <n-tag :type="effectiveAmapKey ? 'success' : 'warning'" round>
+        <div class="flex items-center gap-3">
+          <Badge :variant="effectiveAmapKey ? 'default' : 'warning'" class="px-3 py-1 text-sm">
             {{ amapStatusText }}
-          </n-tag>
-          <n-button tertiary @click="onlineOnly = !onlineOnly">
+          </Badge>
+          <Button variant="secondary" @click="onlineOnly = !onlineOnly">
             {{ onlineOnly ? '显示全部节点' : '仅看在线节点' }}
-          </n-button>
-          <n-button :loading="loading" @click="refreshOverview">刷新</n-button>
-        </n-space>
-      </n-space>
-    </n-card>
+          </Button>
+          <Button :disabled="loading" @click="refreshOverview">
+            <RefreshCw class="w-4 h-4 mr-2" :class="{ 'animate-spin': loading }" />
+            刷新
+          </Button>
+        </div>
+      </div>
 
-    <n-grid :cols="24" :x-gap="16" :y-gap="16" responsive="screen" item-responsive>
-      <n-grid-item span="24 l:17">
-        <n-card size="small" :bordered="false" class="map-card">
-          <div ref="mapContainerRef" class="map-canvas" />
-          <n-alert v-if="mapError" type="error" class="map-overlay">
-            {{ mapError }}
-          </n-alert>
-          <n-alert v-else-if="!effectiveAmapKey" type="warning" class="map-overlay">
-            未配置后台 `amap_key`，且缺少部署 fallback `VITE_AMAP_KEY`，当前仅展示点位列表与数据卡片。
-          </n-alert>
-          <n-alert v-else-if="!mappableItems.length && !loading" type="info" class="map-overlay">
-            当前没有可绘制的点位坐标。
-            已加载 {{ items.length }} 个节点，其中 {{ missingCoordinateCount }} 个缺少经纬度。
-          </n-alert>
-        </n-card>
-      </n-grid-item>
-
-      <n-grid-item span="24 l:7">
-        <n-space vertical :size="16" style="width: 100%">
-          <n-card size="small" title="实时摘要" :bordered="false">
-            <n-statistic label="监测点位" :value="filteredItems.length" />
-            <n-statistic label="在线节点" :value="onlineCount" style="margin-top: 12px" />
-            <n-statistic label="高拥堵点位" :value="highCongestionCount" style="margin-top: 12px" />
-          </n-card>
-
-          <n-card size="small" title="点位明细" :bordered="false">
-            <n-empty v-if="!filteredItems.length && !loading" description="暂无地图数据" />
-            <div v-else class="map-list">
-              <button
-                v-for="item in filteredItems"
-                :key="`${item.camera_id}-${item.road_name}`"
-                type="button"
-                class="map-list-item"
-                @click="focusMarker(item)"
-              >
-                <div class="map-list-head">
-                  <span>{{ item.road_name || item.name || '未命名节点' }}</span>
-                  <n-tag size="small" :type="statusTag(item.density_status)">
-                    {{ densityLabel(item.density_status) }}
-                  </n-tag>
-                </div>
-                <div class="map-list-meta">
-                  车流 {{ item.count_car + item.count_motor }} / 在线 {{ item.online ? '是' : '否' }}
-                </div>
-                <div class="map-list-meta">
-                  拥堵指数 {{ item.congestion_index.toFixed(2) }}
-                </div>
-              </button>
-            </div>
-          </n-card>
-
-          <n-card v-if="selectedItem" size="small" title="点位详情" :bordered="false">
-            <div class="detail-grid">
-              <div>道路：{{ selectedItem.road_name || selectedItem.name || '未命名' }}</div>
-              <div>节点：{{ selectedItem.edge_node_id || '未配置' }}</div>
-              <div>车辆：{{ selectedItem.count_car + selectedItem.count_motor }}</div>
-              <div>行人：{{ selectedItem.count_person }}</div>
-              <div>拥堵：{{ densityLabel(selectedItem.density_status) }}</div>
-              <div>更新时间：{{ formatDateTime(selectedItem.updated_at) }}</div>
-            </div>
-            <img
-              v-if="selectedSnapshot"
-              :src="selectedSnapshot"
-              :alt="selectedItem.road_name"
-              class="detail-image"
-            />
-          </n-card>
-        </n-space>
-      </n-grid-item>
-    </n-grid>
-  </section>
+      <Alert v-if="mapError" variant="destructive" class="pointer-events-auto shadow-lg bg-destructive/10 backdrop-blur-md">
+        <AlertTriangle class="w-4 h-4" />
+        <AlertTitle>错误</AlertTitle>
+        <AlertDescription>{{ mapError }}</AlertDescription>
+      </Alert>
+      <Alert v-else-if="!effectiveAmapKey" variant="warning" class="pointer-events-auto shadow-lg bg-warning/10 backdrop-blur-md border-warning/50">
+        <AlertTriangle class="w-4 h-4 text-warning" />
+        <AlertTitle class="text-warning">配置缺失</AlertTitle>
+        <AlertDescription class="text-warning">未配置后台 `amap_key`，且缺少部署 fallback `VITE_AMAP_KEY`，当前无法显示地图。</AlertDescription>
+      </Alert>
+      <Alert v-else-if="!mappableItems.length && !loading" variant="default" class="pointer-events-auto shadow-lg bg-background/85 backdrop-blur-md">
+        <Info class="w-4 h-4" />
+        <AlertTitle>提示</AlertTitle>
+        <AlertDescription>
+          当前没有可绘制的点位坐标。已加载 {{ items.length }} 个节点，其中 {{ missingCoordinateCount }} 个缺少经纬度。
+        </AlertDescription>
+      </Alert>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { NAlert, NButton, NCard, NEmpty, NGrid, NGridItem, NSpace, NStatistic, NTag, useMessage } from 'naive-ui'
-import { AMAP_KEY, authFetch, endpoints } from '../lib/api'
+import { toast } from 'vue-sonner'
+import { RefreshCw, AlertTriangle, Info } from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import {
+  AMAP_KEY,
+  AMAP_SECURITY_JS_CODE,
+  AMAP_SERVICE_HOST,
+  authFetch,
+  endpoints,
+} from '../lib/api'
 import { ensureAmap } from '../lib/amap'
 import {
   normalizeMapOverviewPoint,
@@ -105,11 +67,9 @@ import {
   type SiteSettings,
 } from '../lib/normalize'
 
-const message = useMessage()
 const loading = ref(false)
 const mapError = ref('')
 const items = ref<MapOverviewPoint[]>([])
-const selectedItem = ref<MapOverviewPoint | null>(null)
 const onlineOnly = ref(false)
 const mapContainerRef = ref<HTMLDivElement | null>(null)
 const siteSettings = ref<SiteSettings>(normalizeSiteSettings({}))
@@ -117,7 +77,9 @@ const siteSettings = ref<SiteSettings>(normalizeSiteSettings({}))
 let mapInstance: any = null
 let infoWindow: any = null
 let heatmapLayer: any = null
-const markerMap = new Map<string, any>()
+let mapPluginsReady = false
+let renderEpoch = 0
+const AMAP_PLUGINS = ['AMap.Scale', 'AMap.ToolBar', 'AMap.HeatMap']
 
 const filteredItems = computed(() =>
   onlineOnly.value ? items.value.filter((item) => item.online) : items.value,
@@ -128,13 +90,17 @@ const mappableItems = computed(() =>
 const missingCoordinateCount = computed(
   () => filteredItems.value.length - mappableItems.value.length,
 )
-const onlineCount = computed(() => filteredItems.value.filter((item) => item.online).length)
-const highCongestionCount = computed(
-  () => filteredItems.value.filter((item) => item.congestion_index >= 0.7).length,
-)
 const effectiveAmapKey = computed(() => {
   const runtimeKey = siteSettings.value.amap_key.trim()
   return runtimeKey || String(AMAP_KEY || '').trim()
+})
+const effectiveAmapSecurityJsCode = computed(() => {
+  const runtimeCode = siteSettings.value.amap_security_js_code.trim()
+  return runtimeCode || String(AMAP_SECURITY_JS_CODE || '').trim()
+})
+const effectiveAmapServiceHost = computed(() => {
+  const runtimeHost = siteSettings.value.amap_service_host.trim()
+  return runtimeHost || String(AMAP_SERVICE_HOST || '').trim()
 })
 const amapStatusText = computed(() => {
   if (!effectiveAmapKey.value) {
@@ -142,19 +108,6 @@ const amapStatusText = computed(() => {
   }
   return siteSettings.value.amap_key.trim() ? 'AMap 已由后台配置' : 'AMap 使用部署 fallback'
 })
-const selectedSnapshot = computed(() => {
-  if (!selectedItem.value) return ''
-  return (
-    selectedItem.value.snapshot_url ||
-    endpoints.frameNoAuth(selectedItem.value.road_name || selectedItem.value.name)
-  )
-})
-
-const statusTag = (densityStatus: string) => {
-  if (densityStatus === 'congested') return 'error'
-  if (densityStatus === 'busy') return 'warning'
-  return 'success'
-}
 
 const densityLabel = (densityStatus: string) => {
   if (densityStatus === 'congested') return '拥堵'
@@ -170,42 +123,49 @@ const formatDateTime = (value: string | null) => {
 
 const markerColor = (item: MapOverviewPoint) => {
   if (!item.online) return '#64748b'
-  if (item.congestion_index >= 0.7) return '#dc2626'
+  if (item.congestion_index >= 0.7) return '#ef4444'
   if (item.congestion_index >= 0.4) return '#f59e0b'
-  return '#16a34a'
+  return '#22c55e'
 }
 
 const markerHtml = (item: MapOverviewPoint) => `
   <div style="
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     border-radius: 999px;
     background: ${markerColor(item)};
-    border: 3px solid rgba(255,255,255,0.92);
-    box-shadow: 0 10px 28px rgba(15,23,42,0.24);
+    border: 3px solid rgba(255,255,255,0.95);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   "></div>
 `
 
 const infoHtml = (item: MapOverviewPoint) => `
-  <div style="min-width:240px;padding:4px 2px;line-height:1.8">
-    <div style="font-weight:700;font-size:15px">${item.road_name || item.name || '未命名'}</div>
-    <div>节点：${item.edge_node_id || '未配置'}</div>
-    <div>在线：${item.online ? '是' : '否'} / 拥堵：${densityLabel(item.density_status)}</div>
-    <div>车辆：${item.count_car + item.count_motor} / 行人：${item.count_person}</div>
-    <div>速度：${item.speed_car.toFixed(1)} km/h</div>
-    <div>更新时间：${formatDateTime(item.updated_at)}</div>
+  <div style="min-width:260px;padding:8px 4px;font-family:ui-sans-serif,system-ui,sans-serif;color:#1e293b;">
+    <div style="font-weight:700;font-size:16px;margin-bottom:8px;color:#0f172a;">${item.road_name || item.name || '未命名'}</div>
+    <div style="font-size:13px;margin-bottom:4px;color:#475569;">节点 ID：<span style="font-family:monospace;background:#f1f5f9;padding:2px 4px;border-radius:4px;">${item.edge_node_id || '未配置'}</span></div>
+    <div style="font-size:13px;margin-bottom:4px;color:#475569;">状态：<strong style="color:${item.online?'#22c55e':'#ef4444'}">${item.online ? '在线' : '离线'}</strong> / 拥堵：<strong>${densityLabel(item.density_status)}</strong></div>
+    <div style="font-size:13px;margin-bottom:4px;color:#475569;">车辆：<strong>${item.count_car + item.count_motor}</strong> / 行人：<strong>${item.count_person}</strong></div>
+    <div style="font-size:13px;margin-bottom:4px;color:#475569;">速度：<strong>${item.speed_car.toFixed(1)}</strong> km/h</div>
+    <div style="font-size:12px;color:#94a3b8;margin-top:8px;">更新时间：${formatDateTime(item.updated_at)}</div>
     ${
       (item.snapshot_url || endpoints.frameNoAuth(item.road_name || item.name))
         ? `<img src="${item.snapshot_url || endpoints.frameNoAuth(item.road_name || item.name)}" alt="${
             item.road_name || item.name
-          }" style="width:100%;margin-top:8px;border-radius:10px" />`
+          }" style="width:100%;margin-top:12px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1)" />`
         : ''
     }
   </div>
 `
 
+const isLatestRender = (epoch: number) => epoch === renderEpoch
+
+const loadAmapPlugins = (AMap: any) =>
+  new Promise<void>((resolve) => {
+    AMap.plugin(AMAP_PLUGINS, () => resolve())
+  })
+
 const destroyMap = () => {
-  markerMap.clear()
+  renderEpoch += 1
   if (heatmapLayer) {
     heatmapLayer.setMap?.(null)
     heatmapLayer = null
@@ -214,32 +174,60 @@ const destroyMap = () => {
     mapInstance.destroy()
     mapInstance = null
   }
+  mapPluginsReady = false
   infoWindow = null
 }
 
 const renderMap = async () => {
   if (!mapContainerRef.value || !mappableItems.value.length || !effectiveAmapKey.value) {
+    mapError.value = ''
     destroyMap()
     return
   }
+
+  const currentEpoch = ++renderEpoch
+
   try {
-    const AMap = await ensureAmap(effectiveAmapKey.value)
-    if (!AMap || !mapContainerRef.value) return
+    const AMap = await ensureAmap({
+      key: effectiveAmapKey.value,
+      securityJsCode: effectiveAmapSecurityJsCode.value,
+      serviceHost: effectiveAmapServiceHost.value,
+    })
+    if (!isLatestRender(currentEpoch) || !AMap || !mapContainerRef.value) return
 
     if (!mapInstance) {
       mapInstance = new AMap.Map(mapContainerRef.value, {
         viewMode: '3D',
-        zoom: 12,
+        zoom: 13,
+        mapStyle: 'amap://styles/dark', // Dark map style for industrial look
         center: [mappableItems.value[0].longitude, mappableItems.value[0].latitude],
-        mapStyle: 'amap://styles/light',
       })
-      mapInstance.addControl(new AMap.Scale())
-      mapInstance.addControl(new AMap.ToolBar({ position: 'RB' }))
-      infoWindow = new AMap.InfoWindow({ offset: new AMap.Pixel(0, -18) })
     }
 
+    if (!mapPluginsReady) {
+      await loadAmapPlugins(AMap)
+      if (!isLatestRender(currentEpoch) || !mapInstance) return
+
+      mapInstance.addControl(new AMap.Scale())
+      mapInstance.addControl(new AMap.ToolBar({ position: 'RB' }))
+      infoWindow = new AMap.InfoWindow({ offset: new AMap.Pixel(0, -22) })
+      heatmapLayer = new AMap.HeatMap(mapInstance, {
+        radius: 40,
+        opacity: [0.15, 0.85],
+        gradient: {
+          0.2: '#3b82f6',
+          0.45: '#eab308',
+          0.7: '#f43f5e',
+          1.0: '#b91c1c',
+        },
+      })
+      mapPluginsReady = true
+    }
+
+    if (!isLatestRender(currentEpoch) || !mapInstance) return
+
     mapInstance.clearMap()
-    markerMap.clear()
+    mapError.value = ''
 
     const heatPoints = mappableItems.value
       .map((item) => ({
@@ -256,36 +244,22 @@ const renderMap = async () => {
           content: markerHtml(item),
         })
         marker.on('click', () => {
-          selectedItem.value = item
           infoWindow.setContent(infoHtml(item))
           infoWindow.open(mapInstance, marker.getPosition())
         })
-        markerMap.set(item.road_name || item.name, marker)
         return marker
       })
 
     if (markers.length) {
       mapInstance.add(markers)
-      mapInstance.setFitView(markers, false, [64, 64, 64, 64])
+      mapInstance.setFitView(markers, false, [80, 80, 80, 80])
     }
 
-    mapInstance.plugin(['AMap.HeatMap'], () => {
-      if (heatmapLayer) {
-        heatmapLayer.setMap(null)
-      }
-      heatmapLayer = new AMap.HeatMap(mapInstance, {
-        radius: 35,
-        opacity: [0.15, 0.82],
-        gradient: {
-          0.2: '#38bdf8',
-          0.45: '#facc15',
-          0.7: '#fb7185',
-          1.0: '#b91c1c',
-        },
-      })
+    if (heatmapLayer) {
       heatmapLayer.setDataSet({ data: heatPoints, max: 100 })
-    })
+    }
   } catch (error) {
+    if (!isLatestRender(currentEpoch)) return
     mapError.value = error instanceof Error ? error.message : '地图初始化失败'
   }
 }
@@ -323,35 +297,23 @@ const refreshOverview = async () => {
           ? payload.content
           : []
     items.value = rawItems.map((item: unknown) => normalizeMapOverviewPoint(item))
-    selectedItem.value = items.value[0] || null
-    await nextTick()
-    await renderMap()
   } catch (error) {
     mapError.value = error instanceof Error ? error.message : '加载地图数据失败'
-    message.error(mapError.value)
+    toast.error(mapError.value)
   } finally {
     loading.value = false
   }
 }
 
-const focusMarker = (item: MapOverviewPoint) => {
-  selectedItem.value = item
-  const marker = markerMap.get(item.road_name || item.name)
-  if (marker && mapInstance && infoWindow) {
-    mapInstance.setCenter(marker.getPosition())
-    infoWindow.setContent(infoHtml(item))
-    infoWindow.open(mapInstance, marker.getPosition())
-  }
-}
-
-watch([filteredItems, mappableItems, effectiveAmapKey], async ([value, drawable, key]) => {
-  if (!value.length || !drawable.length || !key) {
+watch([mappableItems, effectiveAmapKey, effectiveAmapSecurityJsCode, effectiveAmapServiceHost], async ([drawable, key]) => {
+  if (!drawable.length || !key) {
+    mapError.value = ''
     destroyMap()
     return
   }
   await nextTick()
   await renderMap()
-})
+}, { flush: 'post' })
 
 onMounted(() => {
   refreshOverview()
@@ -361,115 +323,3 @@ onUnmounted(() => {
   destroyMap()
 })
 </script>
-
-<style scoped>
-.map-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.map-toolbar {
-  border-radius: 18px;
-}
-
-.toolbar-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.toolbar-subtitle {
-  margin-top: 4px;
-  color: #64748b;
-  font-size: 13px;
-}
-
-.map-card {
-  position: relative;
-  overflow: hidden;
-  min-height: 620px;
-}
-
-.map-canvas {
-  min-height: 620px;
-  width: 100%;
-  border-radius: 18px;
-  background:
-    radial-gradient(circle at top, rgba(56, 189, 248, 0.16), transparent 36%),
-    linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
-}
-
-.map-overlay {
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  top: 16px;
-}
-
-.map-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: 420px;
-  overflow: auto;
-}
-
-.map-list-item {
-  border: 0;
-  text-align: left;
-  background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
-  border-radius: 14px;
-  padding: 12px 14px;
-  cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
-}
-
-.map-list-item:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
-}
-
-.map-list-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: center;
-  font-weight: 600;
-  color: #0f172a;
-}
-
-.map-list-meta {
-  margin-top: 6px;
-  color: #64748b;
-  font-size: 13px;
-}
-
-.detail-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  color: #334155;
-  font-size: 13px;
-}
-
-.detail-image {
-  width: 100%;
-  margin-top: 14px;
-  border-radius: 16px;
-  object-fit: cover;
-  min-height: 180px;
-  background: #e2e8f0;
-}
-
-@media (max-width: 768px) {
-  .map-card,
-  .map-canvas {
-    min-height: 420px;
-  }
-
-  .detail-grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

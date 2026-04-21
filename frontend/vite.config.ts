@@ -1,31 +1,16 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import AutoImport from 'unplugin-auto-import/vite'
-import Components from 'unplugin-vue-components/vite'
-import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
+import path from 'path'
 
 export default defineConfig({
   plugins: [
     vue(),
-    AutoImport({
-      imports: [
-        'vue',
-        {
-          'naive-ui': [
-            'useDialog',
-            'useMessage',
-            'useNotification',
-            'useLoadingBar',
-          ],
-        },
-      ],
-      dts: 'src/auto-imports.d.ts',
-    }),
-    Components({
-      resolvers: [NaiveUiResolver()],
-      dts: 'src/components.d.ts',
-    }),
   ],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   server: {
     host: '0.0.0.0',
     port: 5174,
@@ -45,7 +30,6 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'naive-ui': ['naive-ui'],
           'echarts': ['echarts/core', 'echarts/renderers', 'echarts/charts', 'echarts/components'],
           'vue-vendor': ['vue', 'vue-router'],
         },
