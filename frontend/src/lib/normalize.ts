@@ -106,6 +106,13 @@ export type SiteSettings = {
   amap_key: string
   amap_security_js_code: string
   amap_service_host: string
+  llm_provider: string
+  llm_api_base_url: string
+  llm_api_key: string
+  llm_model_name: string
+  ai_float_visible_pages: string
+  llm_title_model_name: string
+  llm_title_prompt: string
 }
 
 export function normalizeSiteSettings(raw: unknown): SiteSettings {
@@ -118,6 +125,13 @@ export function normalizeSiteSettings(raw: unknown): SiteSettings {
     amap_key: String(pick(obj, 'amap_key', 'amapKey', '')),
     amap_security_js_code: String(pick(obj, 'amap_security_js_code', 'amapSecurityJsCode', '')),
     amap_service_host: String(pick(obj, 'amap_service_host', 'amapServiceHost', '')),
+    llm_provider: String(pick(obj, 'llm_provider', 'llmProvider', '')),
+    llm_api_base_url: String(pick(obj, 'llm_api_base_url', 'llmApiBaseUrl', '')),
+    llm_api_key: String(pick(obj, 'llm_api_key', 'llmApiKey', '')),
+    llm_model_name: String(pick(obj, 'llm_model_name', 'llmModelName', '')),
+    ai_float_visible_pages: String(pick(obj, 'ai_float_visible_pages', 'aiFloatVisiblePages', '')),
+    llm_title_model_name: String(pick(obj, 'llm_title_model_name', 'llmTitleModelName', '')),
+    llm_title_prompt: String(pick(obj, 'llm_title_prompt', 'llmTitlePrompt', '')),
   }
 }
 

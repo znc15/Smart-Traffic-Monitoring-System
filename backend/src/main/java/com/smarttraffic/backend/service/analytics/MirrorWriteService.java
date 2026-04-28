@@ -2,7 +2,6 @@ package com.smarttraffic.backend.service.analytics;
 
 import com.smarttraffic.backend.config.DbRuntimeProperties;
 import com.smarttraffic.backend.model.TrafficEventEntity;
-import com.smarttraffic.backend.model.TrafficPredictionEntity;
 import com.smarttraffic.backend.model.TrafficSampleEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -131,54 +130,6 @@ public class MirrorWriteService {
                 target.jdbc.update(sql, params);
             } catch (Exception ex) {
                 log.warn("mirror event write failed: {}", ex.getMessage());
-            }
-        });
-    }
-
-    public void mirrorPrediction(TrafficPredictionEntity prediction) {
-        resolveMirrorTarget().ifPresent(target -> {
-            String sql;
-            if (target.dialect.equals("mysql")) {
-                sql = """
-                        INSERT INTO traffic_predictions (
-                            road_name, generated_at, predict_time, predicted_flow, confidence_low, confidence_high, algorithm
-                        ) VALUES (
-                            :roadName, :generatedAt, :predictTime, :predictedFlow, :confidenceLow, :confidenceHigh, :algorithm
-                        )
-                        ON DUPLICATE KEY UPDATE
-                            predicted_flow = VALUES(predicted_flow),
-                            confidence_low = VALUES(confidence_low),
-                            confidence_high = VALUES(confidence_high),
-                            algorithm = VALUES(algorithm)
-                        """;
-            } else {
-                sql = """
-                        INSERT INTO traffic_predictions (
-                            road_name, generated_at, predict_time, predicted_flow, confidence_low, confidence_high, algorithm
-                        ) VALUES (
-                            :roadName, :generatedAt, :predictTime, :predictedFlow, :confidenceLow, :confidenceHigh, :algorithm
-                        )
-                        ON CONFLICT (road_name, generated_at, predict_time) DO UPDATE SET
-                            predicted_flow = EXCLUDED.predicted_flow,
-                            confidence_low = EXCLUDED.confidence_low,
-                            confidence_high = EXCLUDED.confidence_high,
-                            algorithm = EXCLUDED.algorithm
-                        """;
-            }
-
-            MapSqlParameterSource params = new MapSqlParameterSource()
-                    .addValue("roadName", prediction.getRoadName())
-                    .addValue("generatedAt", prediction.getGeneratedAt())
-                    .addValue("predictTime", prediction.getPredictTime())
-                    .addValue("predictedFlow", prediction.getPredictedFlow())
-                    .addValue("confidenceLow", prediction.getConfidenceLow())
-                    .addValue("confidenceHigh", prediction.getConfidenceHigh())
-                    .addValue("algorithm", prediction.getAlgorithm());
-
-            try {
-                target.jdbc.update(sql, params);
-            } catch (Exception ex) {
-                log.warn("mirror prediction write failed: {}", ex.getMessage());
             }
         });
     }

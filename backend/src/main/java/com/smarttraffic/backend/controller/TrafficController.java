@@ -1,22 +1,25 @@
 package com.smarttraffic.backend.controller;
 
 import com.smarttraffic.backend.dto.traffic.RoadNamesResponse;
-import com.smarttraffic.backend.dto.traffic.PredictionResponse;
+import com.smarttraffic.backend.dto.traffic.TrafficSampleResponse;
 import com.smarttraffic.backend.exception.AppException;
+import com.smarttraffic.backend.model.TrafficSampleEntity;
+import com.smarttraffic.backend.repository.TrafficSampleRepository;
 import com.smarttraffic.backend.security.SecurityUtils;
 import com.smarttraffic.backend.service.RoadService;
 import com.smarttraffic.backend.service.TrafficService;
 import com.smarttraffic.backend.service.analytics.RedisCacheService;
-import com.smarttraffic.backend.service.analytics.TrafficPredictionService;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -24,20 +27,20 @@ import java.util.Map;
 public class TrafficController {
 
     private final TrafficService trafficService;
-    private final TrafficPredictionService trafficPredictionService;
     private final RedisCacheService redisCacheService;
     private final RoadService roadService;
+    private final TrafficSampleRepository trafficSampleRepository;
 
     public TrafficController(
             TrafficService trafficService,
-            TrafficPredictionService trafficPredictionService,
             RedisCacheService redisCacheService,
-            RoadService roadService
+            RoadService roadService,
+            TrafficSampleRepository trafficSampleRepository
     ) {
         this.trafficService = trafficService;
-        this.trafficPredictionService = trafficPredictionService;
         this.redisCacheService = redisCacheService;
         this.roadService = roadService;
+        this.trafficSampleRepository = trafficSampleRepository;
     }
 
     @GetMapping("/roads_name")
@@ -76,17 +79,29 @@ public class TrafficController {
         return ResponseEntity.ok(trafficService.frame(roadName));
     }
 
-    @GetMapping("/traffic/predictions")
-    public PredictionResponse predictions(
-            @RequestParam("road_name") String roadName,
-            @RequestParam(value = "horizon_minutes", defaultValue = "60") Integer horizonMinutes
+    @GetMapping("/traffic/samples/recent")
+    public List<TrafficSampleResponse> recentSamples(
+            @RequestParam(required = false) String road_name,
+            @RequestParam(defaultValue = "120") int limit
     ) {
-        if (roadName == null || roadName.isBlank()) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "road_name is required");
-        }
-        int horizon = horizonMinutes == null ? 60 : horizonMinutes;
-        String cacheKey = "traffic:pred:" + roadName + ":" + horizon;
-        return redisCacheService.get(cacheKey, PredictionResponse.class)
-                .orElseGet(() -> trafficPredictionService.generatePrediction(roadName, horizon));
+        SecurityUtils.requireCurrentUser();
+        List<TrafficSampleEntity> samples = trafficSampleRepository.findRecentSamples(
+                road_name, PageRequest.of(0, limit));
+        // 结果按 sampleTime DESC 返回，前端需要按时间升序展示，因此反转
+        List<TrafficSampleResponse> mapped = samples.stream().map(s -> new TrafficSampleResponse(
+                s.getRoadName(),
+                s.getSampleTime(),
+                s.getCountCar(),
+                s.getCountMotor(),
+                s.getCountPerson(),
+                s.getAvgSpeedCar() != null ? s.getAvgSpeedCar() : 0.0,
+                s.getAvgSpeedMotor() != null ? s.getAvgSpeedMotor() : 0.0,
+                s.getCongestionIndex() != null ? s.getCongestionIndex() : 0.0,
+                s.getDensityStatus(),
+                s.getSpeedStatus()
+        )).collect(java.util.stream.Collectors.toList());
+        java.util.Collections.reverse(mapped);
+        return mapped;
     }
+
 }

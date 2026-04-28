@@ -4,13 +4,13 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-TABLES=(traffic_samples traffic_events traffic_predictions)
+TABLES=(traffic_samples traffic_events)
 SINCE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --all)
-      TABLES=(users cameras site_settings traffic_samples traffic_events traffic_predictions api_clients)
+      TABLES=(users cameras site_settings traffic_samples traffic_events api_clients)
       shift
       ;;
     --since)
@@ -42,7 +42,7 @@ build_count_sql() {
 
   if [[ -n "$SINCE" ]]; then
     case "$table" in
-      traffic_samples|traffic_events|traffic_predictions)
+      traffic_samples|traffic_events)
         if [[ "$engine" == "postgres" ]]; then
           where_clause=" WHERE created_at >= '${SINCE}'::timestamp"
         else

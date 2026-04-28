@@ -6,6 +6,8 @@ import com.smarttraffic.backend.exception.AppException;
 import com.smarttraffic.backend.model.CameraEntity;
 import com.smarttraffic.backend.model.UserEntity;
 import com.smarttraffic.backend.repository.CameraRepository;
+import com.smarttraffic.backend.repository.TrafficSampleRepository;
+import com.smarttraffic.backend.repository.TrafficEventRepository;
 import com.smarttraffic.backend.repository.UserRepository;
 import com.smarttraffic.backend.security.CurrentUser;
 import com.smarttraffic.backend.security.SecurityUtils;
@@ -20,6 +22,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -36,11 +39,17 @@ public class AdminController {
     private final CameraPollerService cameraPollerService;
     private final RedisCacheService redisCacheService;
     private final RoadService roadService;
+    private final PasswordEncoder passwordEncoder;
+    private final TrafficSampleRepository trafficSampleRepository;
+    private final TrafficEventRepository trafficEventRepository;
 
     public AdminController(SystemMetricsService systemMetricsService, CameraRepository cameraRepository,
                            UserRepository userRepository, TrafficService trafficService,
                            TrafficProperties trafficProperties, CameraPollerService cameraPollerService,
-                           RedisCacheService redisCacheService, RoadService roadService) {
+                           RedisCacheService redisCacheService, RoadService roadService,
+                           PasswordEncoder passwordEncoder,
+                           TrafficSampleRepository trafficSampleRepository,
+                           TrafficEventRepository trafficEventRepository) {
         this.systemMetricsService = systemMetricsService;
         this.cameraRepository = cameraRepository;
         this.userRepository = userRepository;
@@ -49,6 +58,9 @@ public class AdminController {
         this.cameraPollerService = cameraPollerService;
         this.redisCacheService = redisCacheService;
         this.roadService = roadService;
+        this.passwordEncoder = passwordEncoder;
+        this.trafficSampleRepository = trafficSampleRepository;
+        this.trafficEventRepository = trafficEventRepository;
     }
 
     @GetMapping("/resources")
@@ -112,10 +124,15 @@ public class AdminController {
     @DeleteMapping("/cameras/{id}")
     public Map<String, String> deleteCamera(@PathVariable Long id) {
         requireAdmin();
-        if (!cameraRepository.existsById(id)) {
-            throw new AppException(HttpStatus.NOT_FOUND, "Camera not found");
-        }
+        CameraEntity cam = cameraRepository.findById(id)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Camera not found"));
+        String roadName = cam.getRoadName();
         cameraRepository.deleteById(id);
+        // 级联删除该路段关联的采样和事件数据
+        if (roadName != null && !roadName.isBlank()) {
+            trafficSampleRepository.deleteByRoadName(roadName);
+            trafficEventRepository.deleteByRoadName(roadName);
+        }
         trafficService.reloadCameras(trafficProperties);
         invalidateTrafficCaches();
         return Map.of("detail", "Deleted");
@@ -138,8 +155,15 @@ public class AdminController {
         if (body.containsKey("email")) {
             user.setEmail((String) body.get("email"));
         }
-        if (body.containsKey("phoneNumber")) {
-            user.setPhoneNumber((String) body.get("phoneNumber"));
+        if (body.containsKey("phoneNumber") || body.containsKey("phone_number")) {
+            String phone = (String) body.getOrDefault("phoneNumber", body.get("phone_number"));
+            user.setPhoneNumber(phone);
+        }
+        if (body.containsKey("password") && body.get("password") != null) {
+            String rawPassword = (String) body.get("password");
+            if (!rawPassword.trim().isEmpty()) {
+                user.setPassword(passwordEncoder.encode(rawPassword));
+            }
         }
         if (body.containsKey("is_superuser") || body.containsKey("role_id")) {
             CurrentUser current = SecurityUtils.requireCurrentUser();
@@ -154,6 +178,7 @@ public class AdminController {
             }
         }
         UserEntity saved = userRepository.save(user);
+        redisCacheService.evictUserInfo(id);
         return AdminUserResponse.fromEntity(saved);
     }
 
@@ -168,6 +193,7 @@ public class AdminController {
             throw new AppException(HttpStatus.NOT_FOUND, "User not found");
         }
         userRepository.deleteById(id);
+        redisCacheService.evictUserInfo(id);
         return Map.of("detail", "Deleted");
     }
 
@@ -189,6 +215,7 @@ public class AdminController {
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
         user.setRoleId(roleId);
         userRepository.save(user);
+        redisCacheService.evictUserInfo(id);
         return Map.of("detail", "Role updated");
     }
 
@@ -203,6 +230,7 @@ public class AdminController {
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
         user.setEnabled(!user.isEnabled());
         userRepository.save(user);
+        redisCacheService.evictUserInfo(id);
         return Map.of("enabled", user.isEnabled());
     }
 

@@ -62,6 +62,42 @@ public class TrafficService {
     }
 
     /**
+     * 获取所有路段当前快照数据，用于定时采样持久化
+     */
+    public Map<String, SnapshotData> getAllSnapshots() {
+        Map<String, SnapshotData> result = new LinkedHashMap<>();
+        for (Map.Entry<String, Snapshot> entry : snapshots.entrySet()) {
+            String roadName = entry.getKey();
+            Snapshot snap = entry.getValue();
+            result.put(roadName, new SnapshotData(
+                    snap.countCar,
+                    snap.countMotor,
+                    snap.countPerson,
+                    snap.speedCar,
+                    snap.speedMotor,
+                    snap.congestionIndex,
+                    snap.densityStatusOverride,
+                    snap.speedStatusOverride,
+                    snap.hasRemote
+            ));
+        }
+        return result;
+    }
+
+    /** 快照数据传输对象 */
+    public record SnapshotData(
+            long countCar,
+            long countMotor,
+            long countPerson,
+            long speedCar,
+            long speedMotor,
+            double congestionIndex,
+            String densityStatus,
+            String speedStatus,
+            boolean hasRemote
+    ) {}
+
+    /**
      * 从数据库读取所有不重复的 roadName 作为道路列表。
      * 如果数据库中没有 roadName 数据，则 fallback 到 TrafficProperties 的配置。
      */

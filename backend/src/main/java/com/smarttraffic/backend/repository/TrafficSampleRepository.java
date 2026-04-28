@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import org.springframework.data.domain.Pageable;
+
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -29,4 +31,14 @@ public interface TrafficSampleRepository extends JpaRepository<TrafficSampleEnti
             ) latest ON ts.road_name = latest.road_name AND ts.sample_time = latest.max_time
             """, nativeQuery = true)
     List<TrafficSampleEntity> findLatestByRoadNames(@Param("roadNames") Collection<String> roadNames);
+
+    void deleteByRoadName(String roadName);
+
+    @Query("SELECT s FROM TrafficSampleEntity s WHERE " +
+           "(:roadName IS NULL OR s.roadName = :roadName) " +
+           "ORDER BY s.sampleTime DESC")
+    List<TrafficSampleEntity> findRecentSamples(
+            @Param("roadName") String roadName,
+            Pageable pageable
+    );
 }

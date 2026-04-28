@@ -45,7 +45,6 @@ python3 -m venv .venv-edge-test
 默认检查：
 - `traffic_samples`
 - `traffic_events`
-- `traffic_predictions`
 
 用法：
 
@@ -86,7 +85,7 @@ bash scripts/check_mirror_consistency.sh --since 2026-03-11T00:00:00
 ```
 
 默认行为：
-- 采样 backend 预测接口延迟
+- 采样 backend 接口延迟
 - 如可访问 edge，则额外采样 edge 指标
 - 结果输出到 `docs/reports/` 与 `docs/reports/raw/`
 

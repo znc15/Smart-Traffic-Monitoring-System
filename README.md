@@ -2,11 +2,19 @@
 
 基于 `Vue 3 + Spring Boot + FastAPI Edge` 的端云协同智能交通监控平台。
 
-项目包含 4 个核心模块：
+项目包含 5 个核心模块：
 - `frontend/`：Vue 3 管理端，默认开发端口 `5174`
 - `backend/`：Spring Boot API 服务，默认端口 `8000`
 - `edge/`：边缘推理节点，默认端口 `8000`
 - `gateway/`：Nginx 统一入口，默认对外端口 `5173`
+
+**核心功能**：
+- 交通态势概览：实时交通监控、流量趋势图表（3 秒轮询持久化）
+- 实时状态推送：高德地图集成，监控节点可视化
+- 历史数据统计：历史数据统计与导出
+- AI 智能分析：多轮对话、道路下拉选择、预设推荐问题、SSE 流式响应、停止生成、消息复制/重新生成、对话重命名/清空、自动生成对话标题（可配置独立标题模型）
+- 节点配置管理：站点设置、用户管理（独立页面）、API 密钥（独立页面）、AI 配置（含标题模型配置）
+- Redis 增强：AI 对话/消息缓存、站点配置缓存、用户信息缓存、API 限流
 
 主站 Docker 一键启动范围只覆盖：
 - `gateway`
@@ -126,10 +134,6 @@ python main.py --mode sim --port 8000 --no-browser
 
 5. 本地门禁：
 
-```bash
-./scripts/local-gate.sh
-```
-
 ## 配置文件矩阵
 
 不同模块的配置入口不一样，这是生产环境最容易踩坑的地方。
@@ -146,7 +150,7 @@ python main.py --mode sim --port 8000 --no-browser
 - `frontend` 的 `VITE_*` 是 build-time config（构建时注入），不是 runtime config（运行时注入）。
 - 主站 Docker 一键启动时，frontend 默认从根 `.env` 的 `BACKEND_PUBLIC_HTTP_BASE / BACKEND_PUBLIC_WS_BASE` 取地址。
 - 如果修改了这些地址，必须重新执行 `docker compose build frontend gateway` 或重新构建前端镜像。
-- `VITE_AMAP_KEY` 现在只作为部署 fallback；管理员可在“系统管理 -> 站点设置”里覆盖高德地图 Key，刷新 `/map` 即可生效，无需重建 frontend。
+- `VITE_AMAP_KEY` 现在只作为部署 fallback；管理员可在“节点配置管理 → 站点设置”里覆盖高德地图 Key，刷新 `/map` 即可生效，无需重建 frontend。
 - `VITE_AMAP_SECURITY_JS_CODE` / `VITE_AMAP_SERVICE_HOST` 是可选的高德安全增强配置，不进入后台站点设置。
 - 如果同时配置了 `VITE_AMAP_SERVICE_HOST` 和 `VITE_AMAP_SECURITY_JS_CODE`，前者优先生效。
 

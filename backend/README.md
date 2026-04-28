@@ -1,6 +1,6 @@
 # Smart Traffic Backend
 
-Spring Boot 后端服务，负责鉴权、交通数据汇聚、预测、MaaS 开放接口、报表导出与边缘节点接入。
+Spring Boot 后端服务，负责鉴权、交通数据汇聚、MaaS 开放接口、报表导出、AI 智能分析与边缘节点接入。
 
 ## 技术栈
 
@@ -81,7 +81,28 @@ docker run -p 8000:8000 smart-traffic-backend
 | `GET` | `/api/v1/site-settings` | 站点配置 |
 | `GET` | `/api/v1/roads_name` | 道路列表 |
 | `GET` | `/api/v1/frames_no_auth/{roadName}` | 无鉴权帧图 |
-| `GET` | `/api/v1/traffic/predictions` | 交通预测 |
+
+### AI 智能分析接口（需登录）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/api/v1/ai/status` | AI 配置状态 |
+| `GET` | `/api/v1/ai/conversations` | 对话列表 |
+| `POST` | `/api/v1/ai/conversations` | 创建对话 |
+| `DELETE` | `/api/v1/ai/conversations/{id}` | 删除对话 |
+| `GET` | `/api/v1/ai/conversations/{id}/messages` | 消息历史 |
+| `POST` | `/api/v1/ai/conversations/{id}/chat` | SSE 流式聊天 |
+
+说明：
+- `/chat` 返回 `text/event-stream`，事件类型：`chunk`、`done`、`error`
+- 对话支持可选 `road_context` 上下文
+- AI 配置通过「节点配置管理 → AI 配置」设置，存储在 `site_settings` 表
+
+### AI 配置管理（需管理员）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `POST` | `/api/v1/admin/llm/test-connection` | 测试 LLM 连接 |
 
 ### 专用鉴权接口
 

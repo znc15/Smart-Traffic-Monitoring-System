@@ -1,6 +1,6 @@
 # Smart Traffic Frontend
 
-Vue 3 管理端，提供登录、监控大屏、GIS 地图、分析报表与后台管理界面。
+Vue 3 管理端，提供登录、交通态势概览、实时状态推送、历史数据统计与节点配置管理界面。
 
 ## 技术栈
 
@@ -52,10 +52,14 @@ pnpm dev
 | 路径 | 说明 |
 |------|------|
 | `/login` | 登录 / 注册 |
-| `/dashboard` | 监控大屏 |
-| `/map` | GIS 地图 |
-| `/analytics` | 分析报表 |
-| `/admin` | 系统管理 |
+| `/dashboard` | 交通态势概览 |
+| `/cameras` | 实时视频监测 |
+| `/monitoring` | 节点监控汇聚 |
+| `/map` | 实时状态推送 |
+| `/analytics` | 历史数据统计 |
+| `/alerts` | 异常事件告警 |
+| `/admin` | 节点配置管理 |
+| `/ai-assistant` | AI 智能分析 |
 
 ## 环境变量
 

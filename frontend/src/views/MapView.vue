@@ -5,7 +5,7 @@
     <div class="absolute left-6 right-6 top-6 flex flex-col gap-4 pointer-events-none z-10">
       <div class="p-5 rounded-2xl bg-background/85 backdrop-blur-xl border border-border/50 shadow-xl pointer-events-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 class="text-xl font-bold text-foreground">城市路网 GIS 地图</h1>
+          <h1 class="text-xl font-bold text-foreground">城市路网实时状态</h1>
           <p class="text-sm text-muted-foreground mt-1">
             当前页面仅显示地图，点位详情请直接点击地图标记查看
           </p>

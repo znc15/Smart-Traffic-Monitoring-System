@@ -19,6 +19,10 @@
             <Search class="w-4 h-4 mr-2" />
             查询
           </Button>
+          <div class="flex items-center gap-2">
+            <Label class="text-sm whitespace-nowrap">刷新间隔</Label>
+            <Select v-model="refreshInterval" :options="refreshOptions" class="w-24" @update:model-value="restartPollTimer" />
+          </div>
           <div class="flex gap-2">
             <Button variant="outline" @click="downloadJson">
               <Download class="w-4 h-4 mr-2" />
@@ -112,6 +116,7 @@ import { Search, Download } from 'lucide-vue-next'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { use } from 'echarts/core'
@@ -141,6 +146,23 @@ const tableLoading = ref(false)
 
 const currentPage = ref(1)
 const pageSize = 15
+
+// 流量趋势持久化数据（从后端 API 加载）
+const trendSamples = ref<any[]>([])
+let trendPollTimer: ReturnType<typeof setInterval> | null = null
+const refreshInterval = ref(3)
+const refreshOptions = [
+  { label: '3 秒', value: 3 },
+  { label: '5 秒', value: 5 },
+  { label: '10 秒', value: 10 },
+  { label: '30 秒', value: 30 },
+  { label: '60 秒', value: 60 },
+]
+
+function restartPollTimer() {
+  if (trendPollTimer) clearInterval(trendPollTimer)
+  trendPollTimer = setInterval(loadTrendSamples, refreshInterval.value * 1000)
+}
 
 const paginatedRows = computed(() => {
   const start = (currentPage.value - 1) * pageSize
@@ -174,8 +196,13 @@ const latestTotals = computed(() =>
   }))
 )
 
-const historicalSeries = computed(() =>
-  state.roads.map((road) => ({
+const historicalSeries = computed(() => {
+  // 从后端 API 获取的持久化数据中提取路段列表
+  const roadSet = new Set<string>()
+  trendSamples.value.forEach((s: any) => { if (s.road_name) roadSet.add(s.road_name) })
+  const roads = roadSet.size > 0 ? [...roadSet] : state.roads
+
+  return roads.map((road) => ({
     name: road,
     type: 'line' as const,
     smooth: true,
@@ -185,13 +212,26 @@ const historicalSeries = computed(() =>
         { offset: 1, color: 'rgba(59, 130, 246, 0.02)' }
       ])
     },
-    data: state.historicalData.map((p) => Number(p[`${road}_total`] || 0))
+    data: trendSamples.value
+      .filter((s: any) => s.road_name === road)
+      .map((s: any) => (s.count_car || 0) + (s.count_motor || 0))
   }))
-)
+})
 
-const xAxisData = computed(() =>
-  state.historicalData.map((p) => String(p.time))
-)
+const xAxisData = computed(() => {
+  // 使用第一个路段的时间轴作为 x 轴
+  const firstRoad = trendSamples.value.find((s: any) => s.road_name)?.road_name
+  if (!firstRoad) return []
+  return trendSamples.value
+    .filter((s: any) => s.road_name === firstRoad)
+    .map((s: any) => {
+      try {
+        return new Date(s.sample_time).toLocaleTimeString('zh-CN', { hour12: false })
+      } catch {
+        return String(s.sample_time)
+      }
+    })
+})
 
 const toIsoOrEmpty = (val: string) => {
   if (!val) return ''
@@ -330,12 +370,28 @@ const handleResize = () => {
   pieChart?.resize()
 }
 
+const loadTrendSamples = async () => {
+  try {
+    const params = new URLSearchParams()
+    params.set('limit', '120')
+    const res = await authFetch(`${endpoints.trafficSamplesRecent}?${params.toString()}`, { method: 'GET' })
+    if (res.ok) {
+      trendSamples.value = await res.json()
+    }
+  } catch {
+    // 静默失败，保留上次数据
+  }
+}
+
 onMounted(async () => {
   await initializeTrafficStore()
+  await loadTrendSamples()
   await nextTick()
   renderCharts()
   await loadReport()
   window.addEventListener('resize', handleResize)
+  // 每 N 秒轮询更新趋势数据
+  trendPollTimer = setInterval(loadTrendSamples, refreshInterval.value * 1000)
 })
 
 watch([historicalSeries, latestTotals, isDark], () => {
@@ -343,6 +399,7 @@ watch([historicalSeries, latestTotals, isDark], () => {
 })
 
 onUnmounted(() => {
+  if (trendPollTimer) clearInterval(trendPollTimer)
   lineChart?.dispose()
   pieChart?.dispose()
   window.removeEventListener('resize', handleResize)

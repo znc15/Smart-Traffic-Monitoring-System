@@ -120,18 +120,6 @@ public class ApiDocsController {
                         "curl -H 'Authorization: Bearer <token>' https://host/api/v1/frames/road1 --output frame.jpg"
                 ),
                 buildEndpoint(
-                        "/api/v1/traffic/predictions",
-                        "GET",
-                        "获取指定道路交通流量预测数据",
-                        "无需认证",
-                        List.of(
-                                buildParam("road_name", "query", "道路名称", true),
-                                buildParam("horizon_minutes", "query", "预测时间范围（分钟），默认 60", false)
-                        ),
-                        Map.of("road_name", "road1", "predictions", List.of()),
-                        "curl 'https://host/api/v1/traffic/predictions?road_name=road1&horizon_minutes=60'"
-                ),
-                buildEndpoint(
                         "/api/v1/maas/congestion",
                         "GET",
                         "获取指定地理范围内的实时拥堵数据（MaaS 接口）",

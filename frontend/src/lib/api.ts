@@ -58,12 +58,18 @@ export const endpoints = {
   adminUsers: `${API_HTTP_BASE}/admin/users`,
   adminCameras: `${API_HTTP_BASE}/admin/cameras`,
   adminSiteSettings: `${API_HTTP_BASE}/admin/site-settings`,
+  adminSiteSettingsFull: `${API_HTTP_BASE}/admin/site-settings/full`,
   adminResources: `${API_HTTP_BASE}/admin/resources`,
   adminNodes: `${API_HTTP_BASE}/admin/nodes`,
   adminEvents: `${API_HTTP_BASE}/admin/events`,
   adminNodeConfig: (cameraId: number) => `${API_HTTP_BASE}/admin/nodes/${cameraId}/config`,
   adminApiClients: `${API_HTTP_BASE}/admin/api-clients`,
   apiDocs: `${API_HTTP_BASE}/api-docs`,
+  trafficSamplesRecent: `${API_HTTP_BASE}/traffic/samples/recent`,
+  aiConversations: `${API_HTTP_BASE}/ai/conversations`,
+  aiStatus: `${API_HTTP_BASE}/ai/status`,
+  aiLlmTestConnection: `${API_HTTP_BASE}/admin/llm/test-connection`,
+  aiLlmModels: `${API_HTTP_BASE}/admin/llm/models`,
 }
 
 export function getToken(): string | null {

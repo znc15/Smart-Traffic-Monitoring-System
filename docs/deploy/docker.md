@@ -27,7 +27,7 @@ MAAS_API_KEY=replace-with-your-api-key
 - 根 `.env` 现在同时影响：
   - backend 运行时变量
   - frontend 构建时的 API / WS 地址
-- 主站 Docker 一键启动范围只包含 `gateway/frontend/backend/database/mysql/redis`
+- 主站 Docker 一键启动范围包含 `gateway/frontend/backend/database/mysql/redis`
 - `edge` 继续独立部署
 
 ## 2. 构建并启动
@@ -55,7 +55,6 @@ curl -I http://localhost:5173/
 curl -I http://localhost:5173/react/
 curl http://localhost:8000/api/v1/site-settings
 curl http://localhost:8000/api/v1/roads_name
-curl "http://localhost:8000/api/v1/traffic/predictions?road_name=陈兴道路&horizon_minutes=10"
 ```
 
 预期：
@@ -112,7 +111,21 @@ bash scripts/check_mirror_consistency.sh --all
 - 当前自动化脚本支持“切主库 + 保持双写”
 - 如果要结束灰度并关闭镜像写，请参考 [`production.md`](production.md) 中的手动步骤
 
-## 7. 停止与清理
+## 7. AI 助手配置（可选）
+
+AI 助手支持 OpenAI 兼容 API 和 Claude API，通过后台管理界面配置：
+
+1. 登录后进入「系统管理 → AI 配置」
+2. 选择 LLM 提供商（`openai` / `claude`）
+3. 填写 API Base URL、API Key、模型名称
+4. 点击「保存」后可「测试连接」
+
+说明：
+- AI 助手的配置存储在 `site_settings` 表，不需要重启服务
+- 对话历史存储在 `ai_chat_conversations` / `ai_chat_messages` 表
+- SSE 流式响应默认超时 120 秒
+
+## 8. 停止与清理
 
 停止：
 

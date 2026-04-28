@@ -38,6 +38,32 @@ public class UpdateSiteSettingsRequest {
     @JsonAlias("congestion_threshold")
     private Double congestionThreshold;
 
+    @JsonAlias("llm_provider")
+    @Size(max = 32, message = "LLM 提供商不能超过32个字符")
+    private String llmProvider;
+
+    @JsonAlias("llm_api_base_url")
+    @Size(max = 512, message = "LLM API Base URL 不能超过512个字符")
+    private String llmApiBaseUrl;
+
+    @JsonAlias("llm_api_key")
+    @Size(max = 512, message = "LLM API Key 不能超过512个字符")
+    private String llmApiKey;
+
+    @JsonAlias("llm_model_name")
+    @Size(max = 128, message = "LLM 模型名称不能超过128个字符")
+    private String llmModelName;
+
+    @JsonAlias("ai_float_visible_pages")
+    private String aiFloatVisiblePages;
+
+    @JsonAlias("llm_title_model_name")
+    @Size(max = 255, message = "标题生成模型名称不能超过255个字符")
+    private String llmTitleModelName;
+
+    @JsonAlias("llm_title_prompt")
+    private String llmTitlePrompt;
+
     @JsonIgnore
     private final Set<String> setFields = new HashSet<>();
 
@@ -69,4 +95,25 @@ public class UpdateSiteSettingsRequest {
 
     public Double getCongestionThreshold() { return congestionThreshold; }
     public void setCongestionThreshold(Double congestionThreshold) { this.congestionThreshold = congestionThreshold; setFields.add("congestionThreshold"); }
+
+    public String getLlmProvider() { return llmProvider; }
+    public void setLlmProvider(String llmProvider) { this.llmProvider = llmProvider; setFields.add("llmProvider"); }
+
+    public String getLlmApiBaseUrl() { return llmApiBaseUrl; }
+    public void setLlmApiBaseUrl(String llmApiBaseUrl) { this.llmApiBaseUrl = llmApiBaseUrl; setFields.add("llmApiBaseUrl"); }
+
+    public String getLlmApiKey() { return llmApiKey; }
+    public void setLlmApiKey(String llmApiKey) { this.llmApiKey = llmApiKey; setFields.add("llmApiKey"); }
+
+    public String getLlmModelName() { return llmModelName; }
+    public void setLlmModelName(String llmModelName) { this.llmModelName = llmModelName; setFields.add("llmModelName"); }
+
+    public String getAiFloatVisiblePages() { return aiFloatVisiblePages; }
+    public void setAiFloatVisiblePages(String aiFloatVisiblePages) { this.aiFloatVisiblePages = aiFloatVisiblePages; setFields.add("aiFloatVisiblePages"); }
+
+    public String getLlmTitleModelName() { return llmTitleModelName; }
+    public void setLlmTitleModelName(String llmTitleModelName) { this.llmTitleModelName = llmTitleModelName; setFields.add("llmTitleModelName"); }
+
+    public String getLlmTitlePrompt() { return llmTitlePrompt; }
+    public void setLlmTitlePrompt(String llmTitlePrompt) { this.llmTitlePrompt = llmTitlePrompt; setFields.add("llmTitlePrompt"); }
 }

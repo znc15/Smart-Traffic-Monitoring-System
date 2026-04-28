@@ -51,6 +51,7 @@ services:
       retries: 10
     networks:
       - mynet
+
   backend:
     build:
       context: ./backend

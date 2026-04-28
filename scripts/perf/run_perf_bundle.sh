@@ -110,7 +110,7 @@ import time
 print(int(time.time()*1000))
 PY
 )"
-  curl -s "$BACKEND_URL/api/v1/traffic/predictions?road_name=$ROAD_NAME&horizon_minutes=30" >/dev/null || true
+  curl -s "$BACKEND_URL/api/v1/info/$ROAD_NAME" >/dev/null || true
   end="$(python3 - <<'PY'
 import time
 print(int(time.time()*1000))
