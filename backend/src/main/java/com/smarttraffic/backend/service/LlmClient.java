@@ -2,17 +2,19 @@ package com.smarttraffic.backend.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Spliterators;
-import java.util.function.Consumer;
-import java.util.stream.StreamSupport;
+import java.util.function.BiConsumer;
 
 /**
  * LLM 客户端抽象，统一处理 OpenAI 和 Claude 两种 API 格式
@@ -20,9 +22,24 @@ import java.util.stream.StreamSupport;
 public interface LlmClient {
 
     /**
-     * 流式调用 LLM，将每个 chunk 的文本通过 onChunk 回调输出
+     * Tool call 结果
      */
-    void streamChat(List<Map<String, String>> messages, Consumer<String> onChunk);
+    record ToolCall(String id, String name, String arguments) {}
+
+    /**
+     * 流式调用 LLM，支持 tool calling
+     * @param messages 消息列表
+     * @param tools 工具定义列表（可为 null）
+     * @param onChunk 文本 chunk 回调
+     * @param onToolCall tool call 回调（可为 null）
+     * @return 如果有 tool call 则返回列表，否则返回空列表
+     */
+    List<ToolCall> streamChatWithTools(
+            List<Map<String, Object>> messages,
+            List<Map<String, Object>> tools,
+            java.util.function.Consumer<String> onChunk,
+            BiConsumer<String, String> onToolCall
+    );
 
     /**
      * 测试 LLM 连接是否正常
@@ -34,15 +51,6 @@ public interface LlmClient {
      */
     default List<String> fetchModels() {
         return List.of();
-    }
-
-    /**
-     * 非流式调用 LLM，返回完整回复文本
-     */
-    default String chat(List<Map<String, String>> messages, int maxTokens) {
-        StringBuilder sb = new StringBuilder();
-        streamChat(messages, sb::append);
-        return sb.toString();
     }
 
     /**
@@ -65,13 +73,23 @@ public interface LlmClient {
         }
 
         @Override
-        public void streamChat(List<Map<String, String>> messages, Consumer<String> onChunk) {
+        public List<ToolCall> streamChatWithTools(
+                List<Map<String, Object>> messages,
+                List<Map<String, Object>> tools,
+                java.util.function.Consumer<String> onChunk,
+                BiConsumer<String, String> onToolCall) {
+            
+            List<ToolCall> toolCalls = new ArrayList<>();
+            
             try {
-                Map<String, Object> body = Map.of(
-                        "model", model,
-                        "messages", messages,
-                        "stream", true
-                );
+                Map<String, Object> body = new LinkedHashMap<>();
+                body.put("model", model);
+                body.put("messages", messages);
+                body.put("stream", true);
+                if (tools != null && !tools.isEmpty()) {
+                    body.put("tools", tools);
+                    body.put("tool_choice", "auto");
+                }
 
                 restClient.post()
                         .uri(baseUrl + "/v1/chat/completions")
@@ -87,9 +105,29 @@ public interface LlmClient {
                                         String data = line.substring(6).trim();
                                         if ("[DONE]".equals(data)) break;
                                         JsonNode node = objectMapper.readTree(data);
-                                        JsonNode delta = node.at("/choices/0/delta/content");
-                                        if (!delta.isMissingNode() && !delta.isNull()) {
-                                            onChunk.accept(delta.asText());
+                                        JsonNode delta = node.at("/choices/0/delta");
+                                        if (!delta.isMissingNode()) {
+                                            // Handle text content
+                                            JsonNode contentNode = delta.get("content");
+                                            if (contentNode != null && !contentNode.isNull() && contentNode.isTextual()) {
+                                                onChunk.accept(contentNode.asText());
+                                            }
+                                            // Handle tool calls
+                                            JsonNode toolCallsNode = delta.get("tool_calls");
+                                            if (toolCallsNode != null && toolCallsNode.isArray()) {
+                                                for (JsonNode tc : toolCallsNode) {
+                                                    String id = tc.path("id").asText("");
+                                                    JsonNode func = tc.path("function");
+                                                    String name = func.path("name").asText("");
+                                                    String args = func.path("arguments").asText("");
+                                                    if (!name.isEmpty()) {
+                                                        toolCalls.add(new ToolCall(id, name, args));
+                                                        if (onToolCall != null) {
+                                                            onToolCall.accept(name, args);
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -100,6 +138,8 @@ public interface LlmClient {
                 log.error("OpenAI 流式调用失败: {}", e.getMessage());
                 onChunk.accept("[错误] AI 服务调用失败: " + e.getMessage());
             }
+            
+            return toolCalls;
         }
 
         @Override
@@ -136,7 +176,7 @@ public interface LlmClient {
                 JsonNode root = objectMapper.readTree(response);
                 JsonNode data = root.path("data");
                 if (!data.isArray()) return List.of();
-                return StreamSupport.stream(data.spliterator(), false)
+                return java.util.stream.StreamSupport.stream(data.spliterator(), false)
                         .map(node -> node.path("id").asText(""))
                         .filter(id -> !id.isEmpty())
                         .sorted()
@@ -166,25 +206,36 @@ public interface LlmClient {
         }
 
         @Override
-        public void streamChat(List<Map<String, String>> messages, Consumer<String> onChunk) {
+        public List<ToolCall> streamChatWithTools(
+                List<Map<String, Object>> messages,
+                List<Map<String, Object>> tools,
+                java.util.function.Consumer<String> onChunk,
+                BiConsumer<String, String> onToolCall) {
+            
+            List<ToolCall> toolCalls = new ArrayList<>();
+            
             try {
                 // Claude 需要把 system 消息提取出来
                 String systemPrompt = messages.stream()
                         .filter(m -> "system".equals(m.get("role")))
-                        .map(m -> m.get("content"))
+                        .map(m -> String.valueOf(m.get("content")))
                         .findFirst()
                         .orElse(null);
-                List<Map<String, String>> nonSystemMessages = messages.stream()
+                
+                List<Map<String, Object>> nonSystemMessages = messages.stream()
                         .filter(m -> !"system".equals(m.get("role")))
                         .toList();
 
-                Map<String, Object> body = new java.util.LinkedHashMap<>();
+                Map<String, Object> body = new LinkedHashMap<>();
                 body.put("model", model);
                 body.put("max_tokens", 4096);
                 body.put("stream", true);
                 body.put("messages", nonSystemMessages);
                 if (systemPrompt != null) {
                     body.put("system", systemPrompt);
+                }
+                if (tools != null && !tools.isEmpty()) {
+                    body.put("tools", tools);
                 }
 
                 restClient.post()
@@ -202,11 +253,36 @@ public interface LlmClient {
                                         String data = line.substring(6).trim();
                                         JsonNode node = objectMapper.readTree(data);
                                         String type = node.path("type").asText("");
-                                        if ("content_block_delta".equals(type)) {
-                                            JsonNode textNode = node.at("/delta/text");
-                                            if (!textNode.isMissingNode() && !textNode.isNull()) {
-                                                onChunk.accept(textNode.asText());
-                                            }
+                                        
+                                        switch (type) {
+                                            case "content_block_start":
+                                                JsonNode contentBlock = node.path("content_block");
+                                                if ("tool_use".equals(contentBlock.path("type").asText(""))) {
+                                                    String id = contentBlock.path("id").asText("");
+                                                    String name = contentBlock.path("name").asText("");
+                                                    toolCalls.add(new ToolCall(id, name, ""));
+                                                    if (onToolCall != null) {
+                                                        onToolCall.accept(name, "");
+                                                    }
+                                                }
+                                                break;
+                                            case "content_block_delta":
+                                                // Handle text delta
+                                                JsonNode textDelta = node.at("/delta/text");
+                                                if (!textDelta.isMissingNode() && !textDelta.isNull()) {
+                                                    onChunk.accept(textDelta.asText());
+                                                }
+                                                // Handle tool use input delta
+                                                JsonNode delta = node.path("delta");
+                                                if ("input_json_delta".equals(delta.path("type").asText(""))) {
+                                                    String partialJson = delta.path("partial_json").asText("");
+                                                    if (!toolCalls.isEmpty() && partialJson != null) {
+                                                        ToolCall last = toolCalls.get(toolCalls.size() - 1);
+                                                        toolCalls.set(toolCalls.size() - 1,
+                                                                new ToolCall(last.id(), last.name(), last.arguments() + partialJson));
+                                                    }
+                                                }
+                                                break;
                                         }
                                     }
                                 }
@@ -217,6 +293,8 @@ public interface LlmClient {
                 log.error("Claude 流式调用失败: {}", e.getMessage());
                 onChunk.accept("[错误] AI 服务调用失败: " + e.getMessage());
             }
+            
+            return toolCalls;
         }
 
         @Override

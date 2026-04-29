@@ -10,11 +10,17 @@ export type Conversation = {
   updated_at: string
 }
 
+export type ToolCallInfo = {
+  name: string
+  arguments: string
+}
+
 export type Message = {
   id: number
   role: 'user' | 'assistant'
   content: string
   created_at: string
+  toolCalls?: ToolCallInfo[]
 }
 
 export type UseAiChatOptions = {
@@ -30,6 +36,7 @@ export type UseAiChatReturn = {
   roadContext: Ref<string>
   streaming: Ref<boolean>
   streamingContent: Ref<string>
+  streamingToolCalls: Ref<ToolCallInfo[]>
   aiAvailable: Ref<boolean>
   abortController: Ref<AbortController | null>
   
@@ -57,6 +64,7 @@ export function useAiChat(options: UseAiChatOptions = {}): UseAiChatReturn {
   const roadContext = ref('')
   const streaming = ref(false)
   const streamingContent = ref('')
+  const streamingToolCalls = ref<ToolCallInfo[]>([])
   const aiAvailable = ref(false)
   const abortController = ref<AbortController | null>(null)
 
@@ -187,6 +195,7 @@ export function useAiChat(options: UseAiChatOptions = {}): UseAiChatReturn {
     }
     streaming.value = false
     streamingContent.value = ''
+    streamingToolCalls.value = []
   }
 
   async function sendMessage(): Promise<void> {
@@ -261,6 +270,16 @@ export function useAiChat(options: UseAiChatOptions = {}): UseAiChatReturn {
             streamingContent.value += eventData
             await scrollToBottom()
           }
+          if (eventName === 'tool_call' && eventData) {
+            try {
+              const tc = JSON.parse(eventData)
+              streamingToolCalls.value = [...streamingToolCalls.value, { name: tc.name, arguments: tc.arguments }]
+              await scrollToBottom()
+            } catch { /* ignore parse errors */ }
+          }
+          if (eventName === 'tool_result' && eventData) {
+            await scrollToBottom()
+          }
         }
       }
 
@@ -274,6 +293,7 @@ export function useAiChat(options: UseAiChatOptions = {}): UseAiChatReturn {
     } finally {
       streaming.value = false
       streamingContent.value = ''
+      streamingToolCalls.value = []
       abortController.value = null
     }
   }
@@ -306,6 +326,7 @@ export function useAiChat(options: UseAiChatOptions = {}): UseAiChatReturn {
     roadContext,
     streaming,
     streamingContent,
+    streamingToolCalls,
     aiAvailable,
     abortController,
     

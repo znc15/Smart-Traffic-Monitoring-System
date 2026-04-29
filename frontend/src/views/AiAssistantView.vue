@@ -87,8 +87,15 @@
               <Bot class="w-4 h-4" />
             </div>
             <div class="max-w-[80%] rounded-lg px-4 py-2 text-sm bg-muted">
+              <!-- Tool call indicators -->
+              <div v-if="streamingToolCalls.length > 0 && !streamingContent" class="space-y-1">
+                <div v-for="(tc, i) in streamingToolCalls" :key="i" class="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 class="h-3 w-3 animate-spin" />
+                  <span>正在调用 {{ toolDisplayName(tc.name) }}...</span>
+                </div>
+              </div>
               <MarkdownBody v-if="streamingContent" :content="streamingContent" />
-              <span v-else class="animate-pulse">思考中...</span>
+              <span v-else-if="streamingToolCalls.length === 0" class="animate-pulse">思考中...</span>
             </div>
           </div>
         </div>
@@ -130,7 +137,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, nextTick, watch } from 'vue'
-import { Plus, Trash2, Eraser, Send, Square } from 'lucide-vue-next'
+import { Plus, Trash2, Eraser, Send, Square, Loader2 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -152,6 +159,7 @@ const {
   roadContext,
   streaming,
   streamingContent,
+  streamingToolCalls,
   aiAvailable,
   loadConversations,
   createConversation,
@@ -199,6 +207,17 @@ async function handleClearMessages(id: number) {
 // ── Road context change ─────────────────────────────────
 function onRoadContextChange() {
   // Road context is stored per conversation, update is implicit via next sendMessage
+}
+
+// ── Tool display name helper ─────────────────────────────
+function toolDisplayName(name: string): string {
+  const toolNames: Record<string, string> = {
+    query_traffic: '交通数据查询',
+    list_cameras: '摄像头列表',
+    query_history: '历史数据查询',
+    reverse_geocode: '位置查询',
+  }
+  return toolNames[name] || name
 }
 
 // ── Preset question click ───────────────────────────────

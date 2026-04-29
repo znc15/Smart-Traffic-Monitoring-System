@@ -7,6 +7,7 @@ Thumbs.db
 .vscode/
 *.iml
 *.swp
+.agents/s
 
 # === AI / Claude ===
 .claude/
@@ -72,3 +73,4 @@ edge/models/*_openvino_model/
 .pytest_cache/
 __pycache__/
 .ace-tool/
+.trellis/

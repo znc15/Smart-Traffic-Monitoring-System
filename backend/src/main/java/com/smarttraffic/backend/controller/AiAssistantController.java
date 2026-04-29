@@ -1,5 +1,6 @@
 package com.smarttraffic.backend.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarttraffic.backend.exception.AppException;
 import com.smarttraffic.backend.model.AiChatConversationEntity;
 import com.smarttraffic.backend.model.AiChatMessageEntity;
@@ -7,6 +8,8 @@ import com.smarttraffic.backend.repository.AiChatConversationRepository;
 import com.smarttraffic.backend.repository.AiChatMessageRepository;
 import com.smarttraffic.backend.security.CurrentUser;
 import com.smarttraffic.backend.security.SecurityUtils;
+import com.smarttraffic.backend.service.AiToolExecutor;
+import com.smarttraffic.backend.service.LlmClient;
 import com.smarttraffic.backend.service.LlmService;
 import com.smarttraffic.backend.service.TrafficService;
 import com.smarttraffic.backend.service.analytics.RedisCacheService;
@@ -29,23 +32,31 @@ import java.util.concurrent.Executors;
 public class AiAssistantController {
 
     private static final Logger log = LoggerFactory.getLogger(AiAssistantController.class);
+    private static final int MAX_TOOL_ITERATIONS = 5;
+
     private final LlmService llmService;
+    private final AiToolExecutor toolExecutor;
     private final AiChatConversationRepository conversationRepo;
     private final AiChatMessageRepository messageRepo;
     private final TrafficService trafficService;
     private final RedisCacheService redisCacheService;
+    private final ObjectMapper objectMapper;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     public AiAssistantController(LlmService llmService,
+                                 AiToolExecutor toolExecutor,
                                  AiChatConversationRepository conversationRepo,
                                  AiChatMessageRepository messageRepo,
                                  TrafficService trafficService,
-                                 RedisCacheService redisCacheService) {
+                                 RedisCacheService redisCacheService,
+                                 ObjectMapper objectMapper) {
         this.llmService = llmService;
+        this.toolExecutor = toolExecutor;
         this.conversationRepo = conversationRepo;
         this.messageRepo = messageRepo;
         this.trafficService = trafficService;
         this.redisCacheService = redisCacheService;
+        this.objectMapper = objectMapper;
     }
 
     // ─── 对话列表（支持分页）──────────────────────────────────
@@ -57,7 +68,6 @@ public class AiAssistantController {
         CurrentUser user = SecurityUtils.requireCurrentUser();
         Pageable pageable = PageRequest.of(page, Math.min(size, 100));
 
-        // Try cache first (only for first page)
         if (page == 0) {
             var cached = redisCacheService.getAiConversations(user.id(), Map.class);
             if (cached.isPresent()) {
@@ -149,7 +159,7 @@ public class AiAssistantController {
     @DeleteMapping("/conversations/{id}")
     public Map<String, String> deleteConversation(@PathVariable Long id) {
         CurrentUser user = SecurityUtils.requireCurrentUser();
-        getConversationForUser(id, user.id()); // Validate ownership
+        getConversationForUser(id, user.id());
         messageRepo.deleteByConversationId(id);
         conversationRepo.deleteById(id);
         redisCacheService.evictAiConversations(user.id());
@@ -162,7 +172,7 @@ public class AiAssistantController {
     @DeleteMapping("/conversations/{id}/messages")
     public Map<String, String> clearConversationMessages(@PathVariable Long id) {
         CurrentUser user = SecurityUtils.requireCurrentUser();
-        getConversationForUser(id, user.id()); // Validate ownership
+        getConversationForUser(id, user.id());
         messageRepo.deleteByConversationId(id);
         redisCacheService.evictAiMessages(id);
         return Map.of("message", "已清空对话消息");
@@ -173,9 +183,8 @@ public class AiAssistantController {
     @GetMapping("/conversations/{id}/messages")
     public List<Map<String, Object>> getMessages(@PathVariable Long id) {
         CurrentUser user = SecurityUtils.requireCurrentUser();
-        getConversationForUser(id, user.id()); // Validate ownership
+        getConversationForUser(id, user.id());
 
-        // Try cache first
         var cached = redisCacheService.getAiMessages(id, List.class);
         if (cached.isPresent()) {
             @SuppressWarnings("unchecked")
@@ -197,7 +206,7 @@ public class AiAssistantController {
         return result;
     }
 
-    // ─── 流式聊天（SSE） ────────────────────────────────────────
+    // ─── 流式聊天（SSE）支持 Tool Calling ───────────────────────
 
     @PostMapping(value = "/conversations/{id}/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chat(@PathVariable Long id, @RequestBody Map<String, String> body) {
@@ -218,13 +227,15 @@ public class AiAssistantController {
 
         // 加载历史消息构建上下文
         List<AiChatMessageEntity> history = messageRepo.findByConversationIdOrderByCreatedAtAsc(id);
-        List<Map<String, String>> messages = new ArrayList<>();
+        
+        // 构建消息列表（使用 Object 类型以支持 tool result）
+        List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", buildSystemPrompt(conv.getRoadContext())));
         for (var m : history) {
             messages.add(Map.of("role", m.getRole(), "content", m.getContent()));
         }
 
-        // 首条消息时先用截取设置初始标题，流完成后异步替换为 LLM 生成的标题
+        // 首条消息时设置初始标题
         final boolean needsTitle = history.size() <= 2;
         if (needsTitle) {
             String fallbackTitle = userMessage.length() > 30 ? userMessage.substring(0, 30) + "..." : userMessage;
@@ -232,19 +243,94 @@ public class AiAssistantController {
             conversationRepo.save(conv);
         }
 
-        SseEmitter emitter = new SseEmitter(120_000L);
+        SseEmitter emitter = new SseEmitter(180_000L); // 3 分钟超时
         StringBuilder fullResponse = new StringBuilder();
 
         executor.execute(() -> {
             try {
-                llmService.streamChat(messages, chunk -> {
-                    try {
-                        fullResponse.append(chunk);
-                        emitter.send(SseEmitter.event().name("chunk").data(chunk));
-                    } catch (Exception e) {
-                        log.warn("SSE 发送 chunk 失败: {}", e.getMessage());
+                LlmClient client = llmService.createClient();
+                List<Map<String, Object>> tools = llmService.getToolDefinitions();
+                
+                // 多轮 tool call 循环
+                int iteration = 0;
+                while (iteration < MAX_TOOL_ITERATIONS) {
+                    iteration++;
+                    
+                    // 调用 LLM
+                    List<LlmClient.ToolCall> toolCalls = client.streamChatWithTools(
+                            messages,
+                            tools,
+                            chunk -> {
+                                try {
+                                    fullResponse.append(chunk);
+                                    emitter.send(SseEmitter.event().name("chunk").data(chunk));
+                                } catch (Exception e) {
+                                    log.warn("SSE 发送 chunk 失败: {}", e.getMessage());
+                                }
+                            },
+                            null
+                    );
+
+                    // 如果没有 tool call，结束循环
+                    if (toolCalls.isEmpty()) {
+                        break;
                     }
-                });
+
+                    // 处理每个 tool call
+                    for (LlmClient.ToolCall tc : toolCalls) {
+                        try {
+                            // 发送 tool_call 事件
+                            Map<String, Object> toolCallInfo = new LinkedHashMap<>();
+                            toolCallInfo.put("name", tc.name());
+                            toolCallInfo.put("arguments", tc.arguments());
+                            emitter.send(SseEmitter.event()
+                                    .name("tool_call")
+                                    .data(objectMapper.writeValueAsString(toolCallInfo)));
+
+                            // 执行工具
+                            Map<String, Object> toolResult = toolExecutor.execute(tc.name(), tc.arguments());
+
+                            // 发送 tool_result 事件
+                            emitter.send(SseEmitter.event()
+                                    .name("tool_result")
+                                    .data(objectMapper.writeValueAsString(toolResult)));
+
+                            // 将 assistant 消息（tool call）和 tool result 加入消息历史
+                            Map<String, Object> assistantMsg = new LinkedHashMap<>();
+                            assistantMsg.put("role", "assistant");
+                            assistantMsg.put("content", null);
+                            Map<String, Object> toolCallData = new LinkedHashMap<>();
+                            toolCallData.put("id", tc.id());
+                            toolCallData.put("type", "function");
+                            Map<String, Object> functionData = new LinkedHashMap<>();
+                            functionData.put("name", tc.name());
+                            functionData.put("arguments", tc.arguments());
+                            toolCallData.put("function", functionData);
+                            assistantMsg.put("tool_calls", List.of(toolCallData));
+                            messages.add(assistantMsg);
+
+                            // Tool result 消息
+                            Map<String, Object> toolResultMsg = new LinkedHashMap<>();
+                            toolResultMsg.put("role", "tool");
+                            toolResultMsg.put("tool_call_id", tc.id());
+                            toolResultMsg.put("content", objectMapper.writeValueAsString(toolResult));
+                            messages.add(toolResultMsg);
+
+                        } catch (Exception e) {
+                            log.error("Tool 执行失败: {} - {}", tc.name(), e.getMessage());
+                            try {
+                                Map<String, Object> errorResult = Map.of(
+                                        "success", false,
+                                        "error", "工具执行失败: " + e.getMessage()
+                                );
+                                emitter.send(SseEmitter.event()
+                                        .name("tool_result")
+                                        .data(objectMapper.writeValueAsString(errorResult)));
+                            } catch (Exception ignored) {}
+                        }
+                    }
+                }
+
                 // 保存助手回复
                 AiChatMessageEntity assistantMsg = new AiChatMessageEntity();
                 assistantMsg.setConversationId(id);
@@ -254,8 +340,8 @@ public class AiAssistantController {
                 redisCacheService.evictAiMessages(id);
                 redisCacheService.evictAiConversations(conv.getUserId());
 
-                // Async title generation (fire-and-forget, won't block SSE)
-                if (needsTitle) {
+                // 异步生成标题
+                if (needsTitle && fullResponse.length() > 0) {
                     String assistantReply = fullResponse.toString();
                     executor.execute(() -> {
                         try {
@@ -267,7 +353,7 @@ public class AiAssistantController {
                                 log.info("标题生成成功: {}", generated);
                             }
                         } catch (Exception ex) {
-                            log.warn("异步标题生成失败，保留截取标题: {}", ex.getMessage());
+                            log.warn("异步标题生成失败: {}", ex.getMessage());
                         }
                     });
                 }
@@ -275,7 +361,7 @@ public class AiAssistantController {
                 emitter.send(SseEmitter.event().name("done").data("[DONE]"));
                 emitter.complete();
             } catch (Exception e) {
-                log.error("AI 聊天异常: {}", e.getMessage());
+                log.error("AI 聊天异常: {}", e.getMessage(), e);
                 try {
                     emitter.send(SseEmitter.event().name("error").data("AI 服务异常: " + e.getMessage()));
                 } catch (Exception ignored) {}
@@ -309,31 +395,33 @@ public class AiAssistantController {
     private String buildSystemPrompt(String roadContext) {
         StringBuilder sb = new StringBuilder();
 
-        // 基础角色与能力定义
-        sb.append("你是「智能交通监控系统」的 AI 助手，拥有以下能力：\n\n");
+        sb.append("你是「智能交通监控系统」的 AI 助手。你可以使用工具查询实时交通数据。\n\n");
+        
+        sb.append("## 可用工具\n");
+        sb.append("- `query_traffic`: 查询指定道路的实时交通数据（车流量、车速、拥堵指数等）\n");
+        sb.append("- `list_cameras`: 获取所有摄像头列表（含经纬度、道路名称）\n");
+        sb.append("- `query_history`: 查询指定道路的历史统计数据\n");
+        sb.append("- `reverse_geocode`: 根据经纬度查找最近的摄像头/道路\n\n");
+
         sb.append("## 核心能力\n");
-        sb.append("1. **实时路况分析** — 查询任意道路的当前车流量、车速、拥堵指数、密度状态等实时数据\n");
-        sb.append("2. **趋势研判** — 基于当前数据判断交通趋势，预测短期拥堵变化\n");
-        sb.append("3. **优化建议** — 针对拥堵路段提供分流、信号灯优化、绕行等建议\n");
-        sb.append("4. **异常诊断** — 分析离线节点、车速骤降、密度异常等问题的可能原因\n");
-        sb.append("5. **多路段对比** — 对比不同道路的交通状况，辅助调度决策\n\n");
+        sb.append("1. **实时路况分析** — 使用 query_traffic 查询任意道路的实时数据\n");
+        sb.append("2. **趋势研判** — 基于当前数据判断交通趋势\n");
+        sb.append("3. **优化建议** — 针对拥堵路段提供分流、绕行等建议\n");
+        sb.append("4. **多路段对比** — 对比不同道路的交通状况\n\n");
 
-        // 数据指标说明
         sb.append("## 数据指标说明\n");
-        sb.append("- `count_car / count_motor / count_person` — 当前检测到的汽车/摩托车/行人数量\n");
-        sb.append("- `speed_car / speed_motor` — 汽车/摩托车的平均速度 (km/h)\n");
+        sb.append("- `count_car / count_motor / count_person` — 汽车/摩托车/行人数量\n");
+        sb.append("- `speed_car / speed_motor` — 平均速度 (km/h)\n");
         sb.append("- `congestion_index` — 拥堵指数 (0~1，越高越拥堵)\n");
-        sb.append("- `density_status` — 密度状态：`clear`(畅通) / `busy`(繁忙) / `congested`(拥堵) / `offline`(离线)\n");
-        sb.append("- `speed_status` — 速度状态：`fast`(快速) / `slow`(缓慢) / `unknown`(未知)\n\n");
+        sb.append("- `density_status` — 密度状态：clear(畅通)/busy(繁忙)/congested(拥堵)/offline(离线)\n");
+        sb.append("- `speed_status` — 速度状态：fast(快速)/slow(缓慢)/unknown(未知)\n\n");
 
-        // 交互规范
         sb.append("## 回答规范\n");
         sb.append("- 用简洁、专业的中文回答\n");
-        sb.append("- 涉及数据时引用具体数值，不要凭空猜测\n");
-        sb.append("- 如果用户没有指定道路，优先推荐当前拥堵最严重的路段\n");
+        sb.append("- 涉及数据时使用工具查询，不要凭空猜测\n");
         sb.append("- 给出建议时说明理由和依据\n\n");
 
-        // 注入全部道路列表
+        // 注入道路列表
         List<String> roads = trafficService.roadNames();
         if (!roads.isEmpty()) {
             sb.append("## 当前监控道路列表\n");
@@ -341,24 +429,9 @@ public class AiAssistantController {
             sb.append("\n\n");
         }
 
-        // 注入指定道路的实时数据
+        // 如果有指定道路上下文，提示可以查询
         if (roadContext != null && !roadContext.isBlank()) {
-            sb.append("## 当前关注道路的实时数据：").append(roadContext).append("\n");
-            try {
-                Map<String, Object> info = trafficService.info(roadContext);
-                sb.append("- 在线状态：").append(info.get("online")).append("\n");
-                sb.append("- 汽车数量：").append(info.get("count_car")).append("\n");
-                sb.append("- 摩托车数量：").append(info.get("count_motor")).append("\n");
-                sb.append("- 行人数量：").append(info.get("count_person")).append("\n");
-                sb.append("- 汽车平均速度：").append(info.get("speed_car")).append(" km/h\n");
-                sb.append("- 摩托车平均速度：").append(info.get("speed_motor")).append(" km/h\n");
-                sb.append("- 拥堵指数：").append(info.get("congestion_index")).append("\n");
-                sb.append("- 密度状态：").append(info.get("density_status")).append("\n");
-                sb.append("- 速度状态：").append(info.get("speed_status")).append("\n");
-            } catch (Exception e) {
-                sb.append("（未能获取该道路的实时数据，可能道路名称不在监控范围内）\n");
-            }
-            sb.append("\n请基于以上实时数据回答用户的问题。\n");
+            sb.append("用户当前关注道路：").append(roadContext).append("。你可以使用 query_traffic 查询其实时数据。\n");
         }
 
         return sb.toString();

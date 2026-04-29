@@ -59,7 +59,7 @@ pnpm dev
 | `/analytics` | 历史数据统计 |
 | `/alerts` | 异常事件告警 |
 | `/admin` | 节点配置管理 |
-| `/ai-assistant` | AI 智能分析 |
+| `/ai-assistant` | AI 智能分析（多轮对话、Tool Calling 动态查询交通数据） |
 
 ## 环境变量
 

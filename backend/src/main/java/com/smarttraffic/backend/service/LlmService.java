@@ -7,6 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -51,11 +53,14 @@ public class LlmService {
     }
 
     /**
-     * 流式调用 LLM
+     * 流式调用 LLM（无 tool calling）
      */
     public void streamChat(List<Map<String, String>> messages, Consumer<String> onChunk) {
         LlmClient client = createClient();
-        client.streamChat(messages, onChunk);
+        List<Map<String, Object>> objectMessages = messages.stream()
+                .map(m -> (Map<String, Object>) new LinkedHashMap<String, Object>(m))
+                .toList();
+        client.streamChatWithTools(objectMessages, null, onChunk, null);
     }
 
     /**
@@ -109,6 +114,64 @@ public class LlmService {
         }
     }
 
+    // ─── Tool Calling 工具定义 ──────────────────────────────────
+
+    /**
+     * 返回 4 个工具的 JSON Schema 定义（OpenAI function calling 格式，Claude 也兼容）
+     */
+    public List<Map<String, Object>> getToolDefinitions() {
+        List<Map<String, Object>> tools = new ArrayList<>();
+
+        // query_traffic
+        tools.add(buildTool("query_traffic", "查询指定道路的实时交通数据（车流量、车速、拥堵指数等）",
+                Map.of(
+                        "type", "object",
+                        "properties", Map.of(
+                                "road_name", Map.of("type", "string", "description", "道路名称")
+                        ),
+                        "required", List.of("road_name")
+                )));
+
+        // list_cameras
+        tools.add(buildTool("list_cameras", "获取所有启用的摄像头列表（含经纬度、道路名称、位置）",
+                Map.of("type", "object", "properties", Map.of())));
+
+        // query_history
+        tools.add(buildTool("query_history", "查询指定道路的历史交通统计数据",
+                Map.of(
+                        "type", "object",
+                        "properties", Map.of(
+                                "road_name", Map.of("type", "string", "description", "道路名称"),
+                                "hours", Map.of("type", "integer", "description", "查询最近多少小时的数据，默认24，最大168")
+                        ),
+                        "required", List.of("road_name")
+                )));
+
+        // reverse_geocode
+        tools.add(buildTool("reverse_geocode", "根据经纬度查找最近的摄像头和道路",
+                Map.of(
+                        "type", "object",
+                        "properties", Map.of(
+                                "latitude", Map.of("type", "number", "description", "纬度"),
+                                "longitude", Map.of("type", "number", "description", "经度")
+                        ),
+                        "required", List.of("latitude", "longitude")
+                )));
+
+        return tools;
+    }
+
+    private Map<String, Object> buildTool(String name, String description, Map<String, Object> parameters) {
+        Map<String, Object> tool = new LinkedHashMap<>();
+        tool.put("type", "function");
+        Map<String, Object> function = new LinkedHashMap<>();
+        function.put("name", name);
+        function.put("description", description);
+        function.put("parameters", parameters);
+        tool.put("function", function);
+        return tool;
+    }
+
     private static final String DEFAULT_TITLE_PROMPT =
             "根据以下对话内容生成一个简短的中文标题（不超过20字），只返回标题本身，不要加引号或其他格式。";
 
@@ -144,11 +207,11 @@ public class LlmService {
             String truncatedUser = userMessage.length() > 200 ? userMessage.substring(0, 200) : userMessage;
             String truncatedReply = assistantReply.length() > 200 ? assistantReply.substring(0, 200) : assistantReply;
 
-            List<Map<String, String>> messages = List.of(
-                    Map.of("role", "system", "content", prompt),
-                    Map.of("role", "user", "content", "用户: " + truncatedUser),
-                    Map.of("role", "assistant", "content", "助手: " + truncatedReply),
-                    Map.of("role", "user", "content", "请生成标题")
+            List<Map<String, Object>> titleMessages = List.of(
+                    Map.of("role", "system", "content", (Object) prompt),
+                    Map.of("role", "user", "content", (Object) ("用户: " + truncatedUser)),
+                    Map.of("role", "assistant", "content", (Object) ("助手: " + truncatedReply)),
+                    Map.of("role", "user", "content", (Object) "请生成标题")
             );
 
             LlmClient client = switch (provider.toLowerCase()) {
@@ -159,7 +222,9 @@ public class LlmService {
                 );
             };
 
-            String title = client.chat(messages, 50).trim();
+            StringBuilder sb = new StringBuilder();
+            client.streamChatWithTools(titleMessages, null, sb::append, null);
+            String title = sb.toString().trim();
             // Clean up quotes if the model wraps the title
             if (title.startsWith("\"") && title.endsWith("\"")) {
                 title = title.substring(1, title.length() - 1);

@@ -83,6 +83,16 @@ After implementation:
 - [ ] Verified error handling at each boundary
 - [ ] Checked data survives round-trip
 
+### AI Tool Calling Checklist
+
+For features involving LLM tool calling, additionally verify:
+- [ ] Tool JSON Schema matches backend `AiToolExecutor.execute()` parameter parsing
+- [ ] SSE event names (`tool_call`, `tool_result`, `chunk`, `done`, `error`) are consistent between backend `SseEmitter` and frontend SSE parser
+- [ ] Tool call `arguments` JSON string is correctly parsed by both LLM provider (OpenAI/Claude) and backend executor
+- [ ] Frontend `streamingToolCalls` state resets in all exit paths (`stopGeneration`, `finally` block, `regenerateLast`)
+- [ ] Tool iteration limit (`MAX_TOOL_ITERATIONS = 5`) prevents infinite loops
+- [ ] Error in tool execution returns `{success: false, error: "..."}` to LLM, not thrown exception
+
 ---
 
 ## When to Create Flow Documentation

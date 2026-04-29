@@ -94,9 +94,10 @@ docker run -p 8000:8000 smart-traffic-backend
 | `POST` | `/api/v1/ai/conversations/{id}/chat` | SSE 流式聊天 |
 
 说明：
-- `/chat` 返回 `text/event-stream`，事件类型：`chunk`、`done`、`error`
+- `/chat` 返回 `text/event-stream`，事件类型：`chunk`、`done`、`error`、`tool_call`、`tool_result`
 - 对话支持可选 `road_context` 上下文
 - AI 配置通过「节点配置管理 → AI 配置」设置，存储在 `site_settings` 表
+- **Tool Calling**: AI 可动态调用 `query_traffic`、`list_cameras`、`query_history`、`reverse_geocode` 工具查询实时数据
 
 ### AI 配置管理（需管理员）
 

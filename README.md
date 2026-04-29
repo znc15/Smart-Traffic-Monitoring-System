@@ -12,9 +12,28 @@
 - 交通态势概览：实时交通监控、流量趋势图表（3 秒轮询持久化）
 - 实时状态推送：高德地图集成，监控节点可视化
 - 历史数据统计：历史数据统计与导出
-- AI 智能分析：多轮对话、道路下拉选择、预设推荐问题、SSE 流式响应、停止生成、消息复制/重新生成、对话重命名/清空、自动生成对话标题（可配置独立标题模型）
+- AI 智能分析：多轮对话、道路下拉选择、预设推荐问题、SSE 流式响应、停止生成、消息复制/重新生成、对话重命名/清空、自动生成对话标题（可配置独立标题模型）、**Tool Calling 动态查询道路/摄像头/历史数据**
 - 节点配置管理：站点设置、用户管理（独立页面）、API 密钥（独立页面）、AI 配置（含标题模型配置）
 - Redis 增强：AI 对话/消息缓存、站点配置缓存、用户信息缓存、API 限流
+
+## AI Tool Calling 架构
+
+AI 智能分析模块支持 LLM Tool Calling，允许 AI 在对话中动态查询交通数据：
+
+| 工具名 | 功能 | 后端依赖 |
+|---|---|---|
+| `query_traffic` | 查询指定道路的实时交通数据 | `TrafficService.info(roadName)` |
+| `list_cameras` | 查询摄像头列表（含经纬度、道路名称） | `CameraRepository.findByEnabledTrue()` |
+| `query_history` | 查询指定道路的历史统计数据 | `TrafficSampleRepository` |
+| `reverse_geocode` | 根据经纬度返回最近的摄像头/道路 | `GeocodingService` |
+
+数据流：
+
+```
+用户提问 → LLM 判断需要工具 → tool_call 事件 → 后端执行工具 → tool_result → LLM 生成回答
+```
+
+前端通过 SSE 接收 `tool_call` / `tool_result` 事件，显示"正在调用 xxx 工具..."指示器。
 
 主站 Docker 一键启动范围只覆盖：
 - `gateway`
