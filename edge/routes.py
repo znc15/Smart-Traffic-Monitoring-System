@@ -83,6 +83,9 @@ class ConfigUpdateRequest(BaseModel):
     parking_stationary_seconds: Optional[float] = Field(None, ge=1.0, le=120.0, description="违停判定静止秒数")
     wrong_way_min_track_points: Optional[int] = Field(None, ge=2, le=30, description="逆行判定最少轨迹点数")
     telemetry_interval_sec: Optional[float] = Field(None, ge=1.0, le=60.0, description="主动上报间隔秒数")
+    color_car: Optional[list[int]] = Field(None, min_length=3, max_length=3, description="汽车检测框颜色 RGB [0-255]")
+    color_motor: Optional[list[int]] = Field(None, min_length=3, max_length=3, description="摩托车检测框颜色 RGB [0-255]")
+    color_person: Optional[list[int]] = Field(None, min_length=3, max_length=3, description="行人检测框颜色 RGB [0-255]")
 
     @field_validator('imgsz')
     @classmethod
@@ -90,6 +93,15 @@ class ConfigUpdateRequest(BaseModel):
         if v is not None and v % 32 != 0:
             raise ValueError('imgsz must be a multiple of 32')
         return v
+
+    @field_validator("color_car", "color_motor", "color_person")
+    @classmethod
+    def validate_rgb_color(cls, value: Optional[list[int]]) -> Optional[list[int]]:
+        if value is None:
+            return value
+        if any(not (0 <= v <= 255) for v in value):
+            raise ValueError("RGB values must be between 0 and 255")
+        return value
 
     @field_validator("analysis_roi")
     @classmethod
@@ -130,6 +142,16 @@ class ProbeRequest(BaseModel):
         return validate_probe_source(value)
 
 
+def _bgr_to_rgb(bgr: tuple[int, int, int]) -> list[int]:
+    """Convert BGR tuple to RGB list for API responses."""
+    return [bgr[2], bgr[1], bgr[0]]
+
+
+def _rgb_to_bgr(rgb: list[int]) -> tuple[int, int, int]:
+    """Convert RGB list to BGR tuple for config storage."""
+    return (rgb[2], rgb[1], rgb[0])
+
+
 def _current_config() -> dict:
     """读取 config 模块当前值，返回配置字典"""
     return {
@@ -154,6 +176,9 @@ def _current_config() -> dict:
         "parking_stationary_seconds": config.PARKING_STATIONARY_SECONDS,
         "wrong_way_min_track_points": config.WRONG_WAY_MIN_TRACK_POINTS,
         "telemetry_interval_sec": config.TELEMETRY_INTERVAL_SEC,
+        "color_car": _bgr_to_rgb(config.COLOR_CAR),
+        "color_motor": _bgr_to_rgb(config.COLOR_MOTOR),
+        "color_person": _bgr_to_rgb(config.COLOR_PERSON),
         "loop_state": state.get_loop_state(),
     }
 
@@ -179,6 +204,9 @@ def _config_snapshot() -> dict:
         "parking_stationary_seconds": config.PARKING_STATIONARY_SECONDS,
         "wrong_way_min_track_points": config.WRONG_WAY_MIN_TRACK_POINTS,
         "telemetry_interval_sec": config.TELEMETRY_INTERVAL_SEC,
+        "color_car": config.COLOR_CAR,
+        "color_motor": config.COLOR_MOTOR,
+        "color_person": config.COLOR_PERSON,
     }
 
 
@@ -202,6 +230,9 @@ def _restore_config(snapshot: dict) -> None:
     config.PARKING_STATIONARY_SECONDS = snapshot["parking_stationary_seconds"]
     config.WRONG_WAY_MIN_TRACK_POINTS = snapshot["wrong_way_min_track_points"]
     config.TELEMETRY_INTERVAL_SEC = snapshot["telemetry_interval_sec"]
+    config.COLOR_CAR = snapshot["color_car"]
+    config.COLOR_MOTOR = snapshot["color_motor"]
+    config.COLOR_PERSON = snapshot["color_person"]
 
 
 def _require_detector() -> None:
@@ -644,6 +675,12 @@ def update_config(
         config.WRONG_WAY_MIN_TRACK_POINTS = int(body.wrong_way_min_track_points)
     if body.telemetry_interval_sec is not None:
         config.TELEMETRY_INTERVAL_SEC = float(body.telemetry_interval_sec)
+    if body.color_car is not None:
+        config.COLOR_CAR = _rgb_to_bgr(body.color_car)
+    if body.color_motor is not None:
+        config.COLOR_MOTOR = _rgb_to_bgr(body.color_motor)
+    if body.color_person is not None:
+        config.COLOR_PERSON = _rgb_to_bgr(body.color_person)
 
     # 动态生效：frame_skip / jpeg_quality / telemetry_interval / traffic_enrichment 规则参数 / road_name
     # 需重启：mode / camera_source / detector + tracker 初始化相关参数

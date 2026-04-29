@@ -14,13 +14,6 @@ from ultralytics import YOLO
 import config
 
 # ---------------------------------------------------------------------------
-# Color constants for detection overlays
-# ---------------------------------------------------------------------------
-_COLOR_CAR = (255, 120, 40)     # blue-orange for cars
-_COLOR_MOTOR = (40, 220, 120)   # green for motorcycles
-_COLOR_PERSON = (120, 180, 255)  # light blue for person
-
-# ---------------------------------------------------------------------------
 # 模型加载（懒加载单例，支持 OpenVINO，线程安全）
 # ---------------------------------------------------------------------------
 _model: YOLO | None = None
@@ -221,16 +214,16 @@ def _build_detection_response(
 
             if cls_id in config.CAR_CLASSES:
                 count_car += 1
-                color = _COLOR_CAR
+                color = config.COLOR_CAR
                 label = f"Car {conf:.0%}"
                 cls_name = "car"
             elif cls_id in config.MOTOR_CLASSES:
                 count_motor += 1
-                color = _COLOR_MOTOR
+                color = config.COLOR_MOTOR
                 label = f"Motor {conf:.0%}"
                 cls_name = "motor"
             elif cls_id in config.PERSON_CLASSES:
-                color = _COLOR_PERSON
+                color = config.COLOR_PERSON
                 label = f"Person {conf:.0%}"
                 cls_name = "person"
             else:
@@ -273,13 +266,13 @@ def redraw_detections(frame: np.ndarray, objects_list: list[dict]) -> np.ndarray
         x1, y1, x2, y2 = obj["bbox"]
         conf = obj["confidence"]
         if obj["class"] == "car":
-            color = _COLOR_CAR
+            color = config.COLOR_CAR
             label = f"Car {conf:.0%}"
         elif obj["class"] == "motor":
-            color = _COLOR_MOTOR
+            color = config.COLOR_MOTOR
             label = f"Motor {conf:.0%}"
         else:
-            color = _COLOR_PERSON
+            color = config.COLOR_PERSON
             label = f"Person {conf:.0%}"
         cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
         cv2.putText(annotated, label, (x1, y1 - 6),

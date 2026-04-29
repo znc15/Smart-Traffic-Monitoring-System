@@ -118,10 +118,29 @@ def get_access_host() -> str:
         return "localhost"
     return HTTP_HOST
 
+def _parse_color(name: str, default: tuple[int, int, int]) -> tuple[int, int, int]:
+    """Parse a color from env var 'R,G,B' (0-255 each) into a BGR tuple for OpenCV."""
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        parts = [int(p.strip()) for p in raw.split(",")]
+    except ValueError:
+        return default
+    if len(parts) != 3 or not all(0 <= p <= 255 for p in parts):
+        return default
+    return (parts[2], parts[1], parts[0])  # RGB → BGR
+
+
 # COCO 类别映射
 CAR_CLASSES = {2, 5, 7}       # car, bus, truck → 归为"汽车"
 MOTOR_CLASSES = {1, 3}        # bicycle, motorcycle → 归为"摩托/非机动车"
 PERSON_CLASSES = {0}          # person
+
+# 检测框颜色（BGR，环境变量传 RGB 格式 "R,G,B"）
+COLOR_CAR = _parse_color("COLOR_CAR", (255, 120, 40))       # default: blue-orange
+COLOR_MOTOR = _parse_color("COLOR_MOTOR", (40, 220, 120))   # default: green
+COLOR_PERSON = _parse_color("COLOR_PERSON", (120, 180, 255)) # default: light blue
 
 
 def get_model_path() -> Path:
