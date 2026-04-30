@@ -1,6 +1,6 @@
 package com.smarttraffic.backend.config;
 
-import com.smarttraffic.backend.security.JwtService;
+import com.smarttraffic.backend.security.CurrentUserResolver;
 import com.smarttraffic.backend.security.TokenExtractionService;
 import com.smarttraffic.backend.websocket.AdminMetricsWebSocketHandler;
 import com.smarttraffic.backend.websocket.FrameWebSocketHandler;
@@ -19,7 +19,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
     private final FrameWebSocketHandler frameWebSocketHandler;
     private final AdminMetricsWebSocketHandler adminMetricsWebSocketHandler;
     private final TokenExtractionService tokenExtractionService;
-    private final JwtService jwtService;
+    private final CurrentUserResolver currentUserResolver;
     private final SecurityProperties securityProperties;
 
     public WebSocketConfig(
@@ -27,14 +27,14 @@ public class WebSocketConfig implements WebSocketConfigurer {
             FrameWebSocketHandler frameWebSocketHandler,
             AdminMetricsWebSocketHandler adminMetricsWebSocketHandler,
             TokenExtractionService tokenExtractionService,
-            JwtService jwtService,
+            CurrentUserResolver currentUserResolver,
             SecurityProperties securityProperties
     ) {
         this.trafficInfoWebSocketHandler = trafficInfoWebSocketHandler;
         this.frameWebSocketHandler = frameWebSocketHandler;
         this.adminMetricsWebSocketHandler = adminMetricsWebSocketHandler;
         this.tokenExtractionService = tokenExtractionService;
-        this.jwtService = jwtService;
+        this.currentUserResolver = currentUserResolver;
         this.securityProperties = securityProperties;
     }
 
@@ -45,13 +45,13 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
         WebSocketAuthInterceptor userAuth = new WebSocketAuthInterceptor(
                 tokenExtractionService,
-                jwtService,
+                currentUserResolver,
                 false,
                 wsAllowQueryToken
         );
         WebSocketAuthInterceptor adminAuth = new WebSocketAuthInterceptor(
                 tokenExtractionService,
-                jwtService,
+                currentUserResolver,
                 true,
                 wsAllowQueryToken
         );

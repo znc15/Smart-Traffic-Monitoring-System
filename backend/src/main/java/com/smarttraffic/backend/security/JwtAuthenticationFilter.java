@@ -15,18 +15,18 @@ import java.util.Optional;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final TokenExtractionService tokenExtractionService;
-    private final JwtService jwtService;
+    private final CurrentUserResolver currentUserResolver;
 
-    public JwtAuthenticationFilter(TokenExtractionService tokenExtractionService, JwtService jwtService) {
+    public JwtAuthenticationFilter(TokenExtractionService tokenExtractionService, CurrentUserResolver currentUserResolver) {
         this.tokenExtractionService = tokenExtractionService;
-        this.jwtService = jwtService;
+        this.currentUserResolver = currentUserResolver;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         Optional<String> token = tokenExtractionService.extractFromHttpRequest(request);
-        token.flatMap(jwtService::parseToken)
+        token.flatMap(currentUserResolver::resolve)
                 .ifPresent(currentUser -> SecurityContextHolder.getContext()
                         .setAuthentication(new CurrentUserAuthentication(currentUser, token.get())));
         filterChain.doFilter(request, response);

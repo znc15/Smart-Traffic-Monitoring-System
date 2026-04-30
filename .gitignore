@@ -74,3 +74,5 @@ edge/models/*_openvino_model/
 __pycache__/
 .ace-tool/
 .trellis/
+.codex/
+.agents/

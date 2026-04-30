@@ -70,6 +70,8 @@ export const endpoints = {
   aiStatus: `${API_HTTP_BASE}/ai/status`,
   aiLlmTestConnection: `${API_HTTP_BASE}/admin/llm/test-connection`,
   aiLlmModels: `${API_HTTP_BASE}/admin/llm/models`,
+  alerts: `${API_HTTP_BASE}/alerts`,
+  alertStatus: (id: number) => `${API_HTTP_BASE}/alerts/${id}/status`,
 }
 
 export function getToken(): string | null {

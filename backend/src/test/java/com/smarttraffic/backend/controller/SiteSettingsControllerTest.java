@@ -6,11 +6,14 @@ import com.smarttraffic.backend.model.SiteSettingsEntity;
 import com.smarttraffic.backend.repository.SiteSettingsRepository;
 import com.smarttraffic.backend.security.CurrentUser;
 import com.smarttraffic.backend.security.CurrentUserAuthentication;
+import com.smarttraffic.backend.service.LlmService;
+import com.smarttraffic.backend.service.analytics.RedisCacheService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -31,15 +34,17 @@ class SiteSettingsControllerTest {
     @Test
     void get_shouldReturnDefaultsWhenSettingsRowIsMissing() {
         SiteSettingsRepository repo = mock(SiteSettingsRepository.class);
+        RedisCacheService redisCacheService = mock(RedisCacheService.class);
         when(repo.findById(1L)).thenReturn(Optional.empty());
+        when(redisCacheService.getSiteSettings(Map.class)).thenReturn(Optional.empty());
 
-        SiteSettingsController controller = new SiteSettingsController(repo);
+        SiteSettingsController controller = new SiteSettingsController(repo, mock(LlmService.class), redisCacheService);
 
-        SiteSettingsEntity response = controller.get();
+        Map<String, Object> response = controller.get();
 
-        assertEquals("智能交通监控系统", response.getSiteName());
-        assertEquals("", response.getAnnouncement());
-        assertNull(response.getAmapKey());
+        assertEquals("智能交通监控系统", response.get("site_name"));
+        assertEquals("", response.get("announcement"));
+        assertNull(response.get("amap_key"));
     }
 
     @Test
@@ -52,7 +57,7 @@ class SiteSettingsControllerTest {
         when(repo.save(any(SiteSettingsEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         SecurityContextHolder.getContext().setAuthentication(authWithRole(0));
 
-        SiteSettingsController controller = new SiteSettingsController(repo);
+        SiteSettingsController controller = new SiteSettingsController(repo, mock(LlmService.class), mock(RedisCacheService.class));
         UpdateSiteSettingsRequest request = new UpdateSiteSettingsRequest();
         request.setAmapKey("  demo-amap-key  ");
 
@@ -67,7 +72,7 @@ class SiteSettingsControllerTest {
         SiteSettingsRepository repo = mock(SiteSettingsRepository.class);
         SecurityContextHolder.getContext().setAuthentication(authWithRole(1));
 
-        SiteSettingsController controller = new SiteSettingsController(repo);
+        SiteSettingsController controller = new SiteSettingsController(repo, mock(LlmService.class), mock(RedisCacheService.class));
         UpdateSiteSettingsRequest request = new UpdateSiteSettingsRequest();
         request.setAmapKey("demo-amap-key");
 
@@ -85,7 +90,7 @@ class SiteSettingsControllerTest {
         when(repo.save(any(SiteSettingsEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         SecurityContextHolder.getContext().setAuthentication(authWithRole(0));
 
-        SiteSettingsController controller = new SiteSettingsController(repo);
+        SiteSettingsController controller = new SiteSettingsController(repo, mock(LlmService.class), mock(RedisCacheService.class));
         UpdateSiteSettingsRequest request = new UpdateSiteSettingsRequest();
         request.setAmapKey("   ");
 

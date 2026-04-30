@@ -133,6 +133,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { authFetch, endpoints } from '@/lib/api'
 
 interface Alert {
   id: string
@@ -145,7 +146,26 @@ interface Alert {
   metadata?: Record<string, unknown>
 }
 
+interface BackendAlert {
+  id: number
+  type: string
+  level: string
+  roadName: string
+  nodeId: string | null
+  message: string
+  status: string
+  createdAt: string
+  updatedAt: string | null
+}
+
+const LEVEL_MAP: Record<string, '严重' | '警告' | '信息'> = {
+  CRITICAL: '严重',
+  WARNING: '警告',
+  INFO: '信息',
+}
+
 const alerts = ref<Alert[]>([])
+const loading = ref(false)
 const alertLevelFilter = ref<string>('all')
 const nodeFilter = ref<string>('all')
 const showDetailDialog = ref(false)
@@ -174,6 +194,18 @@ const filteredAlerts = computed(() => {
   })
 })
 
+function mapAlert(raw: BackendAlert): Alert {
+  return {
+    id: String(raw.id),
+    timestamp: raw.createdAt,
+    level: LEVEL_MAP[raw.level] ?? '信息',
+    nodeName: raw.roadName || '-',
+    type: raw.type,
+    description: raw.message,
+    acknowledged: raw.status !== 'UNCONFIRMED',
+  }
+}
+
 function formatTime(timestamp: string): string {
   return new Date(timestamp).toLocaleString('zh-CN')
 }
@@ -187,52 +219,55 @@ function getLevelVariant(level: string): 'default' | 'secondary' | 'destructive'
 }
 
 async function loadAlerts() {
-  // 模拟数据，后续对接后端 API
-  alerts.value = [
-    {
-      id: '1',
-      timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-      level: '严重',
-      nodeName: '中关村大街节点',
-      type: '设备离线',
-      description: '摄像头 CAM-001 已离线超过 5 分钟，请检查网络连接',
-      acknowledged: false,
-    },
-    {
-      id: '2',
-      timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-      level: '警告',
-      nodeName: '西直门桥节点',
-      type: '流量异常',
-      description: '当前车流量较历史同期增长 45%，可能存在拥堵风险',
-      acknowledged: false,
-    },
-    {
-      id: '3',
-      timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-      level: '信息',
-      nodeName: '国贸桥节点',
-      type: '系统通知',
-      description: '节点已完成固件升级，版本 v2.1.0',
-      acknowledged: true,
-    },
-  ]
-  toast.success('告警数据已刷新')
-}
-
-function acknowledgeAlert(id: string) {
-  const alert = alerts.value.find(a => a.id === id)
-  if (alert) {
-    alert.acknowledged = true
-    toast.success('告警已确认')
+  loading.value = true
+  try {
+    const res = await authFetch(endpoints.alerts)
+    if (!res.ok) throw new Error('加载失败')
+    const data: BackendAlert[] = await res.json()
+    alerts.value = data.map(mapAlert)
+    toast.success('告警数据已刷新')
+  } catch {
+    toast.error('加载告警数据失败')
+  } finally {
+    loading.value = false
   }
 }
 
-function acknowledgeAll() {
-  alerts.value.forEach(alert => {
-    alert.acknowledged = true
-  })
-  toast.success('所有告警已确认')
+async function acknowledgeAlert(id: string) {
+  try {
+    const res = await authFetch(endpoints.alertStatus(Number(id)), {
+      method: 'PUT',
+      body: JSON.stringify({ status: 'CONFIRMED' }),
+    })
+    if (!res.ok) throw new Error()
+    const alert = alerts.value.find(a => a.id === id)
+    if (alert) alert.acknowledged = true
+    toast.success('告警已确认')
+  } catch {
+    toast.error('确认告警失败')
+  }
+}
+
+async function acknowledgeAll() {
+  const unacknowledged = filteredAlerts.value.filter(a => !a.acknowledged)
+  if (unacknowledged.length === 0) {
+    toast.info('没有待处理的告警')
+    return
+  }
+  try {
+    await Promise.all(
+      unacknowledged.map(a =>
+        authFetch(endpoints.alertStatus(Number(a.id)), {
+          method: 'PUT',
+          body: JSON.stringify({ status: 'CONFIRMED' }),
+        }).then(res => { if (!res.ok) throw new Error() })
+      )
+    )
+    unacknowledged.forEach(a => { a.acknowledged = true })
+    toast.success('所有告警已确认')
+  } catch {
+    toast.error('批量确认失败，请重试')
+  }
 }
 
 function viewAlertDetail(alert: Alert) {

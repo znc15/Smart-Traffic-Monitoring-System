@@ -165,17 +165,12 @@ public class AdminController {
                 user.setPassword(passwordEncoder.encode(rawPassword));
             }
         }
-        if (body.containsKey("is_superuser") || body.containsKey("role_id")) {
+        if (body.containsKey("is_superuser") || body.containsKey("role_id") || body.containsKey("roleId")) {
             CurrentUser current = SecurityUtils.requireCurrentUser();
             if (current.id().equals(id)) {
                 throw new AppException(HttpStatus.BAD_REQUEST, "Cannot modify your own role");
             }
-            if (body.containsKey("is_superuser")) {
-                boolean isSuper = (Boolean) body.get("is_superuser");
-                user.setRoleId(isSuper ? 1 : 0);
-            } else {
-                user.setRoleId(parseRoleId(body.get("role_id")));
-            }
+            user.setRoleId(resolveRoleId(body));
         }
         UserEntity saved = userRepository.save(user);
         redisCacheService.evictUserInfo(id);
@@ -204,13 +199,7 @@ public class AdminController {
         if (current.id().equals(id)) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Cannot modify your own account");
         }
-        Integer roleId = parseRoleId(body.getOrDefault("role_id", body.get("roleId")));
-        if (roleId == null) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "role_id is required");
-        }
-        if (roleId != 0 && roleId != 1) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "role_id must be 0 or 1");
-        }
+        Integer roleId = resolveRoleId(body);
         UserEntity user = userRepository.findById(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "User not found"));
         user.setRoleId(roleId);
@@ -246,6 +235,23 @@ public class AdminController {
             }
         }
         return null;
+    }
+
+    private Integer resolveRoleId(Map<String, Object> body) {
+        if (body.containsKey("is_superuser")) {
+            return Boolean.TRUE.equals(body.get("is_superuser"))
+                    ? CurrentUser.ADMIN_ROLE_ID
+                    : CurrentUser.USER_ROLE_ID;
+        }
+
+        Integer roleId = parseRoleId(body.getOrDefault("role_id", body.get("roleId")));
+        if (roleId == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "role_id is required");
+        }
+        if (roleId != CurrentUser.ADMIN_ROLE_ID && roleId != CurrentUser.USER_ROLE_ID) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "role_id must be 0 or 1");
+        }
+        return roleId;
     }
 
     private void invalidateTrafficCaches() {

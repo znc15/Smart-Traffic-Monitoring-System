@@ -1,7 +1,7 @@
 package com.smarttraffic.backend.websocket;
 
 import com.smarttraffic.backend.security.CurrentUser;
-import com.smarttraffic.backend.security.JwtService;
+import com.smarttraffic.backend.security.CurrentUserResolver;
 import com.smarttraffic.backend.security.TokenExtractionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
@@ -18,13 +18,18 @@ import java.util.Optional;
 public class WebSocketAuthInterceptor implements HandshakeInterceptor {
 
     private final TokenExtractionService tokenExtractionService;
-    private final JwtService jwtService;
+    private final CurrentUserResolver currentUserResolver;
     private final boolean adminOnly;
     private final boolean allowQueryToken;
 
-    public WebSocketAuthInterceptor(TokenExtractionService tokenExtractionService, JwtService jwtService, boolean adminOnly, boolean allowQueryToken) {
+    public WebSocketAuthInterceptor(
+            TokenExtractionService tokenExtractionService,
+            CurrentUserResolver currentUserResolver,
+            boolean adminOnly,
+            boolean allowQueryToken
+    ) {
         this.tokenExtractionService = tokenExtractionService;
-        this.jwtService = jwtService;
+        this.currentUserResolver = currentUserResolver;
         this.adminOnly = adminOnly;
         this.allowQueryToken = allowQueryToken;
     }
@@ -49,7 +54,7 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
             return false;
         }
 
-        Optional<CurrentUser> user = jwtService.parseToken(token.get());
+        Optional<CurrentUser> user = currentUserResolver.resolve(token.get());
         if (user.isEmpty()) {
             response.setStatusCode(HttpStatus.UNAUTHORIZED);
             return false;

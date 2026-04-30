@@ -165,6 +165,7 @@ import {
 } from 'lucide-vue-next'
 import { clearToken, endpoints, authFetch } from '../lib/api'
 import { normalizeSiteSettings } from '../lib/normalize'
+import { normalizeRoleId, isAdminRole } from '../lib/roles'
 import { closeTrafficStore } from '../store/traffic'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
@@ -194,10 +195,11 @@ const siteName = ref('智慧交通监控')
 const footerText = ref('')
 const hoveredGroup = ref<string | null>(null)
 const expandedGroups = ref<Set<string>>(new Set())
+const roleId = ref<number | null>(null)
 
 const MOBILE_BREAKPOINT = 768
 
-const menuGroups: MenuGroup[] = [
+const allMenuGroups: MenuGroup[] = [
   {
     label: '监控中心',
     icon: Activity,
@@ -236,6 +238,13 @@ const menuGroups: MenuGroup[] = [
   },
 ]
 
+const menuGroups = computed<MenuGroup[]>(() => {
+  if (isAdminRole(roleId.value)) {
+    return allMenuGroups
+  }
+  return allMenuGroups.filter((group) => group.label !== '系统管理')
+})
+
 function isActive(key: string): boolean {
   if (route.path === key) return true
   // /admin loads AdminView with default site tab
@@ -261,7 +270,7 @@ function toggleGroup(label: string) {
 
 // Auto-expand group containing active route
 watch(() => route.path, () => {
-  for (const group of menuGroups) {
+  for (const group of menuGroups.value) {
     if (isGroupActive(group)) {
       expandedGroups.value.add(group.label)
     }
@@ -289,6 +298,10 @@ async function fetchUserInfo() {
     if (!res.ok) return
     const data = await res.json()
     username.value = data.username || '用户'
+    roleId.value = normalizeRoleId(data?.role_id ?? data?.roleId)
+    if (!isAdminRole(roleId.value) && route.path.startsWith('/admin')) {
+      router.replace('/dashboard')
+    }
   } catch {}
 }
 
@@ -310,6 +323,7 @@ const pageTitle = computed(() => {
 function handleLogout() {
   clearToken()
   closeTrafficStore()
+  roleId.value = null
   router.replace('/login')
 }
 </script>

@@ -30,7 +30,7 @@
               </TableCell>
               <TableCell>
                 <Badge variant="outline">
-                  {{ user.is_superuser ? '管理员' : '普通用户' }}
+                  {{ isAdminRole(user.role_id) ? '管理员' : '普通用户' }}
                 </Badge>
               </TableCell>
               <TableCell>
@@ -112,6 +112,8 @@
 import { ref, onMounted, computed } from 'vue'
 import { toast } from 'vue-sonner'
 import { authFetch, endpoints } from '../../lib/api'
+import { normalizeAdminUser, type AdminUser } from '../../lib/normalize'
+import { ADMIN_ROLE_ID, USER_ROLE_ID, isAdminRole } from '../../lib/roles'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
@@ -122,18 +124,20 @@ import { Switch } from '@/components/ui/switch'
 import { Select } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 
-const users = ref<any[]>([])
+type UserForm = {
+  username: string
+  email: string
+  phone_number: string
+  password: string
+  is_superuser: boolean
+}
+
+const users = ref<AdminUser[]>([])
 const userPage = ref(1)
 const userPageSize = ref(5)
 const showUserDialog = ref(false)
 const editingUserId = ref<number | null>(null)
-const newUser = ref({
-  username: '',
-  email: '',
-  phone_number: '',
-  password: '',
-  is_superuser: false,
-})
+const newUser = ref<UserForm>(emptyUserForm())
 
 const paginatedUsers = computed(() => {
   const start = (userPage.value - 1) * userPageSize.value
@@ -149,7 +153,8 @@ async function loadUsers() {
     const res = await authFetch(`${endpoints.adminUsers}?size=100`)
     if (res.ok) {
       const data = await res.json()
-      users.value = data.content || data || []
+      const rawUsers = Array.isArray(data?.content) ? data.content : Array.isArray(data) ? data : []
+      users.value = rawUsers.map(normalizeAdminUser)
     }
   } catch {}
 }
@@ -162,7 +167,7 @@ async function saveUser() {
         email: newUser.value.email,
         phone_number: newUser.value.phone_number || null,
         password: newUser.value.password || null,
-        is_superuser: newUser.value.is_superuser
+        role_id: newUser.value.is_superuser ? ADMIN_ROLE_ID : USER_ROLE_ID,
       }
       const res = await authFetch(`${endpoints.adminUsers}/${editingUserId.value}`, {
         method: 'PUT',
@@ -179,12 +184,15 @@ async function saveUser() {
     } else {
       const res = await authFetch(endpoints.adminUsers, {
         method: 'POST',
-        body: JSON.stringify(newUser.value),
+        body: JSON.stringify({
+          ...newUser.value,
+          role_id: newUser.value.is_superuser ? ADMIN_ROLE_ID : USER_ROLE_ID,
+        }),
       })
       if (res.ok) {
         toast.success('添加成功')
         showUserDialog.value = false
-        newUser.value = { username: '', email: '', phone_number: '', password: '', is_superuser: false }
+        newUser.value = emptyUserForm()
         loadUsers()
       } else {
         const err = await res.json().catch(() => null)
@@ -198,18 +206,18 @@ async function saveUser() {
 
 function openAddUserDialog() {
   editingUserId.value = null
-  newUser.value = { username: '', email: '', phone_number: '', password: '', is_superuser: false }
+  newUser.value = emptyUserForm()
   showUserDialog.value = true
 }
 
-function editUser(user: any) {
+function editUser(user: AdminUser) {
   editingUserId.value = user.id
   newUser.value = {
     username: user.username,
     email: user.email,
-    phone_number: user.phone_number || user.phoneNumber || '',
+    phone_number: user.phone_number,
     password: '',
-    is_superuser: user.is_superuser || user.role_id === 1
+    is_superuser: isAdminRole(user.role_id),
   }
   showUserDialog.value = true
 }
@@ -230,7 +238,7 @@ async function deleteUser(id: number) {
   }
 }
 
-async function toggleUserActive(user: any) {
+async function toggleUserActive(user: AdminUser) {
   try {
     const res = await authFetch(`${endpoints.adminUsers}/${user.id}/status`, {
       method: 'PUT',
@@ -244,6 +252,16 @@ async function toggleUserActive(user: any) {
     }
   } catch {
     toast.error('网络错误')
+  }
+}
+
+function emptyUserForm(): UserForm {
+  return {
+    username: '',
+    email: '',
+    phone_number: '',
+    password: '',
+    is_superuser: false,
   }
 }
 </script>

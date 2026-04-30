@@ -40,21 +40,21 @@ public class AuthService {
         entity.setUsername(request.getUsername());
         entity.setEmail(request.getEmail());
         entity.setPhoneNumber(request.getPhoneNumber());
-        entity.setRoleId(userRepository.count() == 0 ? 0 : 1);
+        entity.setRoleId(userRepository.count() == 0 ? CurrentUser.ADMIN_ROLE_ID : CurrentUser.USER_ROLE_ID);
         entity.setPassword(passwordEncoder.encode(request.getPassword()));
         userRepository.save(entity);
     }
 
     public LoginResponse login(String email, String password) {
         UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "登录信息错误"));
+                .orElseThrow(() -> new AppException(HttpStatus.UNAUTHORIZED, "邮箱未注册"));
 
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new AppException(HttpStatus.UNAUTHORIZED, "登录信息错误");
+            throw new AppException(HttpStatus.UNAUTHORIZED, "密码错误");
         }
 
         if (!user.isEnabled()) {
-            throw new AppException(HttpStatus.FORBIDDEN, "Account is disabled");
+            throw new AppException(HttpStatus.FORBIDDEN, "账户已被禁用，请联系管理员");
         }
 
         CurrentUser currentUser = toCurrentUser(user);
@@ -74,7 +74,7 @@ public class AuthService {
     }
 
     public CurrentUser toCurrentUser(UserEntity user) {
-        return new CurrentUser(user.getId(), user.getUsername(), user.getEmail(), user.getPhoneNumber(), user.getRoleId());
+        return CurrentUser.fromEntity(user);
     }
 
     private UserResponse toUserResponse(UserEntity user) {
