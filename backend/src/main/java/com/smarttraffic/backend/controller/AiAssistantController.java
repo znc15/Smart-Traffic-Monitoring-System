@@ -20,6 +20,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -156,6 +157,7 @@ public class AiAssistantController {
 
     // ─── 删除对话 ──────────────────────────────────────────────
 
+    @Transactional
     @DeleteMapping("/conversations/{id}")
     public Map<String, String> deleteConversation(@PathVariable Long id) {
         CurrentUser user = SecurityUtils.requireCurrentUser();
@@ -169,6 +171,7 @@ public class AiAssistantController {
 
     // ─── 清空对话消息 ──────────────────────────────────────────
 
+    @Transactional
     @DeleteMapping("/conversations/{id}/messages")
     public Map<String, String> clearConversationMessages(@PathVariable Long id) {
         CurrentUser user = SecurityUtils.requireCurrentUser();
@@ -414,12 +417,19 @@ public class AiAssistantController {
         sb.append("- `speed_car / speed_motor` — 平均速度 (km/h)\n");
         sb.append("- `congestion_index` — 拥堵指数 (0~1，越高越拥堵)\n");
         sb.append("- `density_status` — 密度状态：clear(畅通)/busy(繁忙)/congested(拥堵)/offline(离线)\n");
-        sb.append("- `speed_status` — 速度状态：fast(快速)/slow(缓慢)/unknown(未知)\n\n");
+        sb.append("- `speed_status` — 速度状态：fast(快速)/slow(缓慢)/unknown(未知)\n");
+        sb.append("- `online` — 边缘节点在线状态：true(在线)/false(离线)\n\n");
+
+        sb.append("## 数据状态解读（重要）\n");
+        sb.append("- 如果 `online` 为 false 或 `density_status` 为 offline，说明该道路的边缘节点当前离线，不是 API 故障。应向用户如实说明节点离线，并主动提议查询历史数据。\n");
+        sb.append("- 如果 `count_car`、`speed_car` 等均为 0 且 `online` 为 false，说明无实时数据上报，不要编造拥堵或畅通的结论。\n");
+        sb.append("- 如果 tool 返回 `success: false`，根据 error 内容如实告知，不要自行猜测失败原因。\n\n");
 
         sb.append("## 回答规范\n");
         sb.append("- 用简洁、专业的中文回答\n");
         sb.append("- 涉及数据时使用工具查询，不要凭空猜测\n");
-        sb.append("- 给出建议时说明理由和依据\n\n");
+        sb.append("- 给出建议时说明理由和依据\n");
+        sb.append("- 实时数据不可用时，主动使用 query_history 查询历史数据作为参考\n\n");
 
         // 注入道路列表
         List<String> roads = trafficService.roadNames();

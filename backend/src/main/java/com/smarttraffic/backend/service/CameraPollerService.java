@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarttraffic.backend.model.CameraEntity;
 import com.smarttraffic.backend.model.TrafficEventEntity;
 import com.smarttraffic.backend.repository.TrafficEventRepository;
-import com.smarttraffic.backend.service.analytics.MirrorWriteService;
 import com.smarttraffic.backend.repository.CameraRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +46,6 @@ public class CameraPollerService {
     private final TrafficService trafficService;
     private final TrafficEventRepository trafficEventRepository;
     private final ObjectMapper objectMapper;
-    private final MirrorWriteService mirrorWriteService;
     private final AlertService alertService;
     private final RestClient restClient;
 
@@ -56,14 +54,12 @@ public class CameraPollerService {
             TrafficService trafficService,
             TrafficEventRepository trafficEventRepository,
             ObjectMapper objectMapper,
-            MirrorWriteService mirrorWriteService,
             AlertService alertService
     ) {
         this.cameraRepository = cameraRepository;
         this.trafficService = trafficService;
         this.trafficEventRepository = trafficEventRepository;
         this.objectMapper = objectMapper;
-        this.mirrorWriteService = mirrorWriteService;
         this.alertService = alertService;
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(2000);
@@ -155,12 +151,41 @@ public class CameraPollerService {
     private void markOffline(NodeHealth health, FailureDescriptor failure) {
         health.online = false;
         health.healthStatus = failure.healthStatus();
+        health.latencyMs = null;
         health.errorCount++;
         health.consecutiveFailures++;
         health.statusReasonCode = failure.reasonCode();
         health.statusReasonMessage = failure.reasonMessage();
         health.lastErrorStage = failure.stage();
         health.lastError = failure.lastError();
+    }
+
+    public void updateNodeMetricsFromTelemetry(String roadName, String edgeNodeId, Map<String, Object> edgeMetrics) {
+        if (edgeMetrics == null || edgeMetrics.isEmpty()) {
+            return;
+        }
+
+        String normalizedRoadName = trimToNull(roadName);
+        String normalizedEdgeNodeId = trimToNull(edgeNodeId);
+        if (normalizedRoadName == null && normalizedEdgeNodeId == null) {
+            return;
+        }
+
+        NodeHealth health = normalizedRoadName != null
+                ? nodeHealthMap.computeIfAbsent(normalizedRoadName, key -> new NodeHealth())
+                : nodeHealthMap.values().stream()
+                .filter(node -> normalizedEdgeNodeId.equals(node.edgeNodeId))
+                .findFirst()
+                .orElseGet(NodeHealth::new);
+
+        if (normalizedRoadName != null) {
+            health.roadName = normalizedRoadName;
+            nodeHealthMap.putIfAbsent(normalizedRoadName, health);
+        }
+        if (normalizedEdgeNodeId != null) {
+            health.edgeNodeId = normalizedEdgeNodeId;
+        }
+        health.edgeMetrics = new LinkedHashMap<>(edgeMetrics);
     }
 
     private PollOutcome pollCamera(CameraEntity camera, String roadKey, String baseUrl) {
@@ -328,7 +353,6 @@ public class CameraPollerService {
 
         try {
             trafficEventRepository.save(event);
-            mirrorWriteService.mirrorTrafficEvent(event);
         } catch (Exception ex) {
             log.warn("节点状态变化事件写入失败: {}", ex.getMessage());
         }
@@ -413,7 +437,7 @@ public class CameraPollerService {
         volatile String lastErrorStage;
         volatile Instant lastSuccessTime;
         volatile Instant lastPollTime;
-        volatile long latencyMs;
+        volatile Long latencyMs;
         volatile int errorCount;
         volatile int consecutiveFailures;
         volatile String lastError;

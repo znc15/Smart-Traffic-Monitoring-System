@@ -52,12 +52,14 @@ import { RefreshCw, AlertTriangle, Info } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { connectAlertsWs } from '@/lib/alerts-ws'
 import {
   AMAP_KEY,
   AMAP_SECURITY_JS_CODE,
   AMAP_SERVICE_HOST,
   authFetch,
   endpoints,
+  getWsUrl,
 } from '../lib/api'
 import { ensureAmap } from '../lib/amap'
 import {
@@ -73,6 +75,8 @@ const items = ref<MapOverviewPoint[]>([])
 const onlineOnly = ref(false)
 const mapContainerRef = ref<HTMLDivElement | null>(null)
 const siteSettings = ref<SiteSettings>(normalizeSiteSettings({}))
+let alertsWsClient: ReturnType<typeof connectAlertsWs> | null = null
+const alertNodeIds = new Set<string>()
 
 let mapInstance: any = null
 let infoWindow: any = null
@@ -122,6 +126,7 @@ const formatDateTime = (value: string | null) => {
 }
 
 const markerColor = (item: MapOverviewPoint) => {
+  if (item.edge_node_id && alertNodeIds.has(item.edge_node_id)) return '#dc2626'
   if (!item.online) return '#64748b'
   if (item.congestion_index >= 0.7) return '#ef4444'
   if (item.congestion_index >= 0.4) return '#f59e0b'
@@ -129,14 +134,32 @@ const markerColor = (item: MapOverviewPoint) => {
 }
 
 const markerHtml = (item: MapOverviewPoint) => `
-  <div style="
-    width: 20px;
-    height: 20px;
-    border-radius: 999px;
-    background: ${markerColor(item)};
-    border: 3px solid rgba(255,255,255,0.95);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  "></div>
+  <div style="position:relative;width:20px;height:20px;">
+    ${item.edge_node_id && alertNodeIds.has(item.edge_node_id) ? `
+    <div style="
+      position:absolute;
+      left:50%;
+      top:50%;
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      background: rgba(239,68,68,0.15);
+      border: 2px solid rgba(239,68,68,0.35);
+      transform: translate(-50%, -50%);
+    "></div>
+    ` : ''}
+    <div style="
+      position:absolute;
+      left:0;
+      top:0;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      background: ${markerColor(item)};
+      border: 3px solid rgba(255,255,255,0.95);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    "></div>
+  </div>
 `
 
 const infoHtml = (item: MapOverviewPoint) => `
@@ -305,6 +328,42 @@ const refreshOverview = async () => {
   }
 }
 
+type BackendAlert = {
+  id: number
+  type: string
+  level: string
+  roadName?: string
+  road_name?: string
+  nodeId?: string | null
+  node_id?: string | null
+  message: string
+  status: string
+  createdAt?: string
+  created_at?: string
+  updatedAt?: string | null
+  updated_at?: string | null
+}
+
+function handleIncomingAlert(payload: unknown) {
+  const raw = payload as Partial<BackendAlert>
+  const nodeCandidate = raw?.nodeId ?? raw?.node_id ?? ''
+  const nodeId = typeof nodeCandidate === 'string' && nodeCandidate.trim() ? nodeCandidate.trim() : ''
+  if (!nodeId) return
+  if (!alertNodeIds.has(nodeId)) {
+    alertNodeIds.add(nodeId)
+    setTimeout(() => {
+      alertNodeIds.delete(nodeId)
+      renderMap()
+    }, 60_000)
+  }
+  if (typeof raw?.message === 'string' && raw.message.trim()) {
+    toast.warning(raw.message.trim())
+  } else {
+    toast.warning('收到节点告警')
+  }
+  renderMap()
+}
+
 watch([mappableItems, effectiveAmapKey, effectiveAmapSecurityJsCode, effectiveAmapServiceHost], async ([drawable, key]) => {
   if (!drawable.length || !key) {
     mapError.value = ''
@@ -317,9 +376,15 @@ watch([mappableItems, effectiveAmapKey, effectiveAmapSecurityJsCode, effectiveAm
 
 onMounted(() => {
   refreshOverview()
+  alertsWsClient = connectAlertsWs({
+    url: getWsUrl(endpoints.alertsWs),
+    onAlert: handleIncomingAlert,
+  })
 })
 
 onUnmounted(() => {
+  alertsWsClient?.close()
+  alertsWsClient = null
   destroyMap()
 })
 </script>

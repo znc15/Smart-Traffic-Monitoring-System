@@ -116,15 +116,25 @@ public interface LlmClient {
                                             JsonNode toolCallsNode = delta.get("tool_calls");
                                             if (toolCallsNode != null && toolCallsNode.isArray()) {
                                                 for (JsonNode tc : toolCallsNode) {
+                                                    int index = tc.path("index").asInt(0);
                                                     String id = tc.path("id").asText("");
                                                     JsonNode func = tc.path("function");
                                                     String name = func.path("name").asText("");
                                                     String args = func.path("arguments").asText("");
-                                                    if (!name.isEmpty()) {
-                                                        toolCalls.add(new ToolCall(id, name, args));
-                                                        if (onToolCall != null) {
-                                                            onToolCall.accept(name, args);
-                                                        }
+
+                                                    // 确保 list 容量足够
+                                                    while (toolCalls.size() <= index) {
+                                                        toolCalls.add(new ToolCall("", "", ""));
+                                                    }
+
+                                                    ToolCall existing = toolCalls.get(index);
+                                                    String mergedId = !id.isEmpty() ? id : existing.id();
+                                                    String mergedName = !name.isEmpty() ? name : existing.name();
+                                                    String mergedArgs = existing.arguments() + args;
+                                                    toolCalls.set(index, new ToolCall(mergedId, mergedName, mergedArgs));
+
+                                                    if (!name.isEmpty() && onToolCall != null) {
+                                                        onToolCall.accept(name, args);
                                                     }
                                                 }
                                             }

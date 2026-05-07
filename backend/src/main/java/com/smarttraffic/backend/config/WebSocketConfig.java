@@ -3,6 +3,7 @@ package com.smarttraffic.backend.config;
 import com.smarttraffic.backend.security.CurrentUserResolver;
 import com.smarttraffic.backend.security.TokenExtractionService;
 import com.smarttraffic.backend.websocket.AdminMetricsWebSocketHandler;
+import com.smarttraffic.backend.websocket.AlertWebSocketHandler;
 import com.smarttraffic.backend.websocket.FrameWebSocketHandler;
 import com.smarttraffic.backend.websocket.TrafficInfoWebSocketHandler;
 import com.smarttraffic.backend.websocket.WebSocketAuthInterceptor;
@@ -18,6 +19,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
     private final TrafficInfoWebSocketHandler trafficInfoWebSocketHandler;
     private final FrameWebSocketHandler frameWebSocketHandler;
     private final AdminMetricsWebSocketHandler adminMetricsWebSocketHandler;
+    private final AlertWebSocketHandler alertWebSocketHandler;
     private final TokenExtractionService tokenExtractionService;
     private final CurrentUserResolver currentUserResolver;
     private final SecurityProperties securityProperties;
@@ -26,6 +28,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
             TrafficInfoWebSocketHandler trafficInfoWebSocketHandler,
             FrameWebSocketHandler frameWebSocketHandler,
             AdminMetricsWebSocketHandler adminMetricsWebSocketHandler,
+            AlertWebSocketHandler alertWebSocketHandler,
             TokenExtractionService tokenExtractionService,
             CurrentUserResolver currentUserResolver,
             SecurityProperties securityProperties
@@ -33,6 +36,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
         this.trafficInfoWebSocketHandler = trafficInfoWebSocketHandler;
         this.frameWebSocketHandler = frameWebSocketHandler;
         this.adminMetricsWebSocketHandler = adminMetricsWebSocketHandler;
+        this.alertWebSocketHandler = alertWebSocketHandler;
         this.tokenExtractionService = tokenExtractionService;
         this.currentUserResolver = currentUserResolver;
         this.securityProperties = securityProperties;
@@ -65,6 +69,10 @@ public class WebSocketConfig implements WebSocketConfigurer {
                 .setAllowedOrigins(allowedOrigins);
 
         registry.addHandler(adminMetricsWebSocketHandler, "/api/v1/admin/ws/resources")
+                .addInterceptors(adminAuth)
+                .setAllowedOrigins(allowedOrigins);
+
+        registry.addHandler(alertWebSocketHandler, "/api/v1/admin/ws/alerts")
                 .addInterceptors(adminAuth)
                 .setAllowedOrigins(allowedOrigins);
     }

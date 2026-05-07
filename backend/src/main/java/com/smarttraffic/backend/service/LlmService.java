@@ -123,11 +123,11 @@ public class LlmService {
         List<Map<String, Object>> tools = new ArrayList<>();
 
         // query_traffic
-        tools.add(buildTool("query_traffic", "查询指定道路的实时交通数据（车流量、车速、拥堵指数等）",
+        tools.add(buildTool("query_traffic", "查询指定道路的实时交通数据（车流量、车速、拥堵指数、在线状态等）。注意：online=false 或 density_status=offline 表示边缘节点离线，不是 API 故障。当实时数据不可用时，应改用 query_history 查询历史数据。",
                 Map.of(
                         "type", "object",
                         "properties", Map.of(
-                                "road_name", Map.of("type", "string", "description", "道路名称")
+                                "road_name", Map.of("type", "string", "description", "道路名称，必须从当前监控道路列表中选择")
                         ),
                         "required", List.of("road_name")
                 )));
@@ -137,7 +137,7 @@ public class LlmService {
                 Map.of("type", "object", "properties", Map.of())));
 
         // query_history
-        tools.add(buildTool("query_history", "查询指定道路的历史交通统计数据",
+        tools.add(buildTool("query_history", "查询指定道路的历史交通统计数据。当实时数据不可用（节点离线）时，用此工具获取历史趋势作为参考。",
                 Map.of(
                         "type", "object",
                         "properties", Map.of(
@@ -152,8 +152,8 @@ public class LlmService {
                 Map.of(
                         "type", "object",
                         "properties", Map.of(
-                                "latitude", Map.of("type", "number", "description", "纬度"),
-                                "longitude", Map.of("type", "number", "description", "经度")
+                                "latitude", Map.of("type", "number", "description", "纬度 (-90~90)"),
+                                "longitude", Map.of("type", "number", "description", "经度 (-180~180)")
                         ),
                         "required", List.of("latitude", "longitude")
                 )));

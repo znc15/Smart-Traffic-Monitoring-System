@@ -66,9 +66,15 @@ public class TrafficService {
      */
     public Map<String, SnapshotData> getAllSnapshots() {
         Map<String, SnapshotData> result = new LinkedHashMap<>();
+        long busyThreshold = 8;
+        long congestedThreshold = 12;
+        long speedThreshold = 40;
         for (Map.Entry<String, Snapshot> entry : snapshots.entrySet()) {
             String roadName = entry.getKey();
             Snapshot snap = entry.getValue();
+            boolean online = snap.isOnline();
+            String densityStatus = computeDensityStatus(snap, online, busyThreshold, congestedThreshold);
+            String speedStatus = computeSpeedStatus(snap, online, speedThreshold);
             result.put(roadName, new SnapshotData(
                     snap.countCar,
                     snap.countMotor,
@@ -76,8 +82,8 @@ public class TrafficService {
                     snap.speedCar,
                     snap.speedMotor,
                     snap.congestionIndex,
-                    snap.densityStatusOverride,
-                    snap.speedStatusOverride,
+                    densityStatus,
+                    speedStatus,
                     snap.hasRemote
             ));
         }

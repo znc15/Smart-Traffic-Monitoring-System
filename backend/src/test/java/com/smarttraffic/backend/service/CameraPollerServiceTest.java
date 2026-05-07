@@ -5,7 +5,6 @@ import com.smarttraffic.backend.model.CameraEntity;
 import com.smarttraffic.backend.model.TrafficEventEntity;
 import com.smarttraffic.backend.repository.CameraRepository;
 import com.smarttraffic.backend.repository.TrafficEventRepository;
-import com.smarttraffic.backend.service.analytics.MirrorWriteService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpHeaders;
@@ -41,7 +40,6 @@ class CameraPollerServiceTest {
         CameraRepository cameraRepository = mock(CameraRepository.class);
         TrafficService trafficService = mock(TrafficService.class);
         TrafficEventRepository trafficEventRepository = mock(TrafficEventRepository.class);
-        MirrorWriteService mirrorWriteService = mock(MirrorWriteService.class);
         CameraEntity camera = enabledCamera("主干道A", "edge-01", "node-secret", "http://edge-node");
         when(cameraRepository.findByEnabledTrue()).thenReturn(List.of(camera));
 
@@ -49,7 +47,6 @@ class CameraPollerServiceTest {
                 cameraRepository,
                 trafficService,
                 trafficEventRepository,
-                mirrorWriteService,
                 successRestClient()
         );
 
@@ -78,7 +75,6 @@ class CameraPollerServiceTest {
         CameraRepository cameraRepository = mock(CameraRepository.class);
         TrafficService trafficService = mock(TrafficService.class);
         TrafficEventRepository trafficEventRepository = mock(TrafficEventRepository.class);
-        MirrorWriteService mirrorWriteService = mock(MirrorWriteService.class);
         CameraEntity camera = enabledCamera("次干道B", "edge-02", "node-secret", "http://edge-node");
         when(cameraRepository.findByEnabledTrue()).thenReturn(List.of(camera));
 
@@ -86,7 +82,6 @@ class CameraPollerServiceTest {
                 cameraRepository,
                 trafficService,
                 trafficEventRepository,
-                mirrorWriteService,
                 trafficFailureRestClient(
                         HttpClientErrorException.create(
                                 HttpStatus.UNAUTHORIZED,
@@ -115,7 +110,6 @@ class CameraPollerServiceTest {
         CameraRepository cameraRepository = mock(CameraRepository.class);
         TrafficService trafficService = mock(TrafficService.class);
         TrafficEventRepository trafficEventRepository = mock(TrafficEventRepository.class);
-        MirrorWriteService mirrorWriteService = mock(MirrorWriteService.class);
         CameraEntity camera = enabledCamera("超时路段", "edge-03", "node-secret", "http://edge-node");
         when(cameraRepository.findByEnabledTrue()).thenReturn(List.of(camera));
 
@@ -123,7 +117,6 @@ class CameraPollerServiceTest {
                 cameraRepository,
                 trafficService,
                 trafficEventRepository,
-                mirrorWriteService,
                 trafficFailureRestClient(new ResourceAccessException("Read timed out", new SocketTimeoutException("Read timed out")))
         );
 
@@ -133,6 +126,7 @@ class CameraPollerServiceTest {
         assertEquals("offline", health.get("health_status"));
         assertEquals("timeout", health.get("status_reason_code"));
         assertEquals("节点请求超时", health.get("status_reason_message"));
+        assertNull(health.get("latency_ms"));
         verify(trafficEventRepository, never()).save(any(TrafficEventEntity.class));
     }
 
@@ -141,7 +135,6 @@ class CameraPollerServiceTest {
         CameraRepository cameraRepository = mock(CameraRepository.class);
         TrafficService trafficService = mock(TrafficService.class);
         TrafficEventRepository trafficEventRepository = mock(TrafficEventRepository.class);
-        MirrorWriteService mirrorWriteService = mock(MirrorWriteService.class);
         CameraEntity camera = enabledCamera("主干道C", "edge-04", "node-secret", "http://edge-node");
         when(cameraRepository.findByEnabledTrue()).thenReturn(List.of(camera));
 
@@ -149,7 +142,6 @@ class CameraPollerServiceTest {
                 cameraRepository,
                 trafficService,
                 trafficEventRepository,
-                mirrorWriteService,
                 degradedRestClient()
         );
 
@@ -171,7 +163,6 @@ class CameraPollerServiceTest {
         CameraRepository cameraRepository = mock(CameraRepository.class);
         TrafficService trafficService = mock(TrafficService.class);
         TrafficEventRepository trafficEventRepository = mock(TrafficEventRepository.class);
-        MirrorWriteService mirrorWriteService = mock(MirrorWriteService.class);
         CameraEntity camera = enabledCamera("次干道D", "edge-05", "node-secret", "http://edge-node");
         when(cameraRepository.findByEnabledTrue()).thenReturn(List.of(camera));
         when(trafficEventRepository.save(any(TrafficEventEntity.class)))
@@ -181,7 +172,6 @@ class CameraPollerServiceTest {
                 cameraRepository,
                 trafficService,
                 trafficEventRepository,
-                mirrorWriteService,
                 offlineThenDegradedThenOnlineRestClient()
         );
 
@@ -206,7 +196,6 @@ class CameraPollerServiceTest {
 
         ArgumentCaptor<TrafficEventEntity> eventCaptor = ArgumentCaptor.forClass(TrafficEventEntity.class);
         verify(trafficEventRepository, times(2)).save(eventCaptor.capture());
-        verify(mirrorWriteService, times(2)).mirrorTrafficEvent(any(TrafficEventEntity.class));
 
         List<TrafficEventEntity> savedEvents = eventCaptor.getAllValues();
         ObjectMapper mapper = new ObjectMapper();
@@ -226,6 +215,41 @@ class CameraPollerServiceTest {
         assertEquals(null, secondPayload.get("reason_code"));
     }
 
+    @Test
+    void updateNodeMetricsFromTelemetry_shouldMergeLatestMetricsIntoNodeHealth() {
+        CameraRepository cameraRepository = mock(CameraRepository.class);
+        TrafficService trafficService = mock(TrafficService.class);
+        TrafficEventRepository trafficEventRepository = mock(TrafficEventRepository.class);
+        CameraPollerService service = newService(
+                cameraRepository,
+                trafficService,
+                trafficEventRepository,
+                successRestClient()
+        );
+
+        service.updateNodeMetricsFromTelemetry(
+                "人民路",
+                "edge-telemetry-01",
+                Map.of(
+                        "cpu_percent", 64.2,
+                        "memory_percent", 51.7,
+                        "uptime_s", 1800.0
+                )
+        );
+
+        Map<String, Object> health = service.getNodeHealthMap().get("人民路");
+        assertNotNull(health);
+        assertEquals("edge-telemetry-01", health.get("edge_node_id"));
+        assertEquals(
+                Map.of(
+                        "cpu_percent", 64.2,
+                        "memory_percent", 51.7,
+                        "uptime_s", 1800.0
+                ),
+                health.get("edge_metrics")
+        );
+    }
+
     private static CameraEntity enabledCamera(String roadName, String nodeId, String nodeApiKey, String nodeUrl) {
         CameraEntity camera = new CameraEntity();
         camera.setId(1L);
@@ -242,7 +266,6 @@ class CameraPollerServiceTest {
             CameraRepository cameraRepository,
             TrafficService trafficService,
             TrafficEventRepository trafficEventRepository,
-            MirrorWriteService mirrorWriteService,
             RestClient restClient
     ) {
         CameraPollerService service = new CameraPollerService(
@@ -250,7 +273,6 @@ class CameraPollerServiceTest {
                 trafficService,
                 trafficEventRepository,
                 new ObjectMapper(),
-                mirrorWriteService,
                 null // AlertService
         );
         ReflectionTestUtils.setField(service, "restClient", restClient);

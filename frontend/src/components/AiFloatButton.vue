@@ -12,16 +12,50 @@
       </Button>
 
       <!-- 聊天面板 -->
-      <div v-if="panelOpen" class="w-96 h-[520px] border border-border rounded-lg bg-card shadow-xl flex flex-col">
+      <div
+        v-if="panelOpen"
+        class="ai-float-panel border border-border rounded-lg bg-card shadow-xl flex flex-col relative"
+        :style="panelStyle"
+      >
+        <div
+          class="ai-float-resize-handle"
+          role="separator"
+          title="拖拽调整窗口大小"
+          aria-label="拖拽调整窗口大小"
+          @pointerdown="startResize"
+        >
+          <Grip class="h-3.5 w-3.5 rotate-45" />
+        </div>
+
         <!-- 头部 -->
-        <div class="p-3 border-b border-border flex items-center justify-between shrink-0">
+        <div class="p-3 pl-7 border-b border-border flex items-center justify-between shrink-0">
           <div class="flex items-center gap-2">
             <Bot class="h-5 w-5 text-primary" />
             <span class="text-sm font-medium">AI 助手</span>
           </div>
-          <Button variant="ghost" size="icon" class="h-7 w-7" @click="closePanel">
-            <X class="h-4 w-4" />
-          </Button>
+          <div class="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-7 w-7"
+              :disabled="streaming || messages.length === 0 || !currentConversationId"
+              title="清空对话"
+              aria-label="清空对话"
+              @click="clearCurrentConversation"
+            >
+              <Eraser class="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-7 w-7"
+              title="关闭"
+              aria-label="关闭"
+              @click="closePanel"
+            >
+              <X class="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         <!-- 道路选择 -->
@@ -97,9 +131,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { Bot, X, Send, Square } from 'lucide-vue-next'
+import { Bot, X, Send, Square, Eraser, Grip } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ChatMessage, MarkdownBody, RoadSelector, PresetQuestions } from '@/components/ai'
@@ -109,6 +143,19 @@ const route = useRoute()
 const panelOpen = ref(false)
 const messagesContainer = ref<HTMLDivElement | null>(null)
 const inputRef = ref<HTMLTextAreaElement | null>(null)
+const panelSize = ref({
+  width: 384,
+  height: 520,
+})
+
+type ResizeState = {
+  startX: number
+  startY: number
+  startWidth: number
+  startHeight: number
+}
+
+let resizeState: ResizeState | null = null
 
 const {
   conversations,
@@ -124,6 +171,7 @@ const {
   sendMessage,
   stopGeneration,
   regenerateLast,
+  clearConversationMessages,
 } = useAiChat({ messagesContainer, autoScroll: true })
 
 // 悬浮窗可见页面配置
@@ -134,6 +182,11 @@ const visible = computed(() => {
   if (visiblePages.value.length === 0) return true
   return visiblePages.value.some((p) => route.path.startsWith(p))
 })
+
+const panelStyle = computed(() => ({
+  width: `${panelSize.value.width}px`,
+  height: `${panelSize.value.height}px`,
+}))
 
 // Track whether float conversation has been initialized
 let floatInitialized = false
@@ -149,6 +202,10 @@ onMounted(() => {
   loadSettings()
 })
 
+onUnmounted(() => {
+  stopResize()
+})
+
 async function loadSettings() {
   try {
     const res = await fetch('/api/v1/site-settings')
@@ -156,7 +213,10 @@ async function loadSettings() {
     const data = await res.json()
     const raw = data.ai_float_visible_pages || data.aiFloatVisiblePages || ''
     if (raw.trim()) {
-      visiblePages.value = raw.split(',').map((s: string) => s.trim()).filter(Boolean)
+      visiblePages.value = raw
+        .split(',')
+        .map((s: string) => s.trim())
+        .filter(Boolean)
     } else {
       visiblePages.value = []
     }
@@ -195,8 +255,74 @@ function closePanel() {
   panelOpen.value = false
 }
 
+function startResize(event: PointerEvent) {
+  resizeState = {
+    startX: event.clientX,
+    startY: event.clientY,
+    startWidth: panelSize.value.width,
+    startHeight: panelSize.value.height,
+  }
+  window.addEventListener('pointermove', resizePanel)
+  window.addEventListener('pointerup', stopResize)
+  window.addEventListener('pointercancel', stopResize)
+  event.preventDefault()
+}
+
+function resizePanel(event: PointerEvent) {
+  if (!resizeState) return
+  panelSize.value = {
+    width: clampPanelWidth(resizeState.startWidth + resizeState.startX - event.clientX),
+    height: clampPanelHeight(resizeState.startHeight + resizeState.startY - event.clientY),
+  }
+}
+
+function stopResize() {
+  resizeState = null
+  window.removeEventListener('pointermove', resizePanel)
+  window.removeEventListener('pointerup', stopResize)
+  window.removeEventListener('pointercancel', stopResize)
+}
+
+function clampPanelWidth(width: number): number {
+  return Math.min(Math.max(width, Math.min(320, window.innerWidth - 48)), window.innerWidth - 48)
+}
+
+function clampPanelHeight(height: number): number {
+  return Math.min(Math.max(height, Math.min(420, window.innerHeight - 48)), window.innerHeight - 48)
+}
+
+async function clearCurrentConversation() {
+  if (!currentConversationId.value || streaming.value) return
+  await clearConversationMessages(currentConversationId.value)
+}
+
 function onPresetSelect(question: string) {
   inputText.value = question
   sendMessage()
 }
 </script>
+
+<style scoped>
+.ai-float-panel {
+  min-width: min(320px, calc(100vw - 3rem));
+  min-height: min(420px, calc(100vh - 3rem));
+  max-width: calc(100vw - 3rem);
+  max-height: calc(100vh - 3rem);
+  overflow: hidden;
+}
+
+.ai-float-resize-handle {
+  position: absolute;
+  top: 0.25rem;
+  left: 0.25rem;
+  z-index: 1;
+  display: flex;
+  height: 1rem;
+  width: 1rem;
+  cursor: nwse-resize;
+  touch-action: none;
+  align-items: center;
+  justify-content: center;
+  color: hsl(var(--muted-foreground) / 0.65);
+}
+</style>

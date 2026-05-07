@@ -1,6 +1,6 @@
 import { ref, nextTick, type Ref } from 'vue'
 import { toast } from 'vue-sonner'
-import { authFetch, endpoints } from '../lib/api'
+import { authFetch, endpoints, getErrorDetail } from '../lib/api'
 
 export type Conversation = {
   id: number
@@ -39,7 +39,7 @@ export type UseAiChatReturn = {
   streamingToolCalls: Ref<ToolCallInfo[]>
   aiAvailable: Ref<boolean>
   abortController: Ref<AbortController | null>
-  
+
   loadConversations: () => Promise<void>
   createConversation: (title?: string, roadContext?: string | null) => Promise<Conversation | null>
   selectConversation: (conv: Conversation) => Promise<void>
@@ -94,14 +94,17 @@ export function useAiChat(options: UseAiChatOptions = {}): UseAiChatReturn {
       if (res.ok) {
         const data = await res.json()
         // 支持分页格式 {items, total, page, size} 和旧格式数组
-        conversations.value = Array.isArray(data) ? data : (data.items || [])
+        conversations.value = Array.isArray(data) ? data : data.items || []
       }
     } catch {
       toast.error('加载对话列表失败')
     }
   }
 
-  async function createConversation(title = '新对话', roadCtx?: string | null): Promise<Conversation | null> {
+  async function createConversation(
+    title = '新对话',
+    roadCtx?: string | null
+  ): Promise<Conversation | null> {
     try {
       const res = await authFetch(endpoints.aiConversations, {
         method: 'POST',
@@ -133,7 +136,7 @@ export function useAiChat(options: UseAiChatOptions = {}): UseAiChatReturn {
     try {
       const res = await authFetch(`${endpoints.aiConversations}/${id}`, { method: 'DELETE' })
       if (res.ok) {
-        conversations.value = conversations.value.filter(c => c.id !== id)
+        conversations.value = conversations.value.filter((c) => c.id !== id)
         if (currentConversationId.value === id) {
           currentConversationId.value = null
           messages.value = []
@@ -146,13 +149,17 @@ export function useAiChat(options: UseAiChatOptions = {}): UseAiChatReturn {
 
   async function clearConversationMessages(id: number): Promise<void> {
     try {
-      const res = await authFetch(`${endpoints.aiConversations}/${id}/messages`, { method: 'DELETE' })
-      if (res.ok) {
-        if (currentConversationId.value === id) {
-          messages.value = []
-        }
-        toast.success('已清空对话消息')
+      const res = await authFetch(`${endpoints.aiConversations}/${id}/messages`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        toast.error(await getErrorDetail(res, '清空失败'))
+        return
       }
+      if (currentConversationId.value === id) {
+        messages.value = []
+      }
+      toast.success('已清空对话消息')
     } catch {
       toast.error('清空失败')
     }
@@ -165,7 +172,7 @@ export function useAiChat(options: UseAiChatOptions = {}): UseAiChatReturn {
         body: JSON.stringify({ title }),
       })
       if (res.ok) {
-        const conv = conversations.value.find(c => c.id === id)
+        const conv = conversations.value.find((c) => c.id === id)
         if (conv) {
           conv.title = title
         }
@@ -178,7 +185,9 @@ export function useAiChat(options: UseAiChatOptions = {}): UseAiChatReturn {
   async function loadMessages(): Promise<void> {
     if (!currentConversationId.value) return
     try {
-      const res = await authFetch(`${endpoints.aiConversations}/${currentConversationId.value}/messages`)
+      const res = await authFetch(
+        `${endpoints.aiConversations}/${currentConversationId.value}/messages`
+      )
       if (res.ok) {
         messages.value = await res.json()
         await scrollToBottom()
@@ -225,7 +234,7 @@ export function useAiChat(options: UseAiChatOptions = {}): UseAiChatReturn {
           body: JSON.stringify({ content: text }),
           signal: abortController.value.signal,
         },
-        120_000,
+        120_000
       )
 
       if (!res.ok) {
@@ -273,9 +282,14 @@ export function useAiChat(options: UseAiChatOptions = {}): UseAiChatReturn {
           if (eventName === 'tool_call' && eventData) {
             try {
               const tc = JSON.parse(eventData)
-              streamingToolCalls.value = [...streamingToolCalls.value, { name: tc.name, arguments: tc.arguments }]
+              streamingToolCalls.value = [
+                ...streamingToolCalls.value,
+                { name: tc.name, arguments: tc.arguments },
+              ]
               await scrollToBottom()
-            } catch { /* ignore parse errors */ }
+            } catch {
+              /* ignore parse errors */
+            }
           }
           if (eventName === 'tool_result' && eventData) {
             await scrollToBottom()
@@ -304,12 +318,15 @@ export function useAiChat(options: UseAiChatOptions = {}): UseAiChatReturn {
     // Find the last user message
     let lastUserMsgIndex = -1
     for (let i = messages.value.length - 1; i >= 0; i--) {
-      if (messages.value[i].role === 'user') { lastUserMsgIndex = i; break }
+      if (messages.value[i].role === 'user') {
+        lastUserMsgIndex = i
+        break
+      }
     }
     if (lastUserMsgIndex === -1) return
 
     const lastUserMsg = messages.value[lastUserMsgIndex]
-    
+
     // Remove all messages after the last user message (including the assistant response)
     messages.value = messages.value.slice(0, lastUserMsgIndex)
 
@@ -329,7 +346,7 @@ export function useAiChat(options: UseAiChatOptions = {}): UseAiChatReturn {
     streamingToolCalls,
     aiAvailable,
     abortController,
-    
+
     loadConversations,
     createConversation,
     selectConversation,

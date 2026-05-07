@@ -52,15 +52,28 @@ python main.py --mode camera --url "rtsp://admin:pass@192.168.1.100/stream" --ro
 
 ### Docker 部署
 
-在 `edge/` 目录中：
+随整套系统启动（推荐用于单机演示 / 联调）：
+
+```bash
+cd ..
+docker compose up --build -d edge-node
+curl http://localhost:9000/health
+```
+
+说明：
+- 根 Compose 中容器内部端口仍是 `8000`
+- 宿主机默认通过 `EDGE_PUBLIC_PORT=9000` 访问 edge，避免和 backend 的 `8000` 冲突
+- backend 容器内访问 edge 可使用 `http://edge-node:8000`
+
+独立部署到边缘设备时，也可以继续在 `edge/` 目录使用：
 
 ```bash
 docker compose up -d
 ```
 
 说明：
-- `edge` 不在主站根 `docker-compose.yml` 的一键启动范围内
-- 主站和 edge 仍然分开部署
+- 独立 Compose 默认映射 `8000:8000`
+- 如果 edge 与主站不在同一台机器，`BACKEND_TELEMETRY_URL` 需要写可从边缘设备访问的 backend 地址
 
 ## 常用接口
 
@@ -81,9 +94,11 @@ docker compose up -d
 示例：
 
 ```bash
-curl http://localhost:8000/health
-curl http://localhost:8000/api/metrics
-curl -X PUT http://localhost:8000/api/config \
+EDGE_BASE=http://localhost:9000  # 独立部署时可改为 http://localhost:8000
+
+curl "$EDGE_BASE/health"
+curl "$EDGE_BASE/api/metrics"
+curl -X PUT "$EDGE_BASE/api/config" \
   -H "X-Edge-Key: edge-secret" \
   -H "Content-Type: application/json" \
   -d '{"confidence": 0.4}'
@@ -201,29 +216,29 @@ curl -X PUT http://localhost:8000/api/config \
 最小推荐配置：
 
 ```env
-MODE=camera
-CAMERA_URL=rtsp://user:pass@camera/stream
-ROAD_NAME=人民路
+EDGE_MODE=camera
+EDGE_CAMERA_URL=rtsp://user:pass@camera/stream
+EDGE_ROAD_NAME=人民路
 EDGE_NODE_ID=edge-01
 EDGE_API_KEY=replace-me
-BACKEND_TELEMETRY_URL=http://192.168.1.11:8000/api/v1/edge/telemetry
-NO_BROWSER=true
+EDGE_BACKEND_TELEMETRY_URL=http://backend:8000/api/v1/edge/telemetry
+EDGE_NO_BROWSER=true
 ```
 
 弱 CPU 工业机可参考 `edge/docker-compose.yml` 的配置：
 
 ```env
-IMGSZ=160
-FRAME_SKIP=4
-QUANTIZE=int8
-OPENVINO=true
-MAX_MJPEG_CLIENTS=1
-UVICORN_WORKERS=1
+EDGE_IMGSZ=160
+EDGE_FRAME_SKIP=4
+EDGE_QUANTIZE=int8
+EDGE_OPENVINO=true
+EDGE_MAX_MJPEG_CLIENTS=1
+EDGE_UVICORN_WORKERS=1
 ```
 
 模型目录：
 - 默认使用 `edge/models/`
-- Docker Compose 会把它挂载到容器内 `/app/models`
+- 根 Compose 和独立 Compose 都会把它挂载到容器内 `/app/models`
 
 ## 测试
 

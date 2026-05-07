@@ -8,7 +8,7 @@ ALTER TABLE site_settings
 
 -- AI 对话表
 CREATE TABLE IF NOT EXISTS ai_chat_conversations (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     title VARCHAR(255) NOT NULL DEFAULT '新对话',
     road_context VARCHAR(255),
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS ai_chat_conversations (
 
 -- AI 消息表
 CREATE TABLE IF NOT EXISTS ai_chat_messages (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
     conversation_id BIGINT NOT NULL,
     role VARCHAR(16) NOT NULL,
     content TEXT NOT NULL,

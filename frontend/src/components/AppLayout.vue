@@ -204,8 +204,8 @@ const allMenuGroups: MenuGroup[] = [
     label: '监控中心',
     icon: Activity,
     children: [
-      { label: '交通态势概览', key: '/dashboard', icon: LayoutDashboard },
-      { label: '实时视频监测', key: '/cameras', icon: Video },
+      { label: '实时监控跟踪', key: '/dashboard', icon: LayoutDashboard },
+      { label: '节点配置管理', key: '/cameras', icon: Video },
       { label: '节点监控汇聚', key: '/monitoring', icon: Activity },
       { label: '实时状态推送', key: '/map', icon: Map },
     ],

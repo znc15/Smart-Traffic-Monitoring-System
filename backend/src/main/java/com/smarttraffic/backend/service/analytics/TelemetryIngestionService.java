@@ -7,6 +7,7 @@ import com.smarttraffic.backend.model.TrafficEventEntity;
 import com.smarttraffic.backend.model.TrafficSampleEntity;
 import com.smarttraffic.backend.repository.TrafficEventRepository;
 import com.smarttraffic.backend.repository.TrafficSampleRepository;
+import com.smarttraffic.backend.service.CameraPollerService;
 import com.smarttraffic.backend.service.TrafficService;
 import com.smarttraffic.backend.service.AlertService;
 import org.springframework.stereotype.Service;
@@ -24,26 +25,26 @@ public class TelemetryIngestionService {
     private final TrafficEventRepository trafficEventRepository;
     private final TrafficService trafficService;
     private final ObjectMapper objectMapper;
-    private final MirrorWriteService mirrorWriteService;
     private final RedisCacheService redisCacheService;
     private final AlertService alertService;
+    private final CameraPollerService cameraPollerService;
 
     public TelemetryIngestionService(
             TrafficSampleRepository trafficSampleRepository,
             TrafficEventRepository trafficEventRepository,
             TrafficService trafficService,
             ObjectMapper objectMapper,
-            MirrorWriteService mirrorWriteService,
             RedisCacheService redisCacheService,
-            AlertService alertService
+            AlertService alertService,
+            CameraPollerService cameraPollerService
     ) {
         this.trafficSampleRepository = trafficSampleRepository;
         this.trafficEventRepository = trafficEventRepository;
         this.trafficService = trafficService;
         this.objectMapper = objectMapper;
-        this.mirrorWriteService = mirrorWriteService;
         this.redisCacheService = redisCacheService;
         this.alertService = alertService;
+        this.cameraPollerService = cameraPollerService;
     }
 
     @Transactional
@@ -77,7 +78,6 @@ public class TelemetryIngestionService {
         sample.setLaneStatsJson(toJson(request.getLaneStats(), "[]"));
         sample.setSource("edge");
         trafficSampleRepository.save(sample);
-        mirrorWriteService.mirrorTrafficSample(sample);
 
         try {
             alertService.checkAndCreateCongestionAlert(request.getRoadName().trim(), trimToNull(request.getNodeId()), congestionIndex);
@@ -96,7 +96,6 @@ public class TelemetryIngestionService {
             event.setEndAt(item.getEndAt());
             event.setPayloadJson(toJson(item, "{}"));
             trafficEventRepository.save(event);
-            mirrorWriteService.mirrorTrafficEvent(event);
         }
 
         Map<String, Object> snapshot = new LinkedHashMap<>();
@@ -110,8 +109,19 @@ public class TelemetryIngestionService {
         snapshot.put("congestion_index", congestionIndex);
         snapshot.put("lane_stats", request.getLaneStats());
         snapshot.put("events", events);
+        Map<String, Object> edgeMetrics = normalizeEdgeMetrics(request.getEdgeMetrics());
+        if (!edgeMetrics.isEmpty()) {
+            snapshot.put("edge_metrics", edgeMetrics);
+        }
         String normalizedRoadName = request.getRoadName().trim();
         trafficService.updateFromRemote(normalizedRoadName, snapshot, null);
+        if (!edgeMetrics.isEmpty()) {
+            cameraPollerService.updateNodeMetricsFromTelemetry(
+                    normalizedRoadName,
+                    trimToNull(request.getNodeId()),
+                    edgeMetrics
+            );
+        }
 
         // 主动失效热点缓存，避免短时间读到旧值
         redisCacheService.evict("traffic:roads");
@@ -176,6 +186,29 @@ public class TelemetryIngestionService {
         double avgSpeed = (speedCar + speedMotor) / 2.0;
         double speedPenalty = avgSpeed <= 0 ? 1.0 : Math.max(0.0, Math.min(1.0, 1.0 - (avgSpeed / 60.0)));
         return Math.round((densityFactor * 0.7 + speedPenalty * 0.3) * 1000.0) / 1000.0;
+    }
+
+    private static Map<String, Object> normalizeEdgeMetrics(EdgeTelemetryRequest.EdgeMetrics metrics) {
+        if (metrics == null) {
+            return Map.of();
+        }
+        Map<String, Object> normalized = new LinkedHashMap<>();
+        if (metrics.getFps() != null) {
+            normalized.put("fps", metrics.getFps());
+        }
+        if (metrics.getInferenceMs() != null) {
+            normalized.put("inference_ms", metrics.getInferenceMs());
+        }
+        if (metrics.getCpuPercent() != null) {
+            normalized.put("cpu_percent", metrics.getCpuPercent());
+        }
+        if (metrics.getMemoryPercent() != null) {
+            normalized.put("memory_percent", metrics.getMemoryPercent());
+        }
+        if (metrics.getUptimeSeconds() != null) {
+            normalized.put("uptime_s", metrics.getUptimeSeconds());
+        }
+        return normalized;
     }
 
     private String toJson(Object value, String fallback) {

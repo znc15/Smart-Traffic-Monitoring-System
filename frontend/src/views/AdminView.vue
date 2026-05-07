@@ -276,8 +276,8 @@ const fetchingModels = ref(false)
 const availableModels = ref<string[]>([])
 
 const aiFloatPageOptions = [
-  { label: '交通态势概览', value: '/dashboard' },
-  { label: '实时视频监测', value: '/cameras' },
+  { label: '节点配置管理', value: '/dashboard' },
+  { label: '节点配置管理', value: '/cameras' },
   { label: '节点监控汇聚', value: '/monitoring' },
   { label: '实时状态推送', value: '/map' },
   { label: '历史数据统计', value: '/analytics' },

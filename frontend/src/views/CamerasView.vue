@@ -3,7 +3,7 @@
     <Card>
       <CardContent class="p-6">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold">实时视频监测</h3>
+          <h3 class="text-lg font-semibold">节点配置管理</h3>
           <Button @click="openAddCameraDialog">添加摄像头</Button>
         </div>
         <Table>

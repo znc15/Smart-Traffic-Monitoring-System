@@ -57,10 +57,20 @@ describe('store/traffic', () => {
   it('should initialize roads, open websockets and update traffic state', async () => {
     const localStorage = createLocalStorage()
     localStorage.setItem('access_token', 'edge-token')
-    const fetchMock = vi.fn().mockResolvedValue({
+    const fetchMock = vi.fn(async (url: string) => ({
       ok: true,
-      json: async () => ({ road_names: ['人民路', '中山路'] }),
-    })
+      json: async () =>
+        url.includes('/info/')
+          ? {
+              count_car: 1,
+              count_motor: 0,
+              count_person: 0,
+              speed_car: 30,
+              speed_motor: 20,
+              online: true,
+            }
+          : { road_names: ['人民路', '中山路'] },
+    }))
 
     vi.stubGlobal('localStorage', localStorage)
     vi.stubGlobal('fetch', fetchMock)
@@ -97,16 +107,21 @@ describe('store/traffic', () => {
     vi.useFakeTimers()
     const localStorage = createLocalStorage()
     localStorage.setItem('access_token', 'edge-token')
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ road_names: ['人民路'] }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ road_names: ['中山路'] }),
-      })
+    let roadsResponse = ['人民路']
+    const fetchMock = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        url.includes('/info/')
+          ? {
+              count_car: 2,
+              count_motor: 0,
+              count_person: 0,
+              speed_car: 30,
+              speed_motor: 20,
+              online: true,
+            }
+          : { road_names: roadsResponse },
+    }))
 
     vi.stubGlobal('localStorage', localStorage)
     vi.stubGlobal('fetch', fetchMock)
@@ -123,11 +138,44 @@ describe('store/traffic', () => {
     expect(FakeWebSocket.instances).toHaveLength(2)
     const reconnectedSocket = FakeWebSocket.instances[1]
 
+    roadsResponse = ['中山路']
     await store.refreshRoads()
 
     const state = store.useTrafficStoreState()
     expect(state.roads).toEqual(['中山路'])
     expect(reconnectedSocket.close).toHaveBeenCalled()
+
+    store.closeTrafficStore()
+  })
+
+  it('should populate traffic data through HTTP fallback when websocket has not sent data', async () => {
+    const localStorage = createLocalStorage()
+    localStorage.setItem('access_token', 'edge-token')
+    const fetchMock = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        url.includes('/info/')
+          ? {
+              count_car: 9,
+              count_motor: 1,
+              count_person: 0,
+              speed_car: 21,
+              speed_motor: 16,
+              online: true,
+            }
+          : { road_names: ['人民路'] },
+    }))
+
+    vi.stubGlobal('localStorage', localStorage)
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket)
+
+    const store = await import('./traffic')
+    await store.initializeTrafficStore()
+
+    const state = store.useTrafficStoreState()
+    expect(state.trafficData['人民路'].count_car).toBe(9)
+    expect(state.trafficData['人民路'].density_status).toBe('busy')
 
     store.closeTrafficStore()
   })

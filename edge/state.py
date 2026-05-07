@@ -73,12 +73,28 @@ class EdgeState:
 
     def get_traffic(self) -> dict:
         with self._lock:
+            total = self.count_car + self.count_motor + self.count_person
+            if total > 12:
+                density_status = "congested"
+            elif total > 8:
+                density_status = "busy"
+            else:
+                density_status = "clear"
+
+            avg_speed = (self.speed_car + self.speed_motor) / 2.0
+            speed_status = "unknown" if avg_speed <= 0 else ("fast" if avg_speed >= 40 else "slow")
+            density_factor = min(1.0, total / 35.0)
+            speed_penalty = 1.0 if avg_speed <= 0 else max(0.0, min(1.0, 1.0 - (avg_speed / 60.0)))
+
             return {
                 "count_car": self.count_car,
                 "count_motor": self.count_motor,
                 "count_person": self.count_person,
                 "speed_car": self.speed_car,
                 "speed_motor": self.speed_motor,
+                "density_status": density_status,
+                "speed_status": speed_status,
+                "congestion_index": round(density_factor * 0.7 + speed_penalty * 0.3, 3),
                 "lane_stats": self.lane_stats,
                 "events": self.events,
                 "tracked_objects": self.tracked_objects,

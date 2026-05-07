@@ -15,8 +15,11 @@ import { useDark } from '@vueuse/core'
 import { Toaster } from '@/components/ui/sonner'
 import AppLayout from './components/AppLayout.vue'
 
-// Initialize dark mode
-useDark()
+useDark({
+  valueDark: 'dark',
+  valueLight: 'light',
+  initialValue: 'dark',
+})
 
 const route = useRoute()
 const isNoLayoutPage = computed(() => route.path === '/login' || route.meta.noLayout === true)

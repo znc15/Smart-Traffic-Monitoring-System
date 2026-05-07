@@ -5,30 +5,41 @@
     <div class="flex flex-wrap justify-center gap-2">
       <Button
         v-for="question in presetQuestions"
-        :key="question"
+        :key="question.prompt"
         variant="outline"
         size="sm"
-        class="text-xs"
-        @click="$emit('select', question)"
+        class="max-w-[9rem] whitespace-normal text-xs leading-snug"
+        :title="question.prompt"
+        @click="$emit('select', question.prompt)"
       >
-        {{ question }}
+        {{ question.label }}
       </Button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
 import { Bot } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import { authFetch, endpoints } from '@/lib/api'
+import { buildPresetQuestions } from './presetQuestions'
 
 defineEmits<{
   select: [question: string]
 }>()
 
-const presetQuestions = [
-  '当前哪条路最拥堵？',
-  '分析各路段交通趋势',
-  '有哪些离线节点？',
-  '给出分流建议',
-]
+const roads = ref<string[]>([])
+const presetQuestions = computed(() => buildPresetQuestions(roads.value))
+
+onMounted(async () => {
+  try {
+    const res = await authFetch(endpoints.roads)
+    if (!res.ok) return
+    const data = await res.json()
+    roads.value = data.roadNames || data.road_names || []
+  } catch {
+    // Keep fallback preset questions available when roads cannot be loaded.
+  }
+})
 </script>

@@ -2,7 +2,7 @@
 
 本教程适用于根目录 `docker-compose.yml`，目标是快速拉起：
 
-`database + mysql + redis + backend + frontend + gateway`
+`database + mysql + redis + backend + edge-node + frontend + gateway`
 
 ## 1. 准备运行时变量
 
@@ -27,8 +27,9 @@ MAAS_API_KEY=replace-with-your-api-key
 - 根 `.env` 现在同时影响：
   - backend 运行时变量
   - frontend 构建时的 API / WS 地址
-- 主站 Docker 一键启动范围包含 `gateway/frontend/backend/database/mysql/redis`
-- `edge` 继续独立部署
+  - edge-node 运行时变量
+- 根 Docker 一键启动范围包含 `gateway/frontend/backend/edge-node/database/mysql/redis`
+- `edge` 如需部署到独立边缘设备，仍可使用 `edge/docker-compose.yml`
 
 ## 2. 构建并启动
 
@@ -43,6 +44,7 @@ docker compose ps
 |------|----------|------|
 | `gateway` | `5173` | 推荐统一入口 |
 | `backend` | `8000` | 当前 Compose 为了联调直接暴露 |
+| `edge-node` | `9000` | 容器内仍监听 `8000`，宿主机默认映射到 `9000` |
 | `database` | `5433` | PostgreSQL |
 | `mysql` | `3307` | MySQL |
 | `redis` | `6380` | Redis |
@@ -55,6 +57,7 @@ curl -I http://localhost:5173/
 curl -I http://localhost:5173/react/
 curl http://localhost:8000/api/v1/site-settings
 curl http://localhost:8000/api/v1/roads_name
+curl http://localhost:9000/health
 ```
 
 预期：
@@ -74,7 +77,7 @@ BACKEND_PUBLIC_WS_BASE=ws://192.168.1.11:8000
 改完地址后执行：
 
 ```bash
-docker compose build frontend gateway backend
+docker compose build frontend gateway backend edge-node
 docker compose up -d
 ```
 

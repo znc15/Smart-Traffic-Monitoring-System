@@ -1,32 +1,14 @@
 services:
   database:
-    image: postgres:16
+    image: mysql:8.4
     container_name: database
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-odoo}
-      POSTGRES_DB: transportation_system
-    ports:
-      - "127.0.0.1:5433:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d transportation_system"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    networks:
-      - mynet
-  mysql:
-    image: mysql:8.4
-    container_name: mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
-      MYSQL_DATABASE: transportation_system_mysql
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-traffic123}
+      MYSQL_DATABASE: transportation_system
       MYSQL_USER: traffic
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traffic}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-traffic123}
     ports:
-      - "127.0.0.1:3307:3306"
+      - "3306:3306"
     volumes:
       - mysqldata:/var/lib/mysql
     healthcheck:
@@ -66,9 +48,9 @@ services:
       - "8000:8000"
     environment:
       SERVER_PORT: ${SERVER_PORT:-8000}
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://database:5432/transportation_system}
-      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
-      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-${POSTGRES_PASSWORD:-odoo}}
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:mysql://database:3306/transportation_system?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-traffic}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-${MYSQL_PASSWORD:-traffic123}}
       SPRING_FLYWAY_LOCATIONS: ${SPRING_FLYWAY_LOCATIONS:-classpath:db/migration}
       JWT_SECRET: ${JWT_SECRET:-change-this-dev-secret-change-this-dev-secret}
       ACCESS_TOKEN_EXPIRE_DAYS: ${ACCESS_TOKEN_EXPIRE_DAYS:-7}
@@ -83,24 +65,12 @@ services:
       INIT_ADMIN_PASSWORD: ${INIT_ADMIN_PASSWORD:-}
       APP_MAAS_DEFAULT_CLIENT_NAME: ${APP_MAAS_DEFAULT_CLIENT_NAME:-default-dev-client}
       APP_MAAS_DEFAULT_API_KEY: ${MAAS_API_KEY:-dev-maas-key-change-me}
-      APP_DB_PRIMARY: ${APP_DB_PRIMARY:-postgres}
-      APP_DB_MIRROR_WRITE: ${APP_DB_MIRROR_WRITE:-false}
-      APP_DB_MIRROR_MYSQL_ENABLED: ${APP_DB_MIRROR_MYSQL_ENABLED:-false}
-      APP_DB_MIRROR_POSTGRES_ENABLED: ${APP_DB_MIRROR_POSTGRES_ENABLED:-false}
-      APP_DB_MIRROR_MYSQL_URL: ${APP_DB_MIRROR_MYSQL_URL:-jdbc:mysql://mysql:3306/transportation_system_mysql?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC}
-      APP_DB_MIRROR_MYSQL_USERNAME: ${APP_DB_MIRROR_MYSQL_USERNAME:-traffic}
-      APP_DB_MIRROR_MYSQL_PASSWORD: ${APP_DB_MIRROR_MYSQL_PASSWORD:-${MYSQL_PASSWORD:-traffic}}
-      APP_DB_MIRROR_POSTGRES_URL: ${APP_DB_MIRROR_POSTGRES_URL:-jdbc:postgresql://database:5432/transportation_system}
-      APP_DB_MIRROR_POSTGRES_USERNAME: ${APP_DB_MIRROR_POSTGRES_USERNAME:-postgres}
-      APP_DB_MIRROR_POSTGRES_PASSWORD: ${APP_DB_MIRROR_POSTGRES_PASSWORD:-${POSTGRES_PASSWORD:-odoo}}
       APP_REDIS_CACHE_ENABLED: ${APP_REDIS_CACHE_ENABLED:-true}
       APP_CACHE_TTL_SECONDS: ${APP_CACHE_TTL_SECONDS:-10}
       SPRING_REDIS_HOST: ${SPRING_REDIS_HOST:-redis}
       SPRING_REDIS_PORT: ${SPRING_REDIS_PORT:-6379}
     depends_on:
       database:
-        condition: service_healthy
-      mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -109,6 +79,77 @@ services:
       interval: 15s
       timeout: 5s
       retries: 20
+    networks:
+      - mynet
+
+  edge-node:
+    profiles: ["edge"]
+    build:
+      context: ./edge
+      dockerfile: Dockerfile
+      args:
+        PYTHON_BASE_IMAGE: ${EDGE_PYTHON_BASE_IMAGE:-python:3.11-slim}
+    container_name: edge-node
+    restart: unless-stopped
+    ports:
+      - "${EDGE_PUBLIC_PORT:-9000}:8000"
+    environment:
+      MODE: ${EDGE_MODE:-sim}
+      CAMERA_URL: ${EDGE_CAMERA_URL:-}
+      ROAD_NAME: ${EDGE_ROAD_NAME:-示例路段-Edge01}
+      MODEL: ${EDGE_MODEL:-yolov8n.pt}
+      CONF: ${EDGE_CONF:-0.3}
+      OPENVINO: ${EDGE_OPENVINO:-true}
+      NO_BROWSER: ${EDGE_NO_BROWSER:-true}
+      HOST: ${EDGE_HOST:-0.0.0.0}
+      PUBLIC_HOST: ${EDGE_PUBLIC_HOST:-}
+      PORT: 8000
+      FRAME_SKIP: ${EDGE_FRAME_SKIP:-4}
+      IMGSZ: ${EDGE_IMGSZ:-160}
+      QUANTIZE: ${EDGE_QUANTIZE:-int8}
+      JPEG_QUALITY: ${EDGE_JPEG_QUALITY:-50}
+      MAX_MJPEG_CLIENTS: ${EDGE_MAX_MJPEG_CLIENTS:-1}
+      UVICORN_WORKERS: ${EDGE_UVICORN_WORKERS:-1}
+      TRACKER_BACKEND: ${EDGE_TRACKER_BACKEND:-bytetrack}
+      TRACKER_STRICT: ${EDGE_TRACKER_STRICT:-false}
+      TRACKER_CFG: ${EDGE_TRACKER_CFG:-bytetrack.yaml}
+      EDGE_NODE_ID: ${EDGE_NODE_ID:-edge-01}
+      EDGE_API_KEY: ${EDGE_API_KEY:-}
+      BACKEND_TELEMETRY_URL: ${EDGE_BACKEND_TELEMETRY_URL:-}
+      TELEMETRY_INTERVAL_SEC: ${EDGE_TELEMETRY_INTERVAL_SEC:-3}
+      ANALYSIS_ROI: ${EDGE_ANALYSIS_ROI:-0.05,0.25,0.95,0.95}
+      LANE_SPLIT_RATIOS: ${EDGE_LANE_SPLIT_RATIOS:-0.33,0.66}
+      SPEED_METERS_PER_PIXEL: ${EDGE_SPEED_METERS_PER_PIXEL:-0.08}
+      PARKING_STATIONARY_SECONDS: ${EDGE_PARKING_STATIONARY_SECONDS:-8}
+      WRONG_WAY_MIN_TRACK_POINTS: ${EDGE_WRONG_WAY_MIN_TRACK_POINTS:-4}
+      OMP_NUM_THREADS: ${EDGE_OMP_NUM_THREADS:-2}
+      OPENVINO_THREADING: ${EDGE_OPENVINO_THREADING:-SEQ}
+    deploy:
+      resources:
+        limits:
+          cpus: "${EDGE_CPU_LIMIT:-2.0}"
+          memory: ${EDGE_MEMORY_LIMIT:-1.5G}
+        reservations:
+          cpus: "${EDGE_CPU_RESERVATION:-0.5}"
+          memory: ${EDGE_MEMORY_RESERVATION:-256M}
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).read()\""]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+    tmpfs:
+      - /tmp:size=64M
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    volumes:
+      - ./edge/models:/app/models
+      - ./edge/samples:/app/samples
     networks:
       - mynet
 
@@ -160,7 +201,6 @@ networks:
   mynet:
 
 volumes:
-  pgdata:
   mysqldata:
   redisdata:
 

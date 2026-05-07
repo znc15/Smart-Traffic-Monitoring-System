@@ -21,6 +21,42 @@ function parseRecordPayload(value: unknown): Record<string, unknown> {
   return {}
 }
 
+function parseOptionalNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const DENSITY_STATUSES = new Set(['clear', 'busy', 'congested', 'offline'])
+
+function normalizeDensityStatus(
+  value: unknown,
+  online: boolean,
+  countCar: number,
+  countMotor: number,
+  countPerson: number,
+): string {
+  if (!online) {
+    return 'offline'
+  }
+
+  const normalized = String(value || '').trim().toLowerCase()
+  if (DENSITY_STATUSES.has(normalized)) {
+    return normalized
+  }
+
+  const total = countCar + countMotor + countPerson
+  if (total > 12) {
+    return 'congested'
+  }
+  if (total > 8) {
+    return 'busy'
+  }
+  return 'clear'
+}
+
 export type TrafficInfo = {
   count_car: number
   count_motor: number
@@ -34,15 +70,25 @@ export type TrafficInfo = {
 
 export function normalizeTrafficInfo(raw: unknown): TrafficInfo {
   const obj = (raw || {}) as Record<string, unknown>
+  const countCar = Number(pick(obj, 'count_car', 'countCar', 0))
+  const countMotor = Number(pick(obj, 'count_motor', 'countMotor', 0))
+  const countPerson = Number(pick(obj, 'count_person', 'countPerson', 0))
+  const online = Boolean(pick(obj, 'online', 'online', true))
   return {
-    count_car: Number(pick(obj, 'count_car', 'countCar', 0)),
-    count_motor: Number(pick(obj, 'count_motor', 'countMotor', 0)),
-    count_person: Number(pick(obj, 'count_person', 'countPerson', 0)),
+    count_car: countCar,
+    count_motor: countMotor,
+    count_person: countPerson,
     speed_car: Number(pick(obj, 'speed_car', 'speedCar', 0)),
     speed_motor: Number(pick(obj, 'speed_motor', 'speedMotor', 0)),
-    density_status: String(pick(obj, 'density_status', 'densityStatus', 'unknown')),
+    density_status: normalizeDensityStatus(
+      pick(obj, 'density_status', 'densityStatus', ''),
+      online,
+      countCar,
+      countMotor,
+      countPerson,
+    ),
     speed_status: String(pick(obj, 'speed_status', 'speedStatus', 'unknown')),
-    online: Boolean(pick(obj, 'online', 'online', true))
+    online,
   }
 }
 
@@ -211,6 +257,10 @@ export type MapOverviewPoint = {
 
 export function normalizeMapOverviewPoint(raw: unknown): MapOverviewPoint {
   const obj = (raw || {}) as Record<string, unknown>
+  const countCar = Number(pick(obj, 'count_car', 'countCar', 0))
+  const countMotor = Number(pick(obj, 'count_motor', 'countMotor', 0))
+  const countPerson = Number(pick(obj, 'count_person', 'countPerson', 0))
+  const online = Boolean(obj.online)
   return {
     camera_id: Number(pick(obj, 'camera_id', 'cameraId', 0)),
     name: String(obj.name || ''),
@@ -218,12 +268,18 @@ export function normalizeMapOverviewPoint(raw: unknown): MapOverviewPoint {
     edge_node_id: String(pick(obj, 'edge_node_id', 'edgeNodeId', '')),
     latitude: Number(obj.latitude || 0),
     longitude: Number(obj.longitude || 0),
-    online: Boolean(obj.online),
-    density_status: String(pick(obj, 'density_status', 'densityStatus', 'unknown')),
+    online,
+    density_status: normalizeDensityStatus(
+      pick(obj, 'density_status', 'densityStatus', ''),
+      online,
+      countCar,
+      countMotor,
+      countPerson,
+    ),
     congestion_index: Number(pick(obj, 'congestion_index', 'congestionIndex', 0)),
-    count_car: Number(pick(obj, 'count_car', 'countCar', 0)),
-    count_motor: Number(pick(obj, 'count_motor', 'countMotor', 0)),
-    count_person: Number(pick(obj, 'count_person', 'countPerson', 0)),
+    count_car: countCar,
+    count_motor: countMotor,
+    count_person: countPerson,
     speed_car: Number(pick(obj, 'speed_car', 'speedCar', 0)),
     speed_motor: Number(pick(obj, 'speed_motor', 'speedMotor', 0)),
     snapshot_url: String(
@@ -296,6 +352,10 @@ export type AdminNodeHealth = {
   consecutive_failures: number
   last_error: string | null
   edge_metrics: Record<string, unknown> | null
+  cpu_usage: number | null
+  memory_usage: number | null
+  disk_usage: number | null
+  uptime_seconds: number | null
 }
 
 export function normalizeAdminNodeHealth(raw: unknown): AdminNodeHealth {
@@ -321,6 +381,12 @@ export function normalizeAdminNodeHealth(raw: unknown): AdminNodeHealth {
   const errorStageRaw = pick(obj, 'last_error_stage', 'lastErrorStage', null as unknown)
   const normalizedErrorStage: NodeErrorStage =
     errorStageRaw === 'traffic' || errorStageRaw === 'frame' ? errorStageRaw : null
+  const edgeMetrics =
+    obj.edge_metrics && typeof obj.edge_metrics === 'object'
+      ? (obj.edge_metrics as Record<string, unknown>)
+      : obj.edgeMetrics && typeof obj.edgeMetrics === 'object'
+        ? (obj.edgeMetrics as Record<string, unknown>)
+        : null
 
   return {
     camera_id: Number(pick(obj, 'camera_id', 'cameraId', 0)),
@@ -350,12 +416,34 @@ export function normalizeAdminNodeHealth(raw: unknown): AdminNodeHealth {
       pick(obj, 'last_error', 'lastError', null) == null
         ? null
         : String(pick(obj, 'last_error', 'lastError', '')),
-    edge_metrics:
-      obj.edge_metrics && typeof obj.edge_metrics === 'object'
-        ? (obj.edge_metrics as Record<string, unknown>)
-        : obj.edgeMetrics && typeof obj.edgeMetrics === 'object'
-          ? (obj.edgeMetrics as Record<string, unknown>)
-          : null,
+    edge_metrics: edgeMetrics,
+    cpu_usage: parseOptionalNumber(
+      pick(obj, 'cpu_usage', 'cpuUsage', edgeMetrics?.cpu_percent ?? edgeMetrics?.cpu_usage ?? null),
+    ),
+    memory_usage: parseOptionalNumber(
+      pick(
+        obj,
+        'memory_usage',
+        'memoryUsage',
+        edgeMetrics?.memory_percent ?? edgeMetrics?.memory_usage ?? null,
+      ),
+    ),
+    disk_usage: parseOptionalNumber(
+      pick(
+        obj,
+        'disk_usage',
+        'diskUsage',
+        edgeMetrics?.disk_percent ?? edgeMetrics?.disk_usage ?? null,
+      ),
+    ),
+    uptime_seconds: parseOptionalNumber(
+      pick(
+        obj,
+        'uptime_seconds',
+        'uptimeSeconds',
+        edgeMetrics?.uptime_s ?? edgeMetrics?.uptime_seconds ?? null,
+      ),
+    ),
   }
 }
 

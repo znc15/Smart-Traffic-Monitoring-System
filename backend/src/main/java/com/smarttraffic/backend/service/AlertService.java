@@ -4,20 +4,26 @@ import com.smarttraffic.backend.model.AlertEntity;
 import com.smarttraffic.backend.model.SiteSettingsEntity;
 import com.smarttraffic.backend.repository.AlertRepository;
 import com.smarttraffic.backend.repository.SiteSettingsRepository;
+import com.smarttraffic.backend.websocket.AlertWebSocketHandler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class AlertService {
 
     private final AlertRepository alertRepository;
     private final SiteSettingsRepository siteSettingsRepository;
+    private final AlertWebSocketHandler alertWebSocketHandler;
 
-    public AlertService(AlertRepository alertRepository, SiteSettingsRepository siteSettingsRepository) {
+    public AlertService(AlertRepository alertRepository,
+                        SiteSettingsRepository siteSettingsRepository,
+                        AlertWebSocketHandler alertWebSocketHandler) {
         this.alertRepository = alertRepository;
         this.siteSettingsRepository = siteSettingsRepository;
+        this.alertWebSocketHandler = alertWebSocketHandler;
     }
 
     public List<AlertEntity> getAllAlerts() {
@@ -31,16 +37,24 @@ public class AlertService {
     @Transactional
     public AlertEntity createAlert(String type, String level, String roadName, String nodeId, String message) {
         // Only create if there's no undisposed alert of the same type for the same road
-        return alertRepository.findTopByTypeAndRoadNameAndStatusNotOrderByCreatedAtDesc(type, roadName, "DISPOSED")
-                .orElseGet(() -> {
-                    AlertEntity alert = new AlertEntity();
-                    alert.setType(type);
-                    alert.setLevel(level);
-                    alert.setRoadName(roadName);
-                    alert.setNodeId(nodeId);
-                    alert.setMessage(message);
-                    return alertRepository.save(alert);
-                });
+        Optional<AlertEntity> existing = alertRepository.findTopByTypeAndRoadNameAndStatusNotOrderByCreatedAtDesc(
+                type,
+                roadName,
+                "DISPOSED"
+        );
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        AlertEntity alert = new AlertEntity();
+        alert.setType(type);
+        alert.setLevel(level);
+        alert.setRoadName(roadName);
+        alert.setNodeId(nodeId);
+        alert.setMessage(message);
+        AlertEntity saved = alertRepository.save(alert);
+        alertWebSocketHandler.broadcast(saved);
+        return saved;
     }
 
     @Transactional

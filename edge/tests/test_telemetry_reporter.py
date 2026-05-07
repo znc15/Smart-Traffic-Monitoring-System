@@ -44,3 +44,40 @@ def test_post_once_sends_edge_headers(monkeypatch):
         config.BACKEND_TELEMETRY_URL = old_url
         config.EDGE_NODE_ID = old_node_id
         config.EDGE_API_KEY = old_key
+
+
+def test_build_payload_includes_memory_and_uptime_metrics(monkeypatch):
+    monkeypatch.setattr(
+        telemetry_reporter.state,
+        "get_traffic",
+        lambda: {
+            "count_car": 4,
+            "count_motor": 2,
+            "count_person": 1,
+            "speed_car": 28.0,
+            "speed_motor": 16.0,
+            "lane_stats": [],
+            "events": [],
+        },
+    )
+    monkeypatch.setattr(
+        telemetry_reporter.state,
+        "get_edge_metrics",
+        lambda: {
+            "fps": 24.0,
+            "inference_ms": 42.5,
+            "cpu_percent": 61.3,
+            "memory_percent": 47.8,
+            "uptime_s": 5400.0,
+        },
+    )
+
+    payload = telemetry_reporter._build_payload()
+
+    assert payload["edge_metrics"] == {
+        "fps": 24.0,
+        "inference_ms": 42.5,
+        "cpu_percent": 61.3,
+        "memory_percent": 47.8,
+        "uptime_s": 5400.0,
+    }

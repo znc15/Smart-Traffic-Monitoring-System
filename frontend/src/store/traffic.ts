@@ -14,6 +14,7 @@ type State = {
 
 const MAX_HISTORY = 120
 const MAX_RECONNECT = 10
+const HTTP_FALLBACK_INTERVAL_MS = 3000
 
 const state = reactive<State>({
   roads: [],
@@ -26,6 +27,7 @@ const state = reactive<State>({
 const sockets: Record<string, WebSocket> = {}
 const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const reconnectCounts = new Map<string, number>()
+let httpFallbackTimer: ReturnType<typeof setInterval> | null = null
 
 function pushHistory() {
   const point: HistoricalPoint = {
@@ -36,6 +38,41 @@ function pushHistory() {
     point[`${road}_total`] = (data?.count_car || 0) + (data?.count_motor || 0)
   })
   state.historicalData = [...state.historicalData, point].slice(-MAX_HISTORY)
+}
+
+async function fetchRoadInfo(road: string): Promise<boolean> {
+  const res = await fetch(endpoints.info(road), { credentials: 'include' })
+  if (!res.ok) {
+    return false
+  }
+
+  const payload = await res.json()
+  state.trafficData[road] = normalizeTrafficInfo(payload)
+  return true
+}
+
+async function refreshRoadInfos(roads: string[], recordHistory = true): Promise<void> {
+  const results = await Promise.allSettled(roads.map((road) => fetchRoadInfo(road)))
+  const updated = results.some((result) => result.status === 'fulfilled' && result.value)
+  if (updated && recordHistory) {
+    pushHistory()
+  }
+}
+
+function roadsNeedingHttpFallback(): string[] {
+  return state.roads.filter((road) => !state.connections[road] || !state.trafficData[road])
+}
+
+function startHttpFallbackPoll() {
+  if (httpFallbackTimer !== null) return
+
+  httpFallbackTimer = setInterval(() => {
+    const roads = roadsNeedingHttpFallback()
+    if (roads.length === 0) return
+    refreshRoadInfos(roads).catch(() => {
+      // Keep the WebSocket reconnect loop responsible for surfacing connection state.
+    })
+  }, HTTP_FALLBACK_INTERVAL_MS)
 }
 
 function connectRoad(road: string) {
@@ -51,6 +88,10 @@ function connectRoad(road: string) {
   ws.onclose = () => {
     state.connections[road] = false
     if (!state.initialized) return
+
+    fetchRoadInfo(road).catch(() => {
+      // HTTP fallback is best-effort; reconnect continues below.
+    })
 
     const attempts = reconnectCounts.get(road) ?? 0
     if (attempts >= MAX_RECONNECT) {
@@ -68,6 +109,9 @@ function connectRoad(road: string) {
 
   ws.onerror = () => {
     state.connections[road] = false
+    fetchRoadInfo(road).catch(() => {
+      // HTTP fallback is best-effort.
+    })
   }
 
   ws.onmessage = (ev) => {
@@ -95,6 +139,8 @@ export async function initializeTrafficStore() {
   const roads = Array.isArray(body?.road_names) ? body.road_names : []
   state.roads = roads
   roads.forEach((road: string) => connectRoad(road))
+  await refreshRoadInfos(roads, false)
+  startHttpFallbackPoll()
   state.initialized = true
 }
 
@@ -136,6 +182,8 @@ export async function refreshRoads(): Promise<string[]> {
 
   state.roads = freshRoads
   newRoads.forEach((road) => connectRoad(road))
+  await refreshRoadInfos(freshRoads, false)
+  startHttpFallbackPoll()
 
   return freshRoads
 }
@@ -146,6 +194,10 @@ export function closeTrafficStore() {
   for (const timer of reconnectTimers.values()) clearTimeout(timer)
   reconnectTimers.clear()
   reconnectCounts.clear()
+  if (httpFallbackTimer !== null) {
+    clearInterval(httpFallbackTimer)
+    httpFallbackTimer = null
+  }
 
   Object.values(sockets).forEach((ws) => {
     try {

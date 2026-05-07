@@ -80,6 +80,8 @@ def _build_payload() -> dict:
             "fps": metrics.get("fps"),
             "inference_ms": metrics.get("inference_ms"),
             "cpu_percent": metrics.get("cpu_percent"),
+            "memory_percent": metrics.get("memory_percent"),
+            "uptime_s": metrics.get("uptime_s"),
         },
     }
 

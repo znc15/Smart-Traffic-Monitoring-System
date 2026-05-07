@@ -1,8 +1,8 @@
 # 生产部署指南
 
 这份文档聚焦两件事：
-- 让当前仓库的主站 Docker 一键启动方式讲清楚
-- 把前后端 IP / 地址统一收口到根 `.env`
+- 让当前仓库的 Docker 一键启动方式讲清楚
+- 把前后端 IP / 地址与 edge 运行变量统一收口到根 `.env`
 
 ## 1. 推荐拓扑
 
@@ -24,14 +24,15 @@ edge    -> backend (/api/v1/edge/telemetry)
 
 说明：
 - 根 `docker-compose.yml` 目前把 `backend:8000` 暴露到宿主机，便于演示和联调。
+- 根 `docker-compose.yml` 目前把 `edge-node:8000` 映射到宿主机 `9000`，避免和 backend 冲突。
 - 正式生产建议把 backend 只留在内网，或者至少限制为 `127.0.0.1` / 私网访问。
-- 根 Compose 的一键启动范围只包含主站，不包含 edge。
+- edge 如果部署在独立边缘设备，仍可继续使用 `edge/docker-compose.yml`。
 
 ## 2. 配置入口总览
 
 | 文件 | 用途 |
 |------|------|
-| 根 `.env` | 主站 Docker 一键启动主配置，含前后端 IP / 地址 |
+| 根 `.env` | Docker 一键启动主配置，含前后端 IP / 地址与 edge 运行变量 |
 | `frontend/.env.production` | frontend 可选覆盖文件，单独构建时使用 |
 | `docker-compose.override.yml` | 高级覆盖手段，不是常见生产变量必需项 |
 | `backend/.env.example` | backend 完整配置参考 |
@@ -114,7 +115,7 @@ BACKEND_PUBLIC_WS_BASE=ws://192.168.1.11:8000
 ## 6. 构建与启动
 
 ```bash
-docker compose build frontend gateway backend
+docker compose build frontend gateway backend edge-node
 docker compose up -d
 docker compose ps
 ```
@@ -133,13 +134,14 @@ curl -I http://127.0.0.1:5173/
 curl -I http://127.0.0.1:5173/react/
 curl http://127.0.0.1:8000/api/v1/site-settings
 curl http://127.0.0.1:8000/api/v1/roads_name
+curl http://127.0.0.1:9000/health
 docker compose ps
 ```
 
 预期：
 - `/` 返回 `200`
 - `/react/` 返回 `404`
-- `backend`、`frontend`、`gateway`、`database`、`mysql`、`redis` 都处于 `healthy`
+- `backend`、`edge-node`、`frontend`、`gateway`、`database`、`mysql`、`redis` 都处于 `healthy`
 
 说明：
 - `frontend` / `gateway` 的 healthcheck 只检查 Nginx 进程存在，不代表 upstream 一定可用
@@ -190,30 +192,34 @@ docker compose up -d backend
 
 ## 9. Edge 生产配置建议
 
-edge 不在主站一键启动范围内，通常独立部署在边缘设备上。
+edge-node 已接入根 Compose。单机部署可直接在根 `.env` 中配置；如果 edge 部署在独立边缘设备上，则继续使用 `edge/docker-compose.yml` 与 `edge/.env.example`。
 
 推荐最小配置：
 
 ```env
-MODE=camera
-CAMERA_URL=rtsp://user:pass@camera/stream
-ROAD_NAME=人民路
+EDGE_MODE=camera
+EDGE_CAMERA_URL=rtsp://user:pass@camera/stream
+EDGE_ROAD_NAME=人民路
 EDGE_NODE_ID=edge-01
 EDGE_API_KEY=replace-me
-BACKEND_TELEMETRY_URL=http://192.168.1.11:8000/api/v1/edge/telemetry
-NO_BROWSER=true
+EDGE_BACKEND_TELEMETRY_URL=http://backend:8000/api/v1/edge/telemetry
+EDGE_NO_BROWSER=true
 ```
 
 弱 CPU 工业机可考虑：
 
 ```env
-IMGSZ=160
-FRAME_SKIP=4
-QUANTIZE=int8
-OPENVINO=true
-MAX_MJPEG_CLIENTS=1
-UVICORN_WORKERS=1
+EDGE_IMGSZ=160
+EDGE_FRAME_SKIP=4
+EDGE_QUANTIZE=int8
+EDGE_OPENVINO=true
+EDGE_MAX_MJPEG_CLIENTS=1
+EDGE_UVICORN_WORKERS=1
 ```
+
+说明：
+- backend 容器访问根 Compose 内的 edge 可使用 `http://edge-node:8000`
+- 主动遥测鉴权会校验后台摄像头配置中的 `edge_node_id` 和 `node_api_key`，需要与 `EDGE_NODE_ID / EDGE_API_KEY` 一致
 
 ## 10. 备份与恢复
 

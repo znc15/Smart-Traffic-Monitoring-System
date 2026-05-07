@@ -6,6 +6,7 @@ import com.smarttraffic.backend.model.TrafficEventEntity;
 import com.smarttraffic.backend.model.TrafficSampleEntity;
 import com.smarttraffic.backend.repository.TrafficEventRepository;
 import com.smarttraffic.backend.repository.TrafficSampleRepository;
+import com.smarttraffic.backend.service.CameraPollerService;
 import com.smarttraffic.backend.service.TrafficService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -32,8 +33,8 @@ class TelemetryIngestionServiceTest {
         TrafficSampleRepository sampleRepository = mock(TrafficSampleRepository.class);
         TrafficEventRepository eventRepository = mock(TrafficEventRepository.class);
         TrafficService trafficService = mock(TrafficService.class);
-        MirrorWriteService mirrorWriteService = mock(MirrorWriteService.class);
         RedisCacheService redisCacheService = mock(RedisCacheService.class);
+        CameraPollerService cameraPollerService = mock(CameraPollerService.class);
 
         when(sampleRepository.save(any(TrafficSampleEntity.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -45,9 +46,9 @@ class TelemetryIngestionServiceTest {
                 eventRepository,
                 trafficService,
                 new ObjectMapper(),
-                mirrorWriteService,
                 redisCacheService,
-                null // AlertService
+                null, // AlertService
+                cameraPollerService
         );
 
         LocalDateTime now = LocalDateTime.of(2026, 3, 11, 10, 30, 0);
@@ -62,6 +63,11 @@ class TelemetryIngestionServiceTest {
         request.setAvgSpeedMotor(50.0);
         request.setDensityStatus("INVALID");
         request.setSpeedStatus("");
+        EdgeTelemetryRequest.EdgeMetrics edgeMetrics = new EdgeTelemetryRequest.EdgeMetrics();
+        edgeMetrics.setCpuPercent(61.2);
+        edgeMetrics.setMemoryPercent(44.8);
+        edgeMetrics.setUptimeSeconds(3600.0);
+        request.setEdgeMetrics(edgeMetrics);
 
         EdgeTelemetryRequest.LaneStat laneStat = new EdgeTelemetryRequest.LaneStat();
         laneStat.setLaneId("L1");
@@ -108,9 +114,21 @@ class TelemetryIngestionServiceTest {
         assertEquals(20, snapshot.get("count_person"));
         assertEquals("congested", snapshot.get("density_status"));
         assertEquals("slow", snapshot.get("speed_status"));
+        assertEquals(Map.of(
+                "cpu_percent", 61.2,
+                "memory_percent", 44.8,
+                "uptime_s", 3600.0
+        ), snapshot.get("edge_metrics"));
+        verify(cameraPollerService).updateNodeMetricsFromTelemetry(
+                eq("主干道A"),
+                eq("edge-01"),
+                eq(Map.of(
+                        "cpu_percent", 61.2,
+                        "memory_percent", 44.8,
+                        "uptime_s", 3600.0
+                ))
+        );
 
-        verify(mirrorWriteService).mirrorTrafficSample(any(TrafficSampleEntity.class));
-        verify(mirrorWriteService).mirrorTrafficEvent(any(TrafficEventEntity.class));
         verify(redisCacheService).evict("traffic:roads");
         verify(redisCacheService).evict("traffic:info:主干道A");
         verify(redisCacheService).evictByPrefix("traffic:pred:主干道A:");
@@ -122,8 +140,8 @@ class TelemetryIngestionServiceTest {
         TrafficSampleRepository sampleRepository = mock(TrafficSampleRepository.class);
         TrafficEventRepository eventRepository = mock(TrafficEventRepository.class);
         TrafficService trafficService = mock(TrafficService.class);
-        MirrorWriteService mirrorWriteService = mock(MirrorWriteService.class);
         RedisCacheService redisCacheService = mock(RedisCacheService.class);
+        CameraPollerService cameraPollerService = mock(CameraPollerService.class);
 
         when(sampleRepository.save(any(TrafficSampleEntity.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -133,9 +151,9 @@ class TelemetryIngestionServiceTest {
                 eventRepository,
                 trafficService,
                 new ObjectMapper(),
-                mirrorWriteService,
                 redisCacheService,
-                null // AlertService
+                null, // AlertService
+                cameraPollerService
         );
 
         EdgeTelemetryRequest request = new EdgeTelemetryRequest();
@@ -147,7 +165,7 @@ class TelemetryIngestionServiceTest {
 
         verify(sampleRepository).save(any(TrafficSampleEntity.class));
         verify(eventRepository, never()).save(any(TrafficEventEntity.class));
-        verify(mirrorWriteService, never()).mirrorTrafficEvent(any(TrafficEventEntity.class));
         verify(trafficService).updateFromRemote(eq("次干道B"), anyMap(), isNull());
+        verify(cameraPollerService, never()).updateNodeMetricsFromTelemetry(any(), any(), anyMap());
     }
 }

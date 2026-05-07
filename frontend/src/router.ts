@@ -25,8 +25,8 @@ const router = createRouter({
   routes: [
     { path: '/', component: HomeView, meta: { title: '首页', noLayout: true } },
     { path: '/login', component: LoginView, meta: { title: '登录', noLayout: true } },
-    { path: '/dashboard', component: DashboardView, meta: { ...authOnly, title: '交通态势概览' } },
-    { path: '/cameras', component: CamerasView, meta: { ...authOnly, title: '实时视频监测' } },
+    { path: '/dashboard', component: DashboardView, meta: { ...authOnly, title: '实时监控跟踪' } },
+    { path: '/cameras', component: CamerasView, meta: { ...authOnly, title: '节点配置管理' } },
     { path: '/monitoring', component: MonitoringView, meta: { ...authOnly, title: '节点监控汇聚' } },
     { path: '/map', component: MapView, meta: { ...authOnly, title: '实时状态推送' } },
     { path: '/analytics', component: AnalyticsView, meta: { ...authOnly, title: '历史数据统计' } },

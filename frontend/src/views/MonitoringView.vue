@@ -39,7 +39,7 @@
                 <TableCell class="font-medium">{{ node.name || '-' }}</TableCell>
                 <TableCell>{{ node.road_name }}</TableCell>
                 <TableCell class="max-w-[200px] truncate" :title="node.node_url || '-'">{{ node.node_url || '-' }}</TableCell>
-                <TableCell>{{ typeof node.latency_ms === 'number' ? node.latency_ms + ' ms' : '-' }}</TableCell>
+                <TableCell>{{ formatLatency(node) }}</TableCell>
                 <TableCell>
                   <span :class="metricColor(node.cpu_usage)">{{ formatMetric(node.cpu_usage) }}</span>
                 </TableCell>
@@ -69,11 +69,11 @@
                       <p>原因码: {{ node.status_reason_code || '-' }}</p>
                       <p>原因描述: {{ node.status_reason_message || '-' }}</p>
                       <p>最后错误阶段: {{ node.last_error_stage || '-' }}</p>
-                      <p class="max-w-[300px] truncate text-destructive" :title="node.last_error">最后错误: {{ node.last_error || '-' }}</p>
+                      <p class="max-w-[300px] truncate text-destructive" :title="node.last_error ?? undefined">最后错误: {{ node.last_error || '-' }}</p>
                     </div>
                     <div class="space-y-1">
                       <p class="text-muted-foreground font-medium">性能指标</p>
-                      <p>延迟: {{ typeof node.latency_ms === 'number' ? node.latency_ms + ' ms' : '-' }}</p>
+                      <p>延迟: {{ formatLatency(node) }}</p>
                       <p>CPU 使用率: <span :class="metricColor(node.cpu_usage)">{{ formatMetric(node.cpu_usage) }}</span></p>
                       <p>内存使用率: <span :class="metricColor(node.memory_usage)">{{ formatMetric(node.memory_usage) }}</span></p>
                       <template v-if="node.disk_usage != null">
@@ -106,15 +106,28 @@ import { ref, onMounted, computed, reactive } from 'vue'
 import { toast } from 'vue-sonner'
 import { RefreshCw, ChevronRight } from 'lucide-vue-next'
 import { authFetch, endpoints } from '../lib/api'
+import { normalizeAdminNodeHealth, type AdminNodeHealth } from '../lib/normalize'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
 
-const nodes = ref<any[]>([])
+type MonitoringNode = AdminNodeHealth & {
+  node_id: string
+  last_heartbeat: string
+}
 
-const nodeSortKey = ref('last_heartbeat')
+type MonitoringSortKey =
+  | 'last_heartbeat'
+  | 'cpu_usage'
+  | 'memory_usage'
+  | 'latency_ms'
+  | 'error_count'
+
+const nodes = ref<MonitoringNode[]>([])
+
+const nodeSortKey = ref<MonitoringSortKey>('last_heartbeat')
 const nodeSortOptions = [
   { label: '心跳时间', value: 'last_heartbeat' },
   { label: 'CPU使用率', value: 'cpu_usage' },
@@ -136,6 +149,11 @@ function toggleNodeExpand(roadName: string) {
 function formatMetric(val: number | null | undefined): string {
   if (typeof val !== 'number') return '-'
   return val.toFixed(1) + '%'
+}
+
+function formatLatency(node: Pick<MonitoringNode, 'health_status' | 'latency_ms'>): string {
+  if (node.health_status === 'offline' || typeof node.latency_ms !== 'number') return '-'
+  return node.latency_ms + ' ms'
 }
 
 function metricColor(val: number | null | undefined): string {
@@ -166,7 +184,7 @@ const sortedNodes = computed(() => {
     if (nodeSortKey.value === 'last_heartbeat') {
       return new Date(b.last_heartbeat).getTime() - new Date(a.last_heartbeat).getTime()
     }
-    return (b[nodeSortKey.value] || 0) - (a[nodeSortKey.value] || 0)
+    return Number(b[nodeSortKey.value] ?? 0) - Number(a[nodeSortKey.value] ?? 0)
   })
 })
 
@@ -180,14 +198,18 @@ async function loadNodes() {
     if (res.ok) {
       const data = await res.json()
       const rawNodes = data.nodes ? Object.values(data.nodes) : (Array.isArray(data) ? data : [])
-      nodes.value = rawNodes.map((n: any) => ({
-        ...n,
-        node_id: n.edgeNodeId || n.cameraId || n.name || n.roadName || '未知',
-        last_heartbeat: n.lastPollTime || n.lastSuccessTime || new Date().toISOString(),
-        cpu_usage: n.edgeMetrics?.cpu_usage ?? null,
-        memory_usage: n.edgeMetrics?.memory_usage ?? null,
-      }))
+      nodes.value = rawNodes.map((raw): MonitoringNode => {
+        const node = normalizeAdminNodeHealth(raw)
+        return {
+          ...node,
+          node_id: node.edge_node_id || String(node.camera_id || '') || node.name || node.road_name || '未知',
+          last_heartbeat: node.last_poll_time || node.last_success_time || new Date().toISOString(),
+        }
+      })
     }
-  } catch {}
+  } catch (error) {
+    console.error('加载节点监控失败', error)
+    toast.error('加载节点监控失败')
+  }
 }
 </script>

@@ -241,6 +241,8 @@ public class EdgeTelemetryRequest {
         private Double fps;
         private Double inferenceMs;
         private Double cpuPercent;
+        private Double memoryPercent;
+        private Double uptimeSeconds;
 
         public Double getFps() {
             return fps;
@@ -264,6 +266,22 @@ public class EdgeTelemetryRequest {
 
         public void setCpuPercent(Double cpuPercent) {
             this.cpuPercent = cpuPercent;
+        }
+
+        public Double getMemoryPercent() {
+            return memoryPercent;
+        }
+
+        public void setMemoryPercent(Double memoryPercent) {
+            this.memoryPercent = memoryPercent;
+        }
+
+        public Double getUptimeSeconds() {
+            return uptimeSeconds;
+        }
+
+        public void setUptimeSeconds(Double uptimeSeconds) {
+            this.uptimeSeconds = uptimeSeconds;
         }
     }
 }

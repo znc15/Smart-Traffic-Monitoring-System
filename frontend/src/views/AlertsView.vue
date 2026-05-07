@@ -123,7 +123,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { toast } from 'vue-sonner'
 import { RefreshCw } from 'lucide-vue-next'
 import { Card, CardContent } from '@/components/ui/card'
@@ -133,7 +133,8 @@ import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { authFetch, endpoints } from '@/lib/api'
+import { authFetch, endpoints, getWsUrl } from '@/lib/api'
+import { connectAlertsWs } from '@/lib/alerts-ws'
 
 interface Alert {
   id: string
@@ -150,12 +151,16 @@ interface BackendAlert {
   id: number
   type: string
   level: string
-  roadName: string
-  nodeId: string | null
+  roadName?: string
+  road_name?: string
+  nodeId?: string | null
+  node_id?: string | null
   message: string
   status: string
-  createdAt: string
-  updatedAt: string | null
+  createdAt?: string
+  created_at?: string
+  updatedAt?: string | null
+  updated_at?: string | null
 }
 
 const LEVEL_MAP: Record<string, '严重' | '警告' | '信息'> = {
@@ -170,6 +175,7 @@ const alertLevelFilter = ref<string>('all')
 const nodeFilter = ref<string>('all')
 const showDetailDialog = ref(false)
 const selectedAlert = ref<Alert | null>(null)
+let alertsWsClient: ReturnType<typeof connectAlertsWs> | null = null
 
 const alertLevelOptions = [
   { label: '全部级别', value: 'all' },
@@ -195,11 +201,13 @@ const filteredAlerts = computed(() => {
 })
 
 function mapAlert(raw: BackendAlert): Alert {
+  const createdAt = raw.createdAt ?? raw.created_at ?? ''
+  const roadName = raw.roadName ?? raw.road_name ?? ''
   return {
     id: String(raw.id),
-    timestamp: raw.createdAt,
+    timestamp: createdAt,
     level: LEVEL_MAP[raw.level] ?? '信息',
-    nodeName: raw.roadName || '-',
+    nodeName: roadName || '-',
     type: raw.type,
     description: raw.message,
     acknowledged: raw.status !== 'UNCONFIRMED',
@@ -207,7 +215,11 @@ function mapAlert(raw: BackendAlert): Alert {
 }
 
 function formatTime(timestamp: string): string {
-  return new Date(timestamp).toLocaleString('zh-CN')
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) {
+    return timestamp || '—'
+  }
+  return date.toLocaleString('zh-CN')
 }
 
 function getLevelVariant(level: string): 'default' | 'secondary' | 'destructive' {
@@ -218,18 +230,33 @@ function getLevelVariant(level: string): 'default' | 'secondary' | 'destructive'
   }
 }
 
-async function loadAlerts() {
+async function loadAlerts(showToast = true) {
   loading.value = true
   try {
     const res = await authFetch(endpoints.alerts)
     if (!res.ok) throw new Error('加载失败')
     const data: BackendAlert[] = await res.json()
     alerts.value = data.map(mapAlert)
-    toast.success('告警数据已刷新')
+    if (showToast) {
+      toast.success('告警数据已刷新')
+    }
   } catch {
     toast.error('加载告警数据失败')
   } finally {
     loading.value = false
+  }
+}
+
+function handleIncomingAlert(payload: unknown) {
+  const raw = payload as Partial<BackendAlert>
+  if (typeof raw?.id !== 'number') return
+  const mapped = mapAlert(raw as BackendAlert)
+  const idx = alerts.value.findIndex((item) => item.id === String(raw.id))
+  if (idx >= 0) {
+    alerts.value[idx] = mapped
+  } else {
+    alerts.value = [mapped, ...alerts.value]
+    toast.warning('收到新告警')
   }
 }
 
@@ -276,6 +303,15 @@ function viewAlertDetail(alert: Alert) {
 }
 
 onMounted(() => {
-  loadAlerts()
+  loadAlerts(false)
+  alertsWsClient = connectAlertsWs({
+    url: getWsUrl(endpoints.alertsWs),
+    onAlert: handleIncomingAlert,
+  })
+})
+
+onUnmounted(() => {
+  alertsWsClient?.close()
+  alertsWsClient = null
 })
 </script>

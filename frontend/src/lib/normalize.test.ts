@@ -33,6 +33,25 @@ describe('lib/normalize', () => {
     })
   })
 
+  it('should derive density status from counts and force offline status when needed', () => {
+    expect(
+      normalizeTrafficInfo({
+        count_car: 10,
+        count_motor: 0,
+        count_person: 0,
+        online: true,
+      }).density_status,
+    ).toBe('busy')
+
+    expect(
+      normalizeTrafficInfo({
+        count_car: 20,
+        density_status: 'busy',
+        online: false,
+      }).density_status,
+    ).toBe('offline')
+  })
+
   it('should normalize map overview points from mixed snake_case and camelCase payloads', () => {
     const point = normalizeMapOverviewPoint({
       cameraId: 7,
@@ -62,6 +81,16 @@ describe('lib/normalize', () => {
     expect(point.count_motor).toBe(3)
     expect(point.snapshot_url).toBe('/api/v1/frames_no_auth/人民路')
     expect(point.density_status).toBe('congested')
+  })
+
+  it('should show offline map overview points as offline even without density payload', () => {
+    const point = normalizeMapOverviewPoint({
+      road_name: '离线路段',
+      online: false,
+      count_car: 12,
+    })
+
+    expect(point.density_status).toBe('offline')
   })
 
   it('should normalize node runtime config arrays and numeric fields', () => {
@@ -145,7 +174,28 @@ describe('lib/normalize', () => {
       consecutive_failures: 2,
       last_error: 'Read timed out',
       edge_metrics: { fps: 24.5 },
+      cpu_usage: null,
+      memory_usage: null,
+      disk_usage: null,
+      uptime_seconds: null,
     })
+  })
+
+  it('should derive monitoring metrics from edge_metrics payloads', () => {
+    const node = normalizeAdminNodeHealth({
+      road_name: '中山路',
+      edge_metrics: {
+        cpu_percent: '62.4',
+        memory_percent: 48.5,
+        disk_percent: 71.2,
+        uptime_s: '7200',
+      },
+    })
+
+    expect(node.cpu_usage).toBe(62.4)
+    expect(node.memory_usage).toBe(48.5)
+    expect(node.disk_usage).toBe(71.2)
+    expect(node.uptime_seconds).toBe(7200)
   })
 
   it('should parse traffic event payload_json for node health transitions', () => {

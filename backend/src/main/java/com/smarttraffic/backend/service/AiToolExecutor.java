@@ -46,6 +46,9 @@ public class AiToolExecutor {
      */
     public Map<String, Object> execute(String toolName, String argumentsJson) {
         try {
+            if (argumentsJson == null || argumentsJson.isBlank()) {
+                return errorResult("工具 '" + toolName + "' 缺少参数。请确保传入完整的 JSON 参数。");
+            }
             @SuppressWarnings("unchecked")
             Map<String, Object> args = objectMapper.readValue(argumentsJson, Map.class);
             return switch (toolName) {
@@ -75,11 +78,18 @@ public class AiToolExecutor {
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("success", true);
             result.put("road_name", roadName);
+
+            Boolean online = (Boolean) info.get("online");
+            if (online != null && !online) {
+                result.put("notice", "该道路的边缘节点当前离线，暂无实时数据。请向用户说明实情，并提议查询历史数据。");
+            }
+
             result.put("data", info);
             return result;
         } catch (Exception e) {
-            return errorResult("道路 '" + roadName + "' 不在监控范围内。可用道路: " + 
-                    String.join("、", trafficService.roadNames()));
+            List<String> roads = trafficService.roadNames();
+            String hint = roads.isEmpty() ? "当前无可用道路" : "可用道路: " + String.join("、", roads);
+            return errorResult("道路 '" + roadName + "' 查询失败（" + e.getMessage() + "）。" + hint);
         }
     }
 
@@ -129,7 +139,7 @@ public class AiToolExecutor {
                 .findByRoadNameAndSampleTimeBetweenOrderBySampleTimeAsc(roadName, from, to);
 
         if (samples.isEmpty()) {
-            return errorResult("道路 '" + roadName + "' 没有历史数据");
+            return errorResult("道路 '" + roadName + "' 在最近 " + hours + " 小时内没有历史采样数据，可能是该道路为新接入或长期无数据上报。");
         }
 
         List<Map<String, Object>> historyList = new ArrayList<>();

@@ -155,7 +155,11 @@ def test_protected_routes_allow_access_without_key_when_not_configured():
     config.EDGE_API_KEY = ""
 
     try:
-        assert client.get("/api/traffic").status_code == 200
+        traffic_response = client.get("/api/traffic")
+        assert traffic_response.status_code == 200
+        assert traffic_response.json()["density_status"] == "clear"
+        assert traffic_response.json()["speed_status"] == "slow"
+        assert "congestion_index" in traffic_response.json()
         assert client.get("/api/metrics").status_code == 200
         assert client.get("/api/config").status_code == 200
     finally:
